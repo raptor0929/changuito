@@ -1,0 +1,16 @@
+{
+  "name": "changuito",
+  "private": true,
+  "version": "0.1.0",
+  "description": "An agent that shops Argentine supermarkets over MCP and settles in USDC on Stellar.",
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": { "node": ">=22.12" },
+  "scripts": {
+    "dev": "npm run dev -w @changuito/web",
+    "build": "npm run build -w @changuito/mcp && npm run build -w @changuito/web",
+    "start": "npm run start -w @changuito/web",
+    "test": "npm test -w @changuito/mcp",
+    "contracts:build": "stellar contract build --manifest-path contracts/Cargo.toml",
+    "contracts:test": "cargo test --manifest-path contracts/Cargo.toml"
+  }
+}

@@ -1,0 +1,22 @@
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Rust / Soroban
+target/
+**/*.rs.bk
+
+# Secrets. The treasury key signs mints and settlements; it never lands in git.
+.env
+.env*.local
+.secrets/
+*.keystore.json
+
+# Generated at deploy time, recorded in deployments.json instead
+.stellar/
+
+.DS_Store
+*.log
+.vercel

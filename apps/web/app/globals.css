@@ -1,0 +1,48 @@
+:root {
+  /* Argentine flag blue, warmed slightly so it survives a dark background. */
+  --brand: #4fa3e3;
+  --brand-ink: #0b3d66;
+  --bg: #ffffff;
+  --surface: #f6f7f9;
+  --border: #e3e6ea;
+  --text: #16191d;
+  --muted: #646b75;
+  --ok: #1a7f4b;
+  --warn: #9a6100;
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0e1013;
+    --surface: #171a1f;
+    --border: #272c33;
+    --text: #e9ecf1;
+    --muted: #9aa3ae;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #0e1013;
+  --surface: #171a1f;
+  --border: #272c33;
+  --text: #e9ecf1;
+  --muted: #9aa3ae;
+  --ok: #4ade80;
+  --warn: #fbbf24;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--brand); }
