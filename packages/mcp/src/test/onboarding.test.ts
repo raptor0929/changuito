@@ -137,14 +137,18 @@ describe('SERVER_INSTRUCTIONS', () => {
 });
 
 describe('RULE: the server tells the client how to use it', () => {
-  it('index.ts declares instructions and a version matching package.json', async () => {
-    const src = await readFile(new URL('../../src/index.ts', import.meta.url), 'utf8');
+  it('server.ts declares instructions and a version matching package.json', async () => {
+    const src = await readFile(new URL('../../src/server.ts', import.meta.url), 'utf8');
     assert.match(src, /instructions:\s*SERVER_INSTRUCTIONS/, 'the MCP instructions slot is empty');
 
     const pkg = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8'));
-    assert.ok(
-      src.includes(`version: '${pkg.version}'`),
-      `index.ts reports a different version than package.json (${pkg.version})`,
+    // Tolerates the factory's override default (`version: opts.version ?? 'x'`).
+    // A host may rename the server; the version it falls back to is still ours.
+    const declared = new RegExp(`version:[^,\\n]*'${pkg.version.replace(/\./g, '\\.')}'`);
+    assert.match(
+      src,
+      declared,
+      `server.ts reports a different version than package.json (${pkg.version})`,
     );
   });
 
