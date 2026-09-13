@@ -12,7 +12,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { getAdapter, listRetailers, RETAILER_IDS, UNSUPPORTED } from './adapters/registry.js';
-import { ensureCart, getLocation, rememberCart, requireLocation, setLocation } from './session.js';
+import { defaultSession, type SessionState } from './session.js';
 import { SERVER_INSTRUCTIONS } from './onboarding.js';
 import type { Cart, Product } from './types.js';
 
@@ -55,8 +55,17 @@ function renderCart(cart: Cart, handoff?: string): string {
 
 // ---------------------------------------------------------------- tools
 
-/** Everything here is read-only: it never touches an account and never spends. */
-export function registerCatalogTools(server: McpServer): void {
+/**
+ * Everything here is read-only: it never touches an account and never spends.
+ *
+ * `session` is a parameter rather than a module import so one process can host
+ * several shoppers at once. The default keeps the stdio binary's behaviour,
+ * where one process is one user and sharing is not a concern.
+ */
+export function registerCatalogTools(
+  server: McpServer,
+  session: SessionState = defaultSession,
+): void {
   server.registerTool(
     'list_retailers',
     {
@@ -89,7 +98,7 @@ export function registerCatalogTools(server: McpServer): void {
     async ({ retailer, postal_code }) => {
       try {
         const ctx = await getAdapter(retailer).resolveLocation(postal_code);
-        setLocation(ctx);
+        session.setLocation(ctx);
         const out = [
           `Location set: ${retailer}, postal code ${postal_code}, sales channel ${ctx.salesChannel}.`,
         ];
@@ -120,7 +129,7 @@ export function registerCatalogTools(server: McpServer): void {
     },
     async ({ query, limit, offset, sort, include_unavailable }) => {
       try {
-        const ctx = requireLocation();
+        const ctx = session.requireLocation();
         const products = await getAdapter(ctx.retailer).search(query, ctx, {
           limit, offset, sort, onlyAvailable: !include_unavailable,
         });
@@ -140,7 +149,7 @@ export function registerCatalogTools(server: McpServer): void {
     },
     async ({ sku_id }) => {
       try {
-        const ctx = requireLocation();
+        const ctx = session.requireLocation();
         const p = await getAdapter(ctx.retailer).getProduct(sku_id, ctx);
         if (!p) return fail(`SKU ${sku_id} not found at ${ctx.retailer} for postal code ${ctx.postalCode}.`);
         return text(renderProducts([p]));
@@ -171,7 +180,7 @@ export function registerCatalogTools(server: McpServer): void {
     },
     async ({ items }) => {
       try {
-        const ctx = requireLocation();
+        const ctx = session.requireLocation();
         const cart = await getAdapter(ctx.retailer).priceCheck(
           items.map((i) => ({ skuId: i.sku_id, quantity: i.quantity, sellerId: i.seller_id })),
           ctx,
@@ -204,14 +213,14 @@ export function registerCatalogTools(server: McpServer): void {
     },
     async ({ items }) => {
       try {
-        const { cart: current, ctx } = await ensureCart();
+        const { cart: current, ctx } = await session.ensureCart();
         const adapter = getAdapter(ctx.retailer);
         const cart = await adapter.addItems(
           current.cartId,
           items.map((i) => ({ skuId: i.sku_id, quantity: i.quantity, sellerId: i.seller_id })),
           ctx,
         );
-        rememberCart(ctx.retailer, cart.cartId);
+        session.rememberCart(ctx.retailer, cart.cartId);
         return text(renderCart(cart));
       } catch (e) {
         return fail(e instanceof Error ? e.message : String(e));
@@ -231,7 +240,7 @@ export function registerCatalogTools(server: McpServer): void {
     },
     async ({ index, quantity }) => {
       try {
-        const { cart: current, ctx } = await ensureCart();
+        const { cart: current, ctx } = await session.ensureCart();
         const cart = await getAdapter(ctx.retailer).setQuantity(current.cartId, index, quantity, ctx);
         return text(renderCart(cart));
       } catch (e) {
@@ -249,7 +258,7 @@ export function registerCatalogTools(server: McpServer): void {
     },
     async () => {
       try {
-        const { cart } = await ensureCart();
+        const { cart } = await session.ensureCart();
         return text(renderCart(cart));
       } catch (e) {
         return fail(e instanceof Error ? e.message : String(e));
@@ -268,7 +277,7 @@ export function registerCatalogTools(server: McpServer): void {
     },
     async () => {
       try {
-        const { cart, ctx } = await ensureCart();
+        const { cart, ctx } = await session.ensureCart();
         const url = getAdapter(ctx.retailer).handoffUrl(cart.cartId);
         if (!cart.lines.length) return text('Cart is empty — add something before handing it over.');
         return text(renderCart(cart, url));
@@ -286,7 +295,7 @@ export function registerCatalogTools(server: McpServer): void {
       inputSchema: {},
     },
     async () => {
-      const ctx = getLocation();
+      const ctx = session.getLocation();
       if (!ctx) return text('No location set yet. Call set_location first.');
       return text(
         [
@@ -314,6 +323,11 @@ export function registerCatalogTools(server: McpServer): void {
 export interface ServerOptions {
   /** Default true. Set false for read-only hosts (serverless, browsers, CI). */
   checkout?: boolean;
+  /**
+   * State for this shopper. Omit for a process that serves one user; pass
+   * `createSessionState()` per connection for one that serves many.
+   */
+  session?: SessionState;
   name?: string;
   version?: string;
 }
@@ -327,7 +341,7 @@ export async function createSupermercadoServer(opts: ServerOptions = {}): Promis
     { instructions: SERVER_INSTRUCTIONS },
   );
 
-  registerCatalogTools(server);
+  registerCatalogTools(server, opts.session ?? defaultSession);
 
   if (opts.checkout ?? true) {
     const { registerCheckoutTools } = await import('./tools.js');
