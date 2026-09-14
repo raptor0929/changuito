@@ -37,10 +37,21 @@ export async function mcpToolsToAnthropic(client: Client): Promise<Anthropic.Too
  * `is_error` perfectly well: it reads the message and tries a different
  * postal code.
  */
+export interface McpCallResult {
+  /** What goes back to the model. */
+  block: Anthropic.ToolResultBlockParam;
+  /**
+   * What the tool returned structurally, when it declared an output schema.
+   * The model never sees this; the renderer does. Undefined for the tools
+   * whose output is only meant to be read.
+   */
+  structured?: unknown;
+}
+
 export async function callMcpTool(
   client: Client,
   use: { id: string; name: string; input: unknown },
-): Promise<Anthropic.ToolResultBlockParam> {
+): Promise<McpCallResult> {
   try {
     const res = await client.callTool(
       { name: use.name, arguments: (use.input ?? {}) as Record<string, unknown> },
@@ -54,17 +65,22 @@ export async function callMcpTool(
       .join('\n');
 
     return {
-      type: 'tool_result',
-      tool_use_id: use.id,
-      content: text || '(no output)',
-      is_error: res.isError === true,
+      block: {
+        type: 'tool_result',
+        tool_use_id: use.id,
+        content: text || '(no output)',
+        is_error: res.isError === true,
+      },
+      structured: res.structuredContent,
     };
   } catch (e) {
     return {
-      type: 'tool_result',
-      tool_use_id: use.id,
-      content: e instanceof Error ? e.message : String(e),
-      is_error: true,
+      block: {
+        type: 'tool_result',
+        tool_use_id: use.id,
+        content: e instanceof Error ? e.message : String(e),
+        is_error: true,
+      },
     };
   }
 }

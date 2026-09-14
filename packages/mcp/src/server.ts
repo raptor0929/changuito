@@ -13,7 +13,8 @@ import { z } from 'zod';
 
 import { getAdapter, listRetailers, RETAILER_IDS, UNSUPPORTED } from './adapters/registry.js';
 import { defaultSession, type SessionState } from './session.js';
-import { SERVER_INSTRUCTIONS } from './onboarding.js';
+import { CATALOG_INSTRUCTIONS } from './onboarding.js';
+import { CartLinkOutput, CartOutput, ProductsOutput } from './schemas.js';
 import type { Cart, Product } from './types.js';
 
 const RetailerId = z.enum(RETAILER_IDS as unknown as [string, ...string[]]);
@@ -126,6 +127,7 @@ export function registerCatalogTools(
         sort: z.enum(['relevance', 'price_asc', 'price_desc', 'discount']).optional(),
         include_unavailable: z.boolean().optional().describe('Include out-of-stock items. Default false.'),
       },
+      outputSchema: ProductsOutput,
     },
     async ({ query, limit, offset, sort, include_unavailable }) => {
       try {
@@ -133,7 +135,7 @@ export function registerCatalogTools(
         const products = await getAdapter(ctx.retailer).search(query, ctx, {
           limit, offset, sort, onlyAvailable: !include_unavailable,
         });
-        return text(renderProducts(products));
+        return { ...text(renderProducts(products)), structuredContent: { products } };
       } catch (e) {
         return fail(e instanceof Error ? e.message : String(e));
       }
@@ -255,11 +257,12 @@ export function registerCatalogTools(
       title: 'Show the current cart',
       description: 'List everything in the cart with line indexes and the current total.',
       inputSchema: {},
+      outputSchema: CartOutput,
     },
     async () => {
       try {
         const { cart } = await session.ensureCart();
-        return text(renderCart(cart));
+        return { ...text(renderCart(cart)), structuredContent: { cart } };
       } catch (e) {
         return fail(e instanceof Error ? e.message : String(e));
       }
@@ -274,13 +277,17 @@ export function registerCatalogTools(
         'Return a URL that opens this cart in the browser. This is where the server stops: the ' +
         'user reviews, logs in and pays themselves. Nothing here places an order.',
       inputSchema: {},
+      outputSchema: CartLinkOutput,
     },
     async () => {
       try {
         const { cart, ctx } = await session.ensureCart();
         const url = getAdapter(ctx.retailer).handoffUrl(cart.cartId);
-        if (!cart.lines.length) return text('Cart is empty — add something before handing it over.');
-        return text(renderCart(cart, url));
+        if (!cart.lines.length) {
+          return { ...text('Cart is empty — add something before handing it over.'),
+                   structuredContent: { cart } };
+        }
+        return { ...text(renderCart(cart, url)), structuredContent: { cart, handoffUrl: url } };
       } catch (e) {
         return fail(e instanceof Error ? e.message : String(e));
       }
@@ -312,17 +319,18 @@ export function registerCatalogTools(
 }
 
 /**
- * Build a server with the catalog tools, and optionally the checkout half.
+ * Build a server with the catalog tools — search, cart, handoff link. Nothing
+ * here touches an account or spends money.
  *
- * `checkout` is a dynamic import on purpose. The checkout tools pull in
- * Playwright and an EVM signer, neither of which a read-only deployment can
- * use -- and a serverless bundle that carries a browser automation library it
- * will never run is a bundle that may not fit. Leaving it off means the module
- * is never reached, not merely never called.
+ * The checkout tools are deliberately NOT reachable from this module. They
+ * drive a headed browser and hold an EVM signer, and the binary that wants
+ * them imports them itself (see index.ts). Making that a module boundary
+ * rather than a `checkout: false` option is the difference between a host
+ * that does not call Playwright and a host that cannot: a bundler resolves
+ * `await import()` statically, so a flag would keep the dependency out of the
+ * running code and leave it in the deployment.
  */
 export interface ServerOptions {
-  /** Default true. Set false for read-only hosts (serverless, browsers, CI). */
-  checkout?: boolean;
   /**
    * State for this shopper. Omit for a process that serves one user; pass
    * `createSessionState()` per connection for one that serves many.
@@ -330,23 +338,24 @@ export interface ServerOptions {
   session?: SessionState;
   name?: string;
   version?: string;
+  /**
+   * What to tell the model at connect. Defaults to the catalog half, which is
+   * all this function registers. The stdio binary passes the full set,
+   * because it also registers the checkout tools.
+   */
+  instructions?: string;
 }
 
-export async function createSupermercadoServer(opts: ServerOptions = {}): Promise<McpServer> {
-  // `instructions` is shown to the model once at connect. Twenty tool descriptions
-  // say what each tool does; only this can say what order they go in and which two
-  // things must never be asked of the user.
+export function createSupermercadoServer(opts: ServerOptions = {}): McpServer {
+  // `instructions` is shown to the model once at connect. Ten tool descriptions
+  // say what each tool does; only this can say what order they go in and where
+  // the server stops.
   const server = new McpServer(
     { name: opts.name ?? 'supermercado-mcp', version: opts.version ?? '0.2.0' },
-    { instructions: SERVER_INSTRUCTIONS },
+    { instructions: opts.instructions ?? CATALOG_INSTRUCTIONS },
   );
 
   registerCatalogTools(server, opts.session ?? defaultSession);
-
-  if (opts.checkout ?? true) {
-    const { registerCheckoutTools } = await import('./tools.js');
-    registerCheckoutTools(server);
-  }
 
   return server;
 }

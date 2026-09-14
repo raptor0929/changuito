@@ -16,8 +16,8 @@ import { createSessionState, type SessionState } from '@changuito/mcp/session';
  *
  * Spawning the published binary as a subprocess would also be real MCP, but
  * the binary registers the checkout tools, which drive a headed browser on the
- * server host. That cannot run on Vercel, so the server is built here with
- * `checkout: false` instead.
+ * server host. That cannot run on Vercel. `@changuito/mcp/server` is the half
+ * that can: it has no path to the checkout module at all.
  */
 export interface McpPair {
   client: Client;
@@ -27,7 +27,7 @@ export interface McpPair {
 
 export async function bootMcp(): Promise<McpPair> {
   const state = createSessionState();
-  const server = await createSupermercadoServer({ checkout: false, session: state });
+  const server = createSupermercadoServer({ session: state });
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'changuito-web', version: '0.1.0' }, { capabilities: {} });

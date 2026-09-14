@@ -60,6 +60,36 @@ not paraphrase an amount. If a tool escalates with a question, put it to the use
 that is the designed behaviour, not a failure.
 `.trim();
 
+/**
+ * Instructions for a server that registers only the catalog tools.
+ *
+ * Kept separate rather than trimmed at runtime because instructions are a
+ * promise: naming `approve_payment` to a host that never registered it sends
+ * the model to call a tool that does not exist. A read-only server has a
+ * different, shorter story, and the honest part of it is where it stops.
+ */
+export const CATALOG_INSTRUCTIONS = `
+Search Argentine supermarkets and build a real cart, then hand the user a link that
+opens that exact cart on the supermarket's own site.
+
+THE FLOW IS ORDERED:
+  set_location -> search_products -> price_check -> add_to_cart -> get_cart_link
+
+set_location comes first and everything else fails without it. Prices and stock in
+Argentina vary by branch, so a result with no postal code behind it is not a price.
+Ask the user for their postal code; never guess one.
+
+search_products returns SKU ids. add_to_cart takes those, not product names, and
+not productId. Pass the seller it reported too — do not assume "1".
+
+THIS SERVER DOES NOT BUY ANYTHING. get_cart_link is where it stops: the user opens
+the link, reviews the cart and pays. Never tell them an order has been placed, and
+never ask for a password, a card number, a name or a DNI. Nothing here needs them.
+
+price_check changes nothing and creates no cart. Use it freely to confirm a price
+before committing to it.
+`.trim();
+
 export interface SetupStep {
   n: number;
   label: string;

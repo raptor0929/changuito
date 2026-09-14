@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import { loadConfig } from '../config.js';
 import {
   canPurchase,
+  CATALOG_INSTRUCTIONS,
   readiness,
   renderReadiness,
   SERVER_INSTRUCTIONS,
@@ -106,6 +107,31 @@ describe('renderReadiness', () => {
   });
 });
 
+describe('CATALOG_INSTRUCTIONS', () => {
+  it('describes only the read-only flow', () => {
+    for (const tool of ['set_location', 'search_products', 'price_check', 'add_to_cart', 'get_cart_link']) {
+      assert.ok(CATALOG_INSTRUCTIONS.includes(tool), `flow omits ${tool}`);
+    }
+  });
+
+  it('names no checkout tool, because a catalog server registers none', () => {
+    for (const tool of ['link_marketplace_account', 'approve_payment', 'check_funds', 'diagnose']) {
+      assert.ok(!CATALOG_INSTRUCTIONS.includes(tool), `promises ${tool}, which is not registered`);
+    }
+  });
+
+  it('says plainly that it does not buy anything', () => {
+    // The one thing a user could be misled about by a server that builds a
+    // real cart and hands over a real link.
+    assert.match(CATALOG_INSTRUCTIONS, /DOES NOT BUY/);
+  });
+
+  it('keeps the two rules that protect the user', () => {
+    assert.match(CATALOG_INSTRUCTIONS, /never ask for a password/i);
+    assert.match(CATALOG_INSTRUCTIONS, /name or a DNI/i);
+  });
+});
+
 describe('SERVER_INSTRUCTIONS', () => {
   it('states the ordered flow, which no tool description can', () => {
     for (const tool of [
@@ -139,7 +165,11 @@ describe('SERVER_INSTRUCTIONS', () => {
 describe('RULE: the server tells the client how to use it', () => {
   it('server.ts declares instructions and a version matching package.json', async () => {
     const src = await readFile(new URL('../../src/server.ts', import.meta.url), 'utf8');
-    assert.match(src, /instructions:\s*SERVER_INSTRUCTIONS/, 'the MCP instructions slot is empty');
+    assert.match(
+      src,
+      /instructions:\s*opts\.instructions \?\? CATALOG_INSTRUCTIONS/,
+      'the MCP instructions slot is empty, or no longer defaults to the catalog half',
+    );
 
     const pkg = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8'));
     // Tolerates the factory's override default (`version: opts.version ?? 'x'`).

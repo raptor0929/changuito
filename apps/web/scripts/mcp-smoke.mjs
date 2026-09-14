@@ -19,7 +19,7 @@ const die = (label, detail) => {
 };
 
 const state = createSessionState();
-const server = await createSupermercadoServer({ checkout: false, session: state });
+const server = createSupermercadoServer({ session: state });
 const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 const client = new Client({ name: 'changuito-web', version: '0.1.0' }, { capabilities: {} });
 await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
@@ -75,6 +75,28 @@ if (process.argv.includes('--live')) {
   res.isError
     ? die('live set_location', res.content[0].text)
     : ok('live set_location', `${Date.now() - t0}ms — ${res.content[0].text.split('\n')[0]}`);
+
+  const search = await client.callTool(
+    { name: 'search_products', arguments: { query: 'leche descremada', limit: 5 } },
+    undefined,
+    { timeout: 30_000 },
+  );
+
+  // Both halves, every time. A tool that returns only structuredContent sends
+  // `content: []`, and a plain stdio client then sees an empty answer.
+  const line = search.content?.[0]?.text?.split('\n')[0] ?? '';
+  line.includes('sku=') || /^\d+\. /.test(line)
+    ? ok('live search text', line.slice(0, 60))
+    : die('live search text', `expected the model-facing listing, got: ${line}`);
+
+  const products = search.structuredContent?.products;
+  Array.isArray(products) && products.length > 0
+    ? ok('live search structuredContent', `${products.length} products, first ${products[0].price.display}`)
+    : die('live search structuredContent', 'no structured products came back');
+
+  Number.isInteger(products?.[0]?.price?.centavos)
+    ? ok('prices arrive as integer centavos, not a parsed string')
+    : die('prices', JSON.stringify(products?.[0]?.price));
 }
 
 await client.close();
