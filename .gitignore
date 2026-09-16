@@ -21,3 +21,6 @@ target/
 *.log
 .vercel
 *.tsbuildinfo
+
+# Soroban writes one JSON per test on every run; useful locally, noise in git
+contracts/**/test_snapshots/
