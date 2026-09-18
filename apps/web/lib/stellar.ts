@@ -5,7 +5,7 @@
  * 7-decimal token, and explorer links. Contract calls live in lib/escrow.ts on
  * top of the generated bindings.
  */
-import { Horizon, rpc } from '@stellar/stellar-sdk';
+import { Horizon, rpc, StrKey } from '@stellar/stellar-sdk';
 
 import { DEPLOYMENTS } from './deployments.ts';
 
@@ -112,3 +112,20 @@ export const explorer = {
   contract: (id: string) => `https://stellar.expert/explorer/testnet/contract/${id}`,
   account: (address: string) => `https://stellar.expert/explorer/testnet/account/${address}`,
 };
+
+// ---------------------------------------------------------------- addresses
+
+/**
+ * What kind of Stellar address this is, or null if it is not one.
+ *
+ * Both kinds show up here. A Pollar "internal" wallet is an ordinary G-address;
+ * a Pollar smart wallet (passkey) is a deployed contract, so its address starts
+ * with C. Our token holds balances for either — Soroban does not care — but
+ * only a G-address has a Horizon account with XLM in it, so the caller has to
+ * know which one it is holding.
+ */
+export function addressKind(address: string): 'account' | 'contract' | null {
+  if (StrKey.isValidEd25519PublicKey(address)) return 'account';
+  if (StrKey.isValidContract(address)) return 'contract';
+  return null;
+}

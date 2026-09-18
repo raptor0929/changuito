@@ -243,4 +243,43 @@ a { color: var(--brand); }
   .shell { padding: 16px 16px 0; }
   .masthead { flex-direction: column; gap: 8px; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  /* Stacked under the title, the widget may as well use the width. */
+  .wallet { width: 100%; }
 }
+
+/* --------------------------------------------------------------- wallet */
+
+.wallet {
+  min-width: 190px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wallet-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.wallet-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.wallet-addr {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  cursor: pointer;
+}
+.wallet-addr:hover { color: var(--brand); }
+.wallet-balance { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.wallet-balance strong { font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.wallet-unit { font-size: 12px; color: var(--muted); }
+.wallet-sub { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.wallet-warn { color: var(--warn); }
+.wallet-muted { color: var(--muted); }
+.wallet-error { margin: 0; font-size: 12px; color: var(--warn); }
+.wallet-actions { display: flex; gap: 6px; }
+.wallet-off { opacity: 0.7; }
+
+.btn-sm { padding: 5px 10px; font-size: 12px; font-weight: 500; border-radius: 8px; }
