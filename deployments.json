@@ -1,0 +1,20 @@
+{
+  "network": "testnet",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "deployedAt": "2026-09-21T06:53:57.747Z",
+  "accounts": {
+    "resolver": "GBGMPRHU3NW3BCXUNDNC7VSYQKS6FZKWFHSGEHHMR3G3TZOUWEDBHTFK",
+    "treasury": "GAXUICH5DZMB4ZIZVF6ETTE524RCZYRKHWLGG7EOLY6ECVD4IS6TBNZG"
+  },
+  "contracts": {
+    "usdc": {
+      "id": "CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF",
+      "decimals": 7,
+      "symbol": "USDC"
+    },
+    "escrow": {
+      "id": "CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557"
+    }
+  }
+}

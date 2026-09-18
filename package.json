@@ -16,6 +16,7 @@
     "start": "npm run start -w @changuito/web",
     "test": "npm test -w @changuito/mcp && npm test -w @changuito/web",
     "contracts:build": "stellar contract build --manifest-path contracts/Cargo.toml",
-    "contracts:test": "cargo test --manifest-path contracts/Cargo.toml"
+    "contracts:test": "cargo test --manifest-path contracts/Cargo.toml",
+    "deploy:testnet": "./scripts/deploy-testnet.sh"
   }
 }
