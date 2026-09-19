@@ -1,6 +1,7 @@
 'use client';
 
 import { usePollar } from '@pollar/react';
+import { useState } from 'react';
 
 import { pollarEnabled, shortAddress } from '../lib/pollar.ts';
 import { useBalances } from '../lib/use-balances.ts';
@@ -29,6 +30,36 @@ function ConnectedWallet() {
   const { wallet, isAuthenticated, verified, openLoginModal, logout } = usePollar();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
   const { data, loading, error, refresh } = useBalances(address);
+
+  const [funding, setFunding] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  async function fund() {
+    if (!address) return;
+    setFunding(true);
+    setNote(null);
+    try {
+      const res = await fetch('/api/faucet', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ address }),
+      });
+      const json = await res.json();
+      // 429 carries a real answer ("you already have enough"), not a failure.
+      if (!res.ok && res.status !== 429) throw new Error(json.error ?? `faucet failed (${res.status})`);
+      setNote(
+        json.note ??
+          (json.created
+            ? 'Cuenta creada con XLM de prueba y fondeada con USDC.'
+            : `+${'50.00'} USDC de prueba.`),
+      );
+      refresh();
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : String(err));
+    } finally {
+      setFunding(false);
+    }
+  }
 
   if (!address) {
     return (
@@ -69,8 +100,12 @@ function ConnectedWallet() {
       </div>
 
       {error && <p className="wallet-error">{error}</p>}
+      {note && <p className="wallet-note">{note}</p>}
 
       <div className="wallet-actions">
+        <button type="button" className="btn btn-sm" onClick={() => void fund()} disabled={funding}>
+          {funding ? 'Fondeando…' : 'Fondear'}
+        </button>
         <button type="button" className="btn btn-ghost btn-sm" onClick={refresh} disabled={loading}>
           Actualizar
         </button>
