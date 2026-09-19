@@ -2,15 +2,25 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import type { Cart } from '@changuito/mcp/types';
+
 import { STARTERS } from '../lib/agent/prompt';
+import type { OpenedOrder } from '../lib/order';
+import { pollarEnabled } from '../lib/pollar';
 import { useChat } from '../lib/use-chat';
 import { CartCard } from './CartCard';
+import { PaymentModal } from './PaymentModal';
 import { ProductGrid } from './ProductGrid';
 import { ToolTrail } from './ToolTrail';
 
 export function Chat() {
   const { state, send, stop } = useChat();
   const [draft, setDraft] = useState('');
+  // The basket the payment modal is open over. A cart, not a block id: the
+  // user pays for what a card showed, and that object is the record of it.
+  const [paying, setPaying] = useState<{ cart: Cart; handoffUrl?: string } | null>(null);
+  // Kept for commit 14, which settles it against the store's receipt.
+  const [, setOrder] = useState<OpenedOrder | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,7 +57,20 @@ export function Chat() {
             case 'products':
               return <ProductGrid key={b.id} items={b.items} note={b.note} />;
             case 'cart':
-              return <CartCard key={b.id} cart={b.cart} handoffUrl={b.handoffUrl} />;
+              return (
+                <CartCard
+                  key={b.id}
+                  cart={b.cart}
+                  handoffUrl={b.handoffUrl}
+                  // No wallet in this build means no pay button, rather than a
+                  // button that opens a modal with nothing to sign with.
+                  onPay={
+                    pollarEnabled
+                      ? (cart) => setPaying({ cart, handoffUrl: b.handoffUrl })
+                      : undefined
+                  }
+                />
+              );
             case 'error':
               return (
                 <p key={b.id} className="bubble is-error" role="alert">
@@ -88,6 +111,15 @@ export function Chat() {
           </button>
         )}
       </form>
+
+      {paying ? (
+        <PaymentModal
+          cart={paying.cart}
+          handoffUrl={paying.handoffUrl}
+          onClose={() => setPaying(null)}
+          onOpened={setOrder}
+        />
+      ) : null}
     </div>
   );
 }
