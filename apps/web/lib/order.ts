@@ -157,3 +157,41 @@ export interface OpenedOrder {
   totalDisplay: string;
   handoffUrl?: string;
 }
+
+/* ------------------------------------------------------------ the receipt */
+
+export interface ReceiptInput {
+  retailer: string;
+  cartId: string;
+  /** The store link the user was handed. */
+  handoffUrl?: string;
+  /** ISO 8601. Chosen by the server and returned, so the hash can be re-derived. */
+  settledAt: string;
+}
+
+/**
+ * What `settle` writes on-chain as `receipt_hash`.
+ *
+ * In a full product this would hash the store's own order number, which is the
+ * thing an auditor can take back to Día. changuito's read-only MCP path stops
+ * at the cart link, so it hashes the handoff instead: the cart the user was
+ * given, and when the resolver released the money for it. Honest about what it
+ * proves, and the shape does not change when a real order number arrives.
+ */
+export function canonicalReceipt(r: ReceiptInput): string {
+  return [
+    'changuito/receipt/v1',
+    `retailer|${r.retailer}`,
+    `cart|${r.cartId}`,
+    `handoff|${r.handoffUrl ?? ''}`,
+    `settled|${r.settledAt}`,
+    '',
+  ].join('\n');
+}
+
+export function receiptHash(r: ReceiptInput): Promise<Uint8Array> {
+  return sha256(canonicalReceipt(r));
+}
+
+/** What the browser asks /api/settle to do once the basket is resolved. */
+export type SettleAction = 'settle' | 'refund';

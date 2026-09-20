@@ -33,7 +33,7 @@ interface Props {
   onOpened: (order: OpenedOrder) => void;
 }
 
-type Phase = 'review' | 'signing' | 'done' | 'failed';
+type Phase = 'review' | 'signing' | 'failed';
 
 function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
   const { wallet, isAuthenticated, verified, openLoginModal, runTx } = usePollar();
@@ -44,7 +44,6 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('review');
   const [failure, setFailure] = useState<string | null>(null);
-  const [hash, setHash] = useState<string | null>(null);
   const confirm = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -98,12 +97,17 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
       if (outcome.status === 'error') {
         // resultCode is the ledger's own verdict and the only part worth
         // pasting into a search; message is for the human.
-        throw new Error(outcome.message ?? outcome.details ?? outcome.resultCode ?? 'la red rechazó la transacción');
+        throw new Error(
+          outcome.message ??
+            outcome.details ??
+            outcome.resultCode ??
+            'la red rechazó la transacción',
+        );
       }
 
-      setHash(outcome.hash);
-      setPhase('done');
       refresh();
+      // The modal's job ends here. What comes next — finishing the basket at
+      // the store, then settling — happens on the page, not behind a dialog.
       onOpened({
         orderId: toHex(orderId),
         basketHash: toHex(basket),
@@ -114,6 +118,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
         totalDisplay: cart.total.display,
         handoffUrl,
       });
+      onClose();
     } catch (err) {
       setFailure(err instanceof Error ? err.message : String(err));
       setPhase('failed');
@@ -130,137 +135,110 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <header className="modal-head">
-          <h2>{phase === 'done' ? 'Fondos en garantía' : 'Confirmar y pagar'}</h2>
-          <button type="button" className="modal-x" onClick={onClose} disabled={phase === 'signing'} aria-label="Cerrar">
+          <h2>Confirmar y pagar</h2>
+          <button
+            type="button"
+            className="modal-x"
+            onClick={onClose}
+            disabled={phase === 'signing'}
+            aria-label="Cerrar"
+          >
             ×
           </button>
         </header>
 
-        {phase === 'done' ? (
-          <Opened hash={hash} handoffUrl={handoffUrl} onClose={onClose} />
-        ) : (
-          <>
-            <ul className="pay-lines">
-              {cart.lines
-                .filter((l) => l.available)
-                .map((l) => (
-                  <li key={l.index}>
-                    <span className="cart-qty">{l.quantity}×</span>
-                    <span>{l.name}</span>
-                    <span className="cart-amount">{l.lineTotal.display}</span>
-                  </li>
-                ))}
-            </ul>
+        <ul className="pay-lines">
+          {cart.lines
+            .filter((l) => l.available)
+            .map((l) => (
+              <li key={l.index}>
+                <span className="cart-qty">{l.quantity}×</span>
+                <span>{l.name}</span>
+                <span className="cart-amount">{l.lineTotal.display}</span>
+              </li>
+            ))}
+        </ul>
 
-            <dl className="pay-rows">
-              <div>
-                <dt>Total en el super</dt>
-                <dd>{cart.total.display}</dd>
-              </div>
-              <div className="pay-total">
-                <dt>A pagar</dt>
-                <dd>{quote ? `${quote.display} USDC` : quoteError ? '—' : 'cotizando…'}</dd>
-              </div>
-              {quote ? (
-                <div className="pay-fine">
-                  <dt>Tipo de cambio</dt>
-                  <dd>{quote.arsPerUsd.toFixed(2)} ARS/USD</dd>
-                </div>
-              ) : null}
-              <div className="pay-fine">
-                <dt>Tu saldo</dt>
-                <dd>{balance ? `${balance.usdcDisplay} USDC` : '—'}</dd>
-              </div>
-            </dl>
-
-            {quoteError ? <p className="pay-error">{quoteError}</p> : null}
-            {failure ? <p className="pay-error">{failure}</p> : null}
-            {short ? (
-              <p className="pay-warn">
-                No te alcanza el saldo. Fondeá desde la billetera arriba y volvé a intentar.
-              </p>
-            ) : null}
-            {address && balance && !balance.funded ? (
-              <p className="pay-warn">Tu cuenta no tiene XLM para la comisión. Usá “Fondear”.</p>
-            ) : null}
-
-            <p className="pay-note">
-              El monto queda bloqueado en un contrato de garantía en Stellar testnet, no se
-              transfiere todavía. Si el carrito no se concreta, vuelve a tu billetera.
-            </p>
-
-            <div className="modal-actions">
-              {!address ? (
-                <button type="button" className="btn" onClick={openLoginModal}>
-                  Conectar billetera
-                </button>
-              ) : (
-                <button
-                  ref={confirm}
-                  type="button"
-                  className="btn"
-                  onClick={() => void pay()}
-                  disabled={!quote || !verified || short || phase === 'signing'}
-                >
-                  {phase === 'signing'
-                    ? 'Firmando…'
-                    : !verified
-                      ? 'Verificando sesión…'
-                      : `Pagar ${quote ? quote.display : ''} USDC`}
-                </button>
-              )}
-              <button type="button" className="btn btn-ghost" onClick={onClose} disabled={phase === 'signing'}>
-                Cancelar
-              </button>
+        <dl className="pay-rows">
+          <div>
+            <dt>Total en el super</dt>
+            <dd>{cart.total.display}</dd>
+          </div>
+          <div className="pay-total">
+            <dt>A pagar</dt>
+            <dd>{quote ? `${quote.display} USDC` : quoteError ? '—' : 'cotizando…'}</dd>
+          </div>
+          {quote ? (
+            <div className="pay-fine">
+              <dt>Tipo de cambio</dt>
+              <dd>{quote.arsPerUsd.toFixed(2)} ARS/USD</dd>
             </div>
+          ) : null}
+          <div className="pay-fine">
+            <dt>Tu saldo</dt>
+            <dd>{balance ? `${balance.usdcDisplay} USDC` : '—'}</dd>
+          </div>
+        </dl>
 
-            {address ? (
-              <p className="pay-fine-line">
-                Desde {shortAddress(address)} hacia el escrow{' '}
-                <a href={explorer.contract(DEPLOYMENTS.escrowId)} target="_blank" rel="noopener noreferrer">
-                  {shortAddress(DEPLOYMENTS.escrowId)}
-                </a>
-              </p>
-            ) : null}
-          </>
-        )}
+        {quoteError ? <p className="pay-error">{quoteError}</p> : null}
+        {failure ? <p className="pay-error">{failure}</p> : null}
+        {short ? (
+          <p className="pay-warn">
+            No te alcanza el saldo. Fondeá desde la billetera arriba y volvé a intentar.
+          </p>
+        ) : null}
+        {address && balance && !balance.funded ? (
+          <p className="pay-warn">Tu cuenta no tiene XLM para la comisión. Usá “Fondear”.</p>
+        ) : null}
+
+        <p className="pay-note">
+          El monto queda bloqueado en un contrato de garantía en Stellar testnet, no se transfiere
+          todavía. Si el carrito no se concreta, vuelve a tu billetera.
+        </p>
+
+        <div className="modal-actions">
+          {!address ? (
+            <button type="button" className="btn" onClick={openLoginModal}>
+              Conectar billetera
+            </button>
+          ) : (
+            <button
+              ref={confirm}
+              type="button"
+              className="btn"
+              onClick={() => void pay()}
+              disabled={!quote || !verified || short || phase === 'signing'}
+            >
+              {phase === 'signing'
+                ? 'Firmando…'
+                : !verified
+                  ? 'Verificando sesión…'
+                  : `Pagar ${quote ? quote.display : ''} USDC`}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onClose}
+            disabled={phase === 'signing'}
+          >
+            Cancelar
+          </button>
+        </div>
+
+        {address ? (
+          <p className="pay-fine-line">
+            Desde {shortAddress(address)} hacia el escrow{' '}
+            <a
+              href={explorer.contract(DEPLOYMENTS.escrowId)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {shortAddress(DEPLOYMENTS.escrowId)}
+            </a>
+          </p>
+        ) : null}
       </section>
     </div>
-  );
-}
-
-function Opened({
-  hash,
-  handoffUrl,
-  onClose,
-}: {
-  hash: string | null;
-  handoffUrl?: string;
-  onClose: () => void;
-}) {
-  return (
-    <>
-      <p className="pay-note">
-        Tu USDC quedó bloqueado en el contrato. Se libera al supermercado cuando el carrito se
-        confirma, y vuelve a vos si no se concreta.
-      </p>
-      {hash ? (
-        <p className="tx-link">
-          <a href={explorer.tx(hash)} target="_blank" rel="noopener noreferrer">
-            Ver la transacción en stellar.expert ↗
-          </a>
-        </p>
-      ) : null}
-      <div className="modal-actions">
-        {handoffUrl ? (
-          <a className="btn" href={handoffUrl} target="_blank" rel="noopener noreferrer">
-            Abrir el carrito
-          </a>
-        ) : null}
-        <button type="button" className="btn btn-ghost" onClick={onClose}>
-          Listo
-        </button>
-      </div>
-    </>
   );
 }

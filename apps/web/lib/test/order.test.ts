@@ -7,6 +7,8 @@ import type { Cart, CartLine } from '@changuito/mcp/types';
 import {
   basketHash,
   canonicalBasket,
+  canonicalReceipt,
+  receiptHash,
   DEFAULT_TIMEOUT_SECS,
   fromHex,
   MAX_TIMEOUT_SECS,
@@ -192,5 +194,42 @@ describe('RULE: the args match the contract they are sent to', () => {
       bounds[2].split('*').reduce((n, x) => n * Number(x.trim()), 1),
       MAX_TIMEOUT_SECS,
     );
+  });
+});
+
+describe('canonicalReceipt', () => {
+  const input = {
+    retailer: 'dia',
+    cartId: 'abc-123',
+    handoffUrl: 'https://diaonline.supermercadosdia.com.ar/checkout?orderFormId=abc-123',
+    settledAt: '2026-09-20T14:30:00.000Z',
+  };
+
+  it('is verifiable: the preimage is plain text a person can read', () => {
+    // The whole point of returning it from /api/settle. 32 bytes on a block
+    // explorer prove nothing unless you can see what was hashed into them.
+    assert.match(canonicalReceipt(input), /^changuito\/receipt\/v1\n/);
+    assert.match(canonicalReceipt(input), /\nsettled\|2026-09-20T14:30:00\.000Z\n/);
+  });
+
+  it('survives a missing handoff url without shifting the other fields', () => {
+    const lines = canonicalReceipt({ ...input, handoffUrl: undefined }).split('\n');
+    assert.equal(lines[3], 'handoff|');
+    assert.equal(lines[4], `settled|${input.settledAt}`);
+  });
+
+  it('hashes to 32 bytes, and a different moment is a different receipt', async () => {
+    const a = await receiptHash(input);
+    assert.equal(a.length, 32);
+    const b = await receiptHash({ ...input, settledAt: '2026-09-20T14:30:01.000Z' });
+    assert.notEqual(toHex(a), toHex(b));
+  });
+
+  it('is not the basket hash, even for the same cart', async () => {
+    // Two BytesN<32> fields on the same order; a collision here would mean the
+    // encoder was reusing one for the other.
+    const receipt = toHex(await receiptHash(input));
+    const basket = toHex(await basketHash(cart()));
+    assert.notEqual(receipt, basket);
   });
 });

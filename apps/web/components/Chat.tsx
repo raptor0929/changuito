@@ -9,6 +9,7 @@ import type { OpenedOrder } from '../lib/order';
 import { pollarEnabled } from '../lib/pollar';
 import { useChat } from '../lib/use-chat';
 import { CartCard } from './CartCard';
+import { OrderPanel } from './OrderPanel';
 import { PaymentModal } from './PaymentModal';
 import { ProductGrid } from './ProductGrid';
 import { ToolTrail } from './ToolTrail';
@@ -19,8 +20,9 @@ export function Chat() {
   // The basket the payment modal is open over. A cart, not a block id: the
   // user pays for what a card showed, and that object is the record of it.
   const [paying, setPaying] = useState<{ cart: Cart; handoffUrl?: string } | null>(null);
-  // Kept for commit 14, which settles it against the store's receipt.
-  const [, setOrder] = useState<OpenedOrder | null>(null);
+  // One open order at a time. It outlives the modal: the user leaves to finish
+  // the basket at the store, and has to find this again when they come back.
+  const [order, setOrder] = useState<OpenedOrder | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -111,6 +113,8 @@ export function Chat() {
           </button>
         )}
       </form>
+
+      {order ? <OrderPanel order={order} onDismiss={() => setOrder(null)} /> : null}
 
       {paying ? (
         <PaymentModal
