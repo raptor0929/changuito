@@ -191,6 +191,16 @@ user's wallet.
 
 **The install fails on Vercel.** Check the Node version is 22.x, not 20.
 
+**`Module not found: Can't resolve '@changuito/mcp/server'` in the Vercel build.**
+The MCP package compiles to `dist/`, which is gitignored, so a fresh checkout
+has the sources and none of the output the `exports` map points at. Two things
+build it now and you should not hit this: `prepare` in `packages/mcp` runs on
+`npm install`, and `prebuild` in `apps/web` runs on `npm run build`. The second
+exists because Vercel caches `node_modules` — on a cache hit the install can be
+a no-op, and `dist/` lives in the source tree, not in the cache. If it somehow
+still happens, set the Build Command override to
+`npm run build -w @changuito/mcp && next build`.
+
 **`[PollarClient] constructor() called server-side` in the build log.** Expected
 and harmless — it is a `console.warn`, not a throw. The provider mounts during
 SSR on purpose; making it client-only would trade this warning for a hydration

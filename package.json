@@ -12,7 +12,7 @@
   },
   "scripts": {
     "dev": "npm run dev -w @changuito/web",
-    "build": "npm run build -w @changuito/mcp && npm run build -w @changuito/web",
+    "build": "npm run build -w @changuito/web",
     "start": "npm run start -w @changuito/web",
     "test": "npm test -w @changuito/mcp && npm test -w @changuito/web",
     "contracts:build": "stellar contract build --manifest-path contracts/Cargo.toml",
