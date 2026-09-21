@@ -14,8 +14,10 @@ submodule or a published package.
 | `createSupermercadoServer()` factory added | the web app connects an MCP `Client` over an in-memory transport instead of spawning a process |
 | checkout tools became a lazy `await import()` | keeps Playwright out of the read-only import graph |
 
-Nothing else was touched. The 492 unit tests are unmodified and still run with
-`npm test -w @changuito/mcp`.
+Nothing else was touched. The 492 unit tests that came with it are unmodified and
+still pass; 28 more were added here to cover the factory, the session state it
+takes, and a cart total that turned out to be the pre-discount subtotal. 520 run
+with `npm test -w @changuito/mcp`.
 
 ## What this package can and cannot do here
 

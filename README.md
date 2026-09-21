@@ -148,6 +148,14 @@ generates `apps/web/lib/deployments.ts` from it, and the tests check that the
 generated bindings carry the same ids, so a redeploy that half-lands fails the
 suite rather than the demo.
 
+### Deeper documentation
+
+`docs/` goes past what fits here:
+[architecture](docs/architecture.md) (the system diagram and the trust
+boundaries), [flows](docs/flows.md) (a chat turn, funding, payment, settlement
+and refund, end to end), [stellar](docs/stellar.md) (every Stellar technology
+used and what each is doing), and the [tech stack](docs/tech-stack.md).
+
 ---
 
 ## Setup
