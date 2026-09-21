@@ -66,6 +66,15 @@ function intoSay(blocks: Block[], f: (b: Extract<Block, { kind: 'say' }>) => Ext
   return [...blocks, f({ kind: 'say', id: nextId(), text: '', thinking: '', tools: [] })];
 }
 
+/**
+ * `Array.prototype.findLastIndex` by hand: the app targets ES2022 and that one
+ * is ES2023, so it does not typecheck here.
+ */
+function lastIndexWhere(blocks: Block[], match: (b: Block, i: number) => boolean): number {
+  for (let i = blocks.length - 1; i >= 0; i--) if (match(blocks[i]!, i)) return i;
+  return -1;
+}
+
 export function applyEvent(state: ChatState, e: UiEvent): ChatState {
   switch (e.t) {
     case 'text':
@@ -98,12 +107,45 @@ export function applyEvent(state: ChatState, e: UiEvent): ChatState {
         blocks: [...state.blocks, { kind: 'products', id: nextId(), items: e.items, note: e.note }],
       };
 
-    case 'cart':
+    case 'cart': {
+      // One cart card per turn.
+      //
+      // The agent renders the basket twice on purpose — once when it is built,
+      // once when the handoff link exists — and appending both left two cards
+      // on screen, the first without the link and the second with it. Reading
+      // that, the basket looks like it was ordered twice.
+      //
+      // Scoped to the current turn rather than the whole transcript: a cart
+      // shown three messages ago is a record of what the basket was then, and
+      // rewriting it would edit history the user has already scrolled past.
+      const turnStart = lastIndexWhere(state.blocks, (b) => b.kind === 'user');
+      const existing = lastIndexWhere(
+        state.blocks,
+        (b, i) => i > turnStart && b.kind === 'cart' && b.cart.cartId === e.cart.cartId,
+      );
+      const prior = existing === -1 ? undefined : (state.blocks[existing] as Extract<Block, { kind: 'cart' }>);
+
+      const block = (id: string): Block => ({
+        kind: 'cart',
+        id,
+        cart: e.cart,
+        // Never take the link back off a card that already had one. The render
+        // that adds it is the second of the pair, so this only matters in the
+        // other order, where dropping it would remove a button the user saw.
+        handoffUrl: e.handoffUrl ?? prior?.handoffUrl,
+      });
+
       return {
         ...state,
-        cart: { cart: e.cart, handoffUrl: e.handoffUrl },
-        blocks: [...state.blocks, { kind: 'cart', id: nextId(), cart: e.cart, handoffUrl: e.handoffUrl }],
+        cart: { cart: e.cart, handoffUrl: e.handoffUrl ?? prior?.handoffUrl },
+        blocks:
+          // Reusing the id matters: React keys off it, so the card updates in
+          // place instead of unmounting and animating back in.
+          prior
+            ? state.blocks.map((b, i) => (i === existing ? block(prior.id) : b))
+            : [...state.blocks, block(nextId())],
       };
+    }
 
     case 'error':
       return {

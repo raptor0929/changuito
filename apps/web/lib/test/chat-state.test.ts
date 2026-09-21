@@ -76,6 +76,55 @@ describe('applyEvent', () => {
     assert.equal(s.cart?.handoffUrl, 'https://dia/checkout');
   });
 
+  it('draws one card when the same cart is rendered twice in a turn', () => {
+    // What the user actually saw: a card with no link, then the same basket
+    // again with one. It reads as two orders.
+    const s = run([
+      { t: 'cart', cart: cart('c1') },
+      { t: 'cart', cart: cart('c1'), handoffUrl: 'https://dia/checkout' },
+    ]);
+    assert.deepEqual(s.blocks.map((b) => b.kind), ['cart']);
+    assert.equal(s.blocks[0].kind === 'cart' && s.blocks[0].handoffUrl, 'https://dia/checkout');
+  });
+
+  it('reuses the block id so the card updates in place', () => {
+    // React keys off it. A new id unmounts the card and animates a new one in,
+    // which looks exactly like the duplicate this replaced.
+    const s = run([
+      { t: 'cart', cart: cart('c1') },
+      { t: 'cart', cart: cart('c1'), handoffUrl: 'https://dia/checkout' },
+    ]);
+    assert.equal(s.blocks[0].id, 'b1');
+  });
+
+  it('never takes the link back off a card that already had one', () => {
+    const s = run([
+      { t: 'cart', cart: cart('c1'), handoffUrl: 'https://dia/checkout' },
+      { t: 'cart', cart: cart('c1') },
+    ]);
+    assert.equal(s.blocks[0].kind === 'cart' && s.blocks[0].handoffUrl, 'https://dia/checkout');
+    assert.equal(s.cart?.handoffUrl, 'https://dia/checkout');
+  });
+
+  it('keeps the cart from an earlier turn as a record of what it was then', () => {
+    // Merging across turns would rewrite a card the user has already scrolled
+    // past — the basket as it was three messages ago is part of the story.
+    const first = run([{ t: 'cart', cart: cart('c1') }], sendUser(initialState, 'armá un desayuno'));
+    const s = run([{ t: 'cart', cart: cart('c1'), handoffUrl: 'https://dia/checkout' }], sendUser(first, 'sumá café'));
+
+    assert.deepEqual(s.blocks.map((b) => b.kind), ['user', 'cart', 'user', 'cart']);
+    assert.equal(s.blocks[1].kind === 'cart' && s.blocks[1].handoffUrl, undefined);
+    assert.equal(s.blocks[3].kind === 'cart' && s.blocks[3].handoffUrl, 'https://dia/checkout');
+  });
+
+  it('still shows both when the cart is genuinely a different one', () => {
+    const s = run([
+      { t: 'cart', cart: cart('old') },
+      { t: 'cart', cart: cart('new') },
+    ]);
+    assert.deepEqual(s.blocks.map((b) => b.kind), ['cart', 'cart']);
+  });
+
   it('done frees the composer and keeps the snapshot for the next turn', () => {
     const sent = sendUser(initialState, 'hola');
     assert.equal(sent.streaming, true);

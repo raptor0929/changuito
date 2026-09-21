@@ -73,7 +73,9 @@ export const RENDER_TOOLS: Anthropic.Tool[] = [
     name: 'render_cart',
     description:
       'Show the current cart as a card, with the total and the link that opens it in the ' +
-      "supermarket's own site. Call this after any change to the cart.",
+      "supermarket's own site. Call get_cart_link first, then this once — the card carries " +
+      'the link, and one card per reply is what the user should see. Call it again only if ' +
+      'the cart changes afterwards.',
     input_schema: { type: 'object', properties: {} },
   },
 ];

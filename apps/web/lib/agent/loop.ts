@@ -129,7 +129,14 @@ export async function runTurn(
     // messages teaches the model not to call tools in parallel.
     const results: Anthropic.ToolResultBlockParam[] = [];
     for (const use of uses) {
-      emit({ t: 'tool_start', id: use.id, name: use.name });
+      // The trail is for work, not for drawing. An MCP call reaches a
+      // supermarket and can take twenty seconds, so naming it explains the
+      // wait and a ✗ explains a gap in the answer. A render tool only moves
+      // data the user is already looking at: "mostrando el carrito ✓" sits
+      // above the cart it is describing, and a ✗ reports a failure whose only
+      // consequence is that the model tries again half a second later.
+      const traced = !RENDER_TOOL_NAMES.has(use.name);
+      if (traced) emit({ t: 'tool_start', id: use.id, name: use.name });
       const t0 = Date.now();
 
       let result: Anthropic.ToolResultBlockParam;
@@ -141,7 +148,7 @@ export async function runTurn(
         result = call.block;
       }
 
-      emit({ t: 'tool_end', id: use.id, ok: result.is_error !== true, ms: Date.now() - t0 });
+      if (traced) emit({ t: 'tool_end', id: use.id, ok: result.is_error !== true, ms: Date.now() - t0 });
       results.push(result);
     }
 
