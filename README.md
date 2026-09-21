@@ -163,7 +163,7 @@ npm install
 cp apps/web/.env.example apps/web/.env.local
 # fill in ANTHROPIC_API_KEY; the other two are optional to start
 
-npm run dev            # http://localhost:3000
+npm run dev            # http://localhost:3124
 ```
 
 Without `NEXT_PUBLIC_POLLAR_API_KEY` the app still runs — search, comparison and
