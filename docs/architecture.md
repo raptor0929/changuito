@@ -39,6 +39,9 @@ anything except a chat client, and this proves it works inside a product.
 │  /api/chat     the agent loop, streamed as Server-Sent Events            │
 │    │                                                                     │
 │    ├─ Anthropic Messages API (streaming, tools, prompt caching)          │
+│    │    ▲                                                                │
+│    │    └── fallback, per hop, whenever the local model cannot answer    │
+│    ├─ a local model, optional — OpenAI-compatible, over a tunnel         │
 │    │                                                                     │
 │    └─ MCP Client ──InMemoryTransport──► McpServer ──HTTPS──► Día's VTEX  │
 │                     (real tools/list and tools/call, no subprocess)      │
@@ -50,6 +53,7 @@ anything except a chat client, and this proves it works inside a product.
 │                                                                          │
 │  state:  MCP session   → warm Map + a snapshot the BROWSER holds         │
 │          chat history  → Upstash Redis, 1h TTL (in-memory fallback)      │
+│          model health  → Upstash Redis: breaker + one lane               │
 └──────────┬───────────────────────────────────────────────────────────────┘
            │  Soroban RPC / Horizon
            ▼
@@ -112,6 +116,7 @@ above a button that spends money.
 |---|---|---|
 | MCP session (postal code, sales channel, cart id) | a **snapshot the browser holds** and sends back each turn, plus a warm `Map` for speed | it is small, it is stable, and there is nothing in it the user does not already have — the cart id is handed to them as a URL |
 | Conversation history (messages, product cache) | **Upstash Redis**, keyed by session, 1h TTL | it is the conversation itself and grows every hop, so it cannot ride in a request body |
+| Local-model health (circuit breaker, lane lease) | **Upstash Redis**, one key each | it is about the *fleet*, not a session. Per-instance, every cold lambda would rediscover a sleeping machine by paying the full timeout — and the visitor pays it too |
 
 Both exist because a Vercel lambda's module scope is a cache, not a database:
 instances are recycled on deploy, on idle and on scale-out, and two messages
@@ -176,7 +181,8 @@ changuito/
 │   ├── components/          Chat, ProductGrid, CartCard, PaymentModal,
 │   │                          OrderPanel, WalletWidget, WalletProvider
 │   └── lib/
-│       ├── agent/           loop, prompt, render-tools, turn-store
+│       ├── agent/           loop, prompt, render-tools, turn-store,
+│       │                     provider + providers/ (wire, gate, the two models)
 │       ├── mcp/             boot (in-memory transport), bridge, session
 │       ├── chat-state.ts    the transcript reducer
 │       ├── order.ts         basket → the five args escrow.open takes

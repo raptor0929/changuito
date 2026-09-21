@@ -23,10 +23,29 @@ tested without a browser.
 |---|---|---|
 | **`@anthropic-ai/sdk`** | 0.127.0 | written against `messages.stream()` rather than the tool runner, because every tool call here has a visible consequence and owning the loop means owning where those are emitted |
 | **Model** | `claude-sonnet-5` | overridable with `AGENT_MODEL`. Adaptive thinking + the effort control are Claude 5 features; the loop falls back to a fixed thinking budget for Haiku 4.5, which otherwise rejects the request outright |
+| **Local model** | optional | any OpenAI-compatible endpoint — Ollama, LM Studio, vLLM, llama.cpp. Off unless `OLLAMA_URL` is set. No SDK: `fetch` plus a tested translation layer, because the app would be taking on a dependency for one POST |
 | **`@modelcontextprotocol/sdk`** | 1.30.0 | both the `Client` and the `McpServer`, linked with `InMemoryTransport` |
 | **`@upstash/redis`** | ^1.39.0 | conversation history. HTTP, not TCP — one connection per lambda is the connection-limit problem the REST API avoids |
 
-See [`../CLAUDE.md`](../CLAUDE.md) for how the agent's behaviour was arrived at.
+### Two models, one message format
+
+A turn can begin on a local model and finish on Sonnet, per hop. The thing that
+makes that legal is that `turn.messages` is **Anthropic-shaped whoever
+answered** — `lib/agent/providers/wire.ts` translates outward to OpenAI's format
+and back again, and nothing in the OpenAI shape is ever stored.
+
+Four gates decide whether the local model is used at all: a probe of
+`/api/tags` that checks the model is *pulled* and not merely that the server
+answers, a circuit breaker, a lane lease that caps concurrent local turns at
+one, and an 8s first-byte deadline. The breaker and the lease live in Redis so
+every lambda shares one view, for the same reason conversation history does.
+
+The default lane count is 1 on purpose: a 16 GB machine runs one model
+instance, so raising it buys a queue rather than parallelism. Overflow goes to
+the hosted model, which is faster anyway.
+
+See [`../CLAUDE.md`](../CLAUDE.md) for how the agent's behaviour was arrived at,
+and [`../DEPLOY.md`](../DEPLOY.md) Part 3 for setting the machine up.
 
 ## Stellar
 
@@ -103,17 +122,21 @@ existing KV stores to Upstash in December 2024.
 ```
 npm test                          # both suites
 npm test -w @changuito/mcp        # 520 — adapters, money, FX, cart maths
-npm test -w @changuito/web        #  67 — chat-state, order, turn-store, …
+npm test -w @changuito/web        # 107 — chat-state, order, turn-store, wire, gate, ollama, …
 npm run contracts:test            #  19 — the escrow
 npm run typecheck -w @changuito/web
 npm run build
 ```
 
-The web suite runs on `node:test` with `--experimental-strip-types`, which has
-one sharp edge: **it cannot resolve extensionless imports**. A test that imports
-a module which imports `'../mcp/bridge'` fails at load. This is why
-`turn-store.ts` depends on the agent loop with `import type` only — type imports
-are erased and cost nothing at runtime.
+The web suite runs on `node:test` with `--experimental-strip-types`, which
+erases types rather than compiling them. Two sharp edges follow:
+
+- **It cannot resolve extensionless imports.** A test that imports a module
+  which imports `'../mcp/bridge'` fails at load. This is why `turn-store.ts`
+  depends on the agent loop with `import type` only — type imports are erased
+  and cost nothing at runtime.
+- **It rejects syntax that emits code.** A parameter property, an `enum` or a
+  namespace fails the whole file with `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`.
 
 ## Environment variables
 
@@ -125,5 +148,8 @@ are erased and cost nothing at runtime.
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | no | conversation history across restarts; falls back to an in-process Map |
 | `FX_ARS_PER_USD` | no | pin the rate so a demo quotes the same number every time |
 | `AGENT_MODEL`, `AGENT_USAGE` | no | model override; per-hop token logging |
+| `AGENT_PROVIDER` | no | `auto` \| `ollama` \| `anthropic`. Defaults to `auto` when `OLLAMA_URL` is set, `anthropic` otherwise |
+| `OLLAMA_URL`, `OLLAMA_MODEL` | no | a local model. Server-side only — never `NEXT_PUBLIC_` |
+| `OLLAMA_HEADERS`, `OLLAMA_LANES` | no | tunnel auth headers as JSON; concurrent local turns (default 1) |
 
 Setup in [`../DEPLOY.md`](../DEPLOY.md); annotated in `apps/web/.env.example`.

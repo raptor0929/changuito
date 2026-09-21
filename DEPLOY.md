@@ -195,6 +195,139 @@ Then **Promote to Production**.
 
 ---
 
+## Part 3 — a local model, with Sonnet as the fallback (optional)
+
+Skip this entirely unless you want it. Nothing here is required, and with none
+of it configured the agent runs on `claude-sonnet-5` exactly as before.
+
+What it buys: inference on hardware you already own, with the hosted model
+catching every case where your machine cannot answer. What it does **not** buy
+is capacity — a 16 GB machine runs one model instance, so the honest
+description is "your machine answers when it is free, and Sonnet answers
+otherwise." On a site with visitors, Sonnet will carry most turns. That is the
+design working, not a fault.
+
+### 3.1 Pick a model that fits
+
+The binding constraint on an Apple Silicon Mac is not total RAM, it is the
+share macOS hands the GPU — about two thirds of unified memory. On 16 GB that
+is ~10.9 GB, and the model's weights *and* its KV cache have to fit inside it.
+
+| Model | Weights (Q4) | Verdict on 16 GB |
+|---|---|---|
+| `qwen3:8b` | ~5.2 GB | **the default.** Leaves room for a 32k context |
+| `qwen3:14b` | ~9.3 GB | better at picking tools, needs KV quantization to fit at all |
+| `qwen3:30b-a3b` | ~19 GB | does not fit. Only ~3B params are *active* per token, but all 19 GB must be **resident** — which experts fire changes token to token |
+
+### 3.2 Set the machine up
+
+```bash
+ollama pull qwen3:8b
+
+# Bind to localhost only. The tunnel is the way in; nothing on the LAN or the
+# internet should reach 11434 directly, because Ollama has no authentication.
+launchctl setenv OLLAMA_HOST "127.0.0.1:11434"
+
+# Keep the model resident between requests. Without this Ollama unloads it
+# after five minutes idle and the next visitor waits out a 5 GB read from disk.
+launchctl setenv OLLAMA_KEEP_ALIVE "-1"
+
+# The context window. This one matters more than it looks: the default is 4096,
+# it truncates silently, and the agent sends twelve tool schemas — so the
+# truncation cuts the tool definitions themselves and the model starts
+# inventing tool names. It cannot be set per-request, because Ollama's
+# OpenAI-compatible endpoint ignores `num_ctx`.
+launchctl setenv OLLAMA_CONTEXT_LENGTH "32768"
+
+# Halve the KV cache, so a 32k context costs ~2.4 GB instead of ~4.8 GB.
+launchctl setenv OLLAMA_FLASH_ATTENTION "1"
+launchctl setenv OLLAMA_KV_CACHE_TYPE "q8_0"
+```
+
+`launchctl setenv` is read at launch, so **quit and reopen Ollama.app** after
+setting these. Confirm with `curl -s localhost:11434/api/tags | jq '.models[].name'`.
+
+A closed lid means no inference. `caffeinate -dimsu` in a terminal keeps the
+machine awake and Ctrl-C ends it.
+
+### 3.3 Reach it from the deployment
+
+Two situations, and they need different answers.
+
+**Local dev only — use Tailscale.** Install it on both machines, sign in with
+the same account, and point `OLLAMA_URL` at the `100.x` address from
+`tailscale ip -4`. No token needed: WireGuard has already authenticated the
+device, so there is no public surface at all. This is the easier and safer
+option, and it is the one to use while building.
+
+It does not work from Vercel — a lambda is not on your tailnet.
+
+**From a Vercel deployment — use a Cloudflare Tunnel with Access.**
+
+```bash
+brew install cloudflared
+cloudflared tunnel login
+cloudflared tunnel create changuito-ollama
+cloudflared tunnel route dns changuito-ollama ollama.yourdomain.com
+cloudflared tunnel run --url http://localhost:11434 changuito-ollama
+```
+
+Then, in Cloudflare Zero Trust, put an **Access** application in front of that
+hostname and create a **service token** for it. Cloudflare rejects
+unauthenticated callers at its own edge, so your Mac never sees the scan
+traffic — and port 11434 is never exposed.
+
+Do **not** use `cloudflared tunnel --url http://localhost:11434` on its own.
+It prints a working `trycloudflare.com` URL in one command, which is why it is
+tempting, but that URL is an unauthenticated, unrotatable bearer token to a
+machine in your house. Ollama's API can pull and delete models, so an open
+instance is remote control of that directory, and port 11434 is actively
+scanned. Use it for a five-minute experiment you are watching, never for
+something left running.
+
+### 3.4 Environment variables on Vercel
+
+| Variable | Value |
+|---|---|
+| `AGENT_PROVIDER` | `auto` |
+| `OLLAMA_URL` | `https://ollama.yourdomain.com` |
+| `OLLAMA_MODEL` | `qwen3:8b` |
+| `OLLAMA_HEADERS` | `{"CF-Access-Client-Id":"…","CF-Access-Client-Secret":"…"}` |
+
+None of them take a `NEXT_PUBLIC_` prefix. `OLLAMA_URL` plus `OLLAMA_HEADERS`
+is a credential pair for a machine of yours, and in the client bundle it would
+be a public one.
+
+### 3.5 Confirm which model actually answered
+
+The point of the fallback is that a turn reads the same either way, which also
+means a laptop that quietly stopped being used is invisible. Two ways to see it:
+
+- The SSE `done` event carries a `brain` field — `qwen3:8b`,
+  `claude-sonnet-5`, or `qwen3:8b → claude-sonnet-5` when it switched mid-turn.
+- Set `AGENT_PROVIDER=ollama`, which refuses to fall back and shows the reason
+  instead. Use it to prove the path works, then set it back to `auto`.
+
+The server log names every refusal: `breaker-open`, `busy`, `unreachable`,
+`model-missing`.
+
+### 3.6 What falls back, and when
+
+| Situation | What happens |
+|---|---|
+| Machine asleep, tunnel down, token wrong | probe fails in ≤2s, Sonnet answers |
+| Model not pulled | caught by the probe, Sonnet answers |
+| Three consecutive failures | local model taken out for 60s, so the next visitors pay nothing to rediscover it |
+| Another visitor mid-basket | `busy` — Sonnet answers rather than queueing |
+| Reachable but no first token in 8s | abandoned, Sonnet answers |
+| Local model used 150s of the turn | the rest of the basket finishes on Sonnet |
+| Failure after text is on screen | visible error, no silent retry — half a sentence cannot be unsaid |
+
+The breaker and the lane counter live in Redis when it is configured, so all
+lambdas share one view. Without Redis they are per-process, which is the right
+answer for one developer on one machine and the wrong one on Vercel — the same
+split as conversation history, for the same reason.
+
 ## Using it
 
 1. Open the site and click **Conectar billetera**. Pollar handles the login.
