@@ -21,7 +21,21 @@ export type UiEvent =
   | { t: 'cart'; cart: Cart; handoffUrl?: string }
   | { t: 'error'; message: string; recoverable: boolean }
   /** Always last. Carries the snapshot the browser must send back next turn. */
-  | { t: 'done'; stopReason: string; snapshot: SessionSnapshot };
+  | {
+      t: 'done';
+      stopReason: string;
+      snapshot: SessionSnapshot;
+      /**
+       * Which model answered, when more than one could have.
+       *
+       * Optional because most deployments have exactly one and the field would
+       * be noise. Where a local model is configured it is the only way to tell
+       * a fallback from a normal turn — the reply reads the same either way,
+       * which is the point, and also means a laptop that quietly stopped being
+       * used is otherwise invisible.
+       */
+      brain?: string;
+    };
 
 export interface ChatRequest {
   sessionId: string;

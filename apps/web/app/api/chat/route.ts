@@ -53,13 +53,16 @@ export async function POST(req: Request): Promise<Response> {
       // and an idle stream is a stream a proxy feels free to close.
       const beat = setInterval(() => write(HEARTBEAT), HEARTBEAT_MS);
 
+      // Hoisted out of the callback so the `done` event can carry it.
+      let brain: string | undefined;
+
       try {
         const { snapshot } = await withSession(body.sessionId, body.snapshot, async (session) => {
           // Read, run, write — all inside the callback, so `withSession`'s
           // per-session queue covers the whole read-modify-write and two tabs
           // on one id cannot each save a history missing the other's messages.
           const turn = (await turns.get(body.sessionId)) ?? newTurnState();
-          await runTurn(session, turn, body.message, emit);
+          brain = (await runTurn(session, turn, body.message, emit)).brain;
 
           // Only after a clean return. A turn that threw mid-hop can leave an
           // assistant `tool_use` with no matching `tool_result`, and the API
@@ -72,7 +75,7 @@ export async function POST(req: Request): Promise<Response> {
 
         // The browser keeps this and sends it back, because this instance
         // might not be here next time.
-        emit({ t: 'done', stopReason: 'end_turn', snapshot });
+        emit({ t: 'done', stopReason: 'end_turn', snapshot, brain });
       } catch (e) {
         emit({
           t: 'error',
