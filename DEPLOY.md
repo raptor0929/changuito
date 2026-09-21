@@ -123,6 +123,10 @@ Preview:
 | `NEXT_PUBLIC_POLLAR_API_KEY` | your Pollar key | the browser, by design |
 | `STELLAR_RESOLVER_SECRET` | the `S…` from step 1.5 | server only |
 | `FX_ARS_PER_USD` | optional, e.g. `1500` | server only |
+| `KV_REST_API_URL` | set by the Redis integration | server only |
+| `KV_REST_API_TOKEN` | set by the Redis integration | server only |
+
+The two `KV_` ones you do not type — see [2.4](#24-conversation-history) below.
 
 `FX_ARS_PER_USD` pins the exchange rate. Set it if you want a demo to quote the
 same number every time; leave it unset and the app uses the live rate.
@@ -132,7 +136,40 @@ either of the others — Next inlines anything with it into the client bundle at
 build time, and `STELLAR_RESOLVER_SECRET` is a key that can mint tokens and
 move escrowed funds.
 
-### 2.4 Deploy a preview first
+### 2.4 Conversation history
+
+Skippable, and the deploy works without it — but skip it and the agent will
+forget mid-conversation, which is a bad thing to discover during a demo.
+
+The problem is that a lambda's module scope is a cache, not a database.
+Instances are recycled on deploy, on idle and on scale-out, so the message
+after a cold start reaches a process that has never heard of you. The page
+still shows every bubble, so the agent looks like it stopped paying attention
+rather than like it restarted.
+
+1. **Storage → Create Database → Marketplace → Upstash for Redis.**
+2. Region: match your functions (Vercel's default is `iad1`, Washington D.C.).
+   Leave Read Regions empty.
+3. **Turn Eviction on.** Off means writes *fail* once the database is full.
+   This is a cache — dropping the oldest session is the right answer, and you
+   will not come close to the free tier's 256 MB anyway. A conversation is
+   roughly 100 KB and expires after an hour.
+4. **Connect Project.** That injects `KV_REST_API_URL` and `KV_REST_API_TOKEN`
+   (plus some it does not use), and that is all the app needs.
+
+Use the REST pair, not `REDIS_URL` or `KV_URL`. Those are `rediss://` strings
+for a TCP client, and one TCP connection per lambda is the connection-limit
+problem an HTTP client exists to avoid.
+
+For local dev, copy the two values into `apps/web/.env`. Leave them out and the
+app falls back to an in-process Map, which on one machine is the same guarantee
+for free.
+
+This does **not** survive a page reload: the browser mints a new session id
+each load, so a reload is a fresh start by design — the chat looks empty and
+the agent is empty, which at least agree with each other.
+
+### 2.5 Deploy a preview first
 
 Push to a branch, let Vercel build it, and check three things on the preview
 URL before promoting.

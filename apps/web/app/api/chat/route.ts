@@ -1,4 +1,5 @@
-import { newTurnState, runTurn, type Turn } from '@/lib/agent/loop';
+import { newTurnState, runTurn } from '@/lib/agent/loop';
+import { turnStore } from '@/lib/agent/turn-store';
 import { withSession } from '@/lib/mcp/session';
 import { encodeEvent, HEARTBEAT, SSE_HEADERS, type ChatRequest, type UiEvent } from '@/lib/protocol';
 
@@ -11,7 +12,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 /** Conversation history, alongside the MCP session it belongs to. */
-const turns = new Map<string, Turn>();
+const turns = turnStore();
 
 const HEARTBEAT_MS = 15_000;
 
@@ -54,9 +55,19 @@ export async function POST(req: Request): Promise<Response> {
 
       try {
         const { snapshot } = await withSession(body.sessionId, body.snapshot, async (session) => {
-          const turn = turns.get(body.sessionId) ?? newTurnState();
-          turns.set(body.sessionId, turn);
+          // Read, run, write — all inside the callback, so `withSession`'s
+          // per-session queue covers the whole read-modify-write and two tabs
+          // on one id cannot each save a history missing the other's messages.
+          const turn = (await turns.get(body.sessionId)) ?? newTurnState();
           await runTurn(session, turn, body.message, emit);
+
+          // Only after a clean return. A turn that threw mid-hop can leave an
+          // assistant `tool_use` with no matching `tool_result`, and the API
+          // rejects that pairing on the *next* request — so the failure would
+          // surface one message later, on a turn that did nothing wrong.
+          // Keeping the previous history leaves every stored value valid, at
+          // the cost of one message the user is about to retry anyway.
+          await turns.set(body.sessionId, turn);
         });
 
         // The browser keeps this and sends it back, because this instance
