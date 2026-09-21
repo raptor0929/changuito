@@ -79,7 +79,10 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
 
   const amountUnits = quote ? BigInt(quote.units) : 0n;
   const held = balance ? BigInt(balance.usdc) : 0n;
-  const short = quote !== null && held < amountUnits;
+  // Only a balance we actually read can be short. Without a wallet the balance
+  // is unknown, not zero, and "no te alcanza" would be a lie under a button
+  // that says "Conectar billetera".
+  const short = balance !== null && quote !== null && held < amountUnits;
 
   async function pay() {
     if (!address || !quote) return;

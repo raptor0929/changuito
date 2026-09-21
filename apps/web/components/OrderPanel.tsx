@@ -13,7 +13,9 @@ import { explorer, formatUsdc } from '../lib/stellar.ts';
  * leave the page to finish the basket at the store, and a dialog they must
  * dismiss to do that is a dialog they will dismiss and then not find again.
  */
-export function OrderPanel({ order, onDismiss }: { order: OpenedOrder; onDismiss: () => void }) {
+// onDismiss is optional: a server-rendered page cannot pass a function prop,
+// and the fixtures page mounts this panel without one.
+export function OrderPanel({ order, onDismiss }: { order: OpenedOrder; onDismiss?: () => void }) {
   const [closing, setClosing] = useState<SettleAction | null>(null);
   const [outcome, setOutcome] = useState<SettleResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,9 +54,11 @@ export function OrderPanel({ order, onDismiss }: { order: OpenedOrder; onDismiss
       <section className={settled ? 'order-panel is-done' : 'order-panel'} aria-live="polite">
         <header className="order-head">
           <strong>{settled ? '✓ Tu changuito está pago' : 'Orden reembolsada'}</strong>
-          <button type="button" className="modal-x" onClick={onDismiss} aria-label="Cerrar">
-            ×
-          </button>
+          {onDismiss ? (
+            <button type="button" className="modal-x" onClick={onDismiss} aria-label="Cerrar">
+              ×
+            </button>
+          ) : null}
         </header>
         <p className="pay-note">
           {settled
