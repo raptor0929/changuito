@@ -109,13 +109,33 @@ could not hand anyone a balance. `contracts/mock_usdc` is the same interface,
 same `"USDC"` symbol, same 7 decimals, with our resolver as admin. The UI calls
 it *"USDC de prueba"* rather than implying Blend.
 
+### The demo USDC token has no issuer, and needs no trustline
+
+`CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF` is a SEP-41 Soroban
+contract, not a classic Stellar asset. There is no `CODE:ISSUER` pair and
+nothing to `changeTrust` to — balances live in the contract's own storage, so a
+mint to an address that has never existed just works. Verified: a freshly
+generated address with no account at all went from `0` to `50.00` through one
+`POST /api/faucet`.
+
+That is deliberate. A classic asset cannot reach an account without a
+trustline, so every visitor would have to sign a `changeTrust` before the
+faucet could give them anything, and "press Fund, get USDC" is the point of the
+widget.
+
+It follows that Pollar's `setTrustline({ code, issuer })` does not apply, and
+Pollar's balance endpoints — Horizon-backed, classic assets only — will not
+list this token. That is why `/api/balance` reads the contract directly and the
+masthead widget uses it instead of the wallet's own asset list.
+
+
 ---
 
 ## Layout
 
 ```
 apps/web/            the Next.js app — chat, wallet, payment, API routes
-packages/mcp/        the supermarket MCP server (vendored, 519 tests)
+packages/mcp/        the supermarket MCP server (vendored, 520 tests)
 packages/*-bindings/ generated TypeScript clients for the two contracts
 contracts/escrow/    open / settle / refund, with events
 contracts/mock_usdc/ SEP-41 token, admin-gated mint
@@ -168,7 +188,7 @@ them. See **[DEPLOY.md](DEPLOY.md)** for that and for putting it on Vercel.
 ## Tests
 
 ```bash
-npm test                    # 519 MCP + 56 web
+npm test                    # 520 MCP + 56 web
 npm run contracts:test      # 34 contract tests
 ```
 

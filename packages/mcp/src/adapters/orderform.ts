@@ -122,8 +122,19 @@ export function toCart(of: VtexOrderForm, retailer: string, cartIdOverride?: str
   });
 
   const totalizers = of.totalizers ?? of.totals ?? [];
-  const itemsTotal = totalizers.find((t) => t.id === 'Items')?.value;
-  const total = itemsTotal ?? of.value ?? lines.reduce((s, l) => s + l.lineTotal.centavos, 0);
+  const pick = (id: string) => totalizers.find((t) => t.id === id)?.value;
+  const itemsTotal = pick('Items');
+  // The Items totalizer is computed on LIST prices, while every line above is
+  // on sellingPrice. On a cart with a promotion the two disagree: a real Día
+  // breakfast cart reported Items $12.630,00 over lines summing to $9.684,75.
+  // Adding Discounts (a negative totalizer) puts the total back on the same
+  // basis as the lines it sits under, so a cart can no longer contradict
+  // itself. Shipping deliberately stays out — this is the goods subtotal, and
+  // payableTotal() is the number the checkout actually charges.
+  const total =
+    itemsTotal !== undefined
+      ? Math.round(itemsTotal + (pick('Discounts') ?? 0))
+      : lines.reduce((s, l) => s + l.lineTotal.centavos, 0);
 
   return {
     retailer,

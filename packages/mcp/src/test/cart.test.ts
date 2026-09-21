@@ -76,6 +76,33 @@ describe('orderForm mapping', () => {
     assert.equal(toCart(withItems([LECHE, PAN]), 'dia').total.centavos, 648_000);
   });
 
+  // Regression. Every fixture above prices Items as the sum of the selling
+  // prices, so the two bases agreed and the bug was invisible. This is the
+  // real shape of a Día cart with a promotion on it: Items is the LIST total,
+  // and Discounts brings it back down. A cart whose total does not match its
+  // own lines is one the escrow would lock the wrong amount of USDC against.
+  it('RULE: the total matches the lines when a promotion is applied', () => {
+    const of = {
+      ...emptyOrderForm,
+      items: [
+        { id: '32932', name: 'Café', quantity: 1, seller: 'ardiaprod1080', listPrice: 507_000, sellingPrice: 329_550, availability: 'available' },
+        { id: '30111', name: 'Leche', quantity: 1, seller: 'ardiaprod1080', listPrice: 186_500, sellingPrice: 186_500, availability: 'available' },
+        { id: '245474', name: 'Pan', quantity: 1, seller: 'ardiaprod1080', listPrice: 361_500, sellingPrice: 235_000, availability: 'available' },
+        { id: '10303', name: 'Mermelada', quantity: 1, seller: 'ardiaprod1080', listPrice: 334_500, sellingPrice: 217_425, availability: 'available' },
+      ],
+      totalizers: [
+        { id: 'Items', name: 'Total de los items', value: 1_263_000 },
+        { id: 'Discounts', name: 'Total de descuentos', value: -294_525 },
+      ],
+      value: 968_475,
+    };
+    const cart = toCart(of, 'dia');
+    const sumOfLines = cart.lines.reduce((s, l) => s + l.lineTotal.centavos, 0);
+    assert.equal(sumOfLines, 968_475);
+    assert.equal(cart.total.centavos, 968_475, 'the total must not be the pre-discount Items subtotal');
+    assert.equal(cart.total.centavos, sumOfLines, 'the total must equal the lines the user was shown');
+  });
+
   it('but payableTotal includes shipping — that is what gets charged', () => {
     assert.equal(payableTotal(withItems([LECHE, PAN])), 798_000);
   });
