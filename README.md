@@ -211,6 +211,62 @@ type-check cleanly:
 
 ---
 
+## Deployed on testnet
+
+Live since **2026-09-21**, and these are the ids the app actually loads —
+`deployments.json` is the single source of truth, and `stellar.test.ts` compares
+it against the ids baked into the generated bindings.
+
+| | |
+|---|---|
+| **escrow** | [`CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557`](https://stellar.expert/explorer/testnet/contract/CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557) |
+| **demo USDC** — SEP-41, `USDC`, 7 decimals | [`CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF`](https://stellar.expert/explorer/testnet/contract/CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF) |
+| **resolver** — settles, refunds, mints | [`GBGMPRHU3NW3BCXUNDNC7VSYQKS6FZKWFHSGEHHMR3G3TZOUWEDBHTFK`](https://stellar.expert/explorer/testnet/account/GBGMPRHU3NW3BCXUNDNC7VSYQKS6FZKWFHSGEHHMR3G3TZOUWEDBHTFK) |
+| **treasury** — receives settled baskets | [`GAXUICH5DZMB4ZIZVF6ETTE524RCZYRKHWLGG7EOLY6ECVD4IS6TBNZG`](https://stellar.expert/explorer/testnet/account/GAXUICH5DZMB4ZIZVF6ETTE524RCZYRKHWLGG7EOLY6ECVD4IS6TBNZG) |
+
+Network passphrase `Test SDF Network ; September 2015`, RPC
+`https://soroban-testnet.stellar.org`.
+
+The escrow's constructor wired those three addresses in at deploy time and there
+is no setter, so who can settle and where the money lands are fixed. You do not
+have to take that from a README — ask the contract:
+
+```bash
+stellar contract invoke --network testnet \
+  --id CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557 \
+  --source-account GBGMPRHU3NW3BCXUNDNC7VSYQKS6FZKWFHSGEHHMR3G3TZOUWEDBHTFK \
+  --send=no -- config
+```
+```json
+{"resolver":"GBGMPRHU…DBHTFK","token":"CB63C7UV…LQUBJF","treasury":"GAXUICH5…S6TBNZG"}
+```
+
+`--send=no` only simulates, so it signs nothing, costs nothing, and any funded
+account will do as `--source-account`.
+
+### The escrow's interface
+
+```rust
+fn open(buyer: Address, order_id: BytesN<32>, amount: i128,
+        basket_hash: BytesN<32>, timeout_secs: u64) -> Order;   // buyer signs
+fn settle(order_id: BytesN<32>, basket_hash: BytesN<32>,
+          receipt_hash: BytesN<32>) -> Order;                   // resolver only
+fn refund(caller: Address, order_id: BytesN<32>) -> Order;      // resolver, or buyer after the deadline
+fn get_order(order_id: BytesN<32>) -> Order;                    // panics if unknown
+fn find_order(order_id: BytesN<32>) -> Option<Order>;           // the non-panicking read
+fn config() -> Config;
+```
+
+That is the deployed wasm's own spec, not a copy of the source —
+`stellar contract info interface --id CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557 --network testnet`
+prints it for yourself.
+
+Source lives in `contracts/escrow/` and `contracts/mock_usdc/`. To put up your
+own copy, `scripts/deploy-testnet.sh` rebuilds both, deploys them, and rewrites
+`deployments.json` and the bindings in one pass — see **[DEPLOY.md](DEPLOY.md)**.
+
+---
+
 ## Verified on testnet
 
 Not by inspection — these are ledger entries:
