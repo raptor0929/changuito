@@ -24,10 +24,19 @@ export function Chat() {
   // the basket at the store, and has to find this again when they come back.
   const [order, setOrder] = useState<OpenedOrder | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  const composer = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [state.blocks]);
+
+  // `disabled` blurs the composer the moment a turn starts, and nothing gives
+  // the focus back when it ends — so the obvious thing, typing the next
+  // message, silently goes nowhere. Shopping is a conversation; the cursor
+  // should be waiting where the next sentence goes.
+  useEffect(() => {
+    if (!state.streaming) composer.current?.focus();
+  }, [state.streaming]);
 
   const submit = (text: string) => {
     if (state.streaming) return;
@@ -96,6 +105,7 @@ export function Chat() {
         }}
       >
         <input
+          ref={composer}
           className="composer-input"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
