@@ -9,6 +9,7 @@ import {
   formatBytes,
   unreadableFileMessage,
 } from '../../lib/bug-report/attachments.ts';
+import { ACCESSORY_PX, keyboardInset, scrollDeltaToClear } from '../../lib/bug-report/keyboard-inset.ts';
 import { SEVERITIES } from '../../lib/bug-report/options.ts';
 import styles from './bug-report.module.css';
 
@@ -63,6 +64,58 @@ export function BugReportForm({ notice }: { notice?: string }) {
     }
     if (errors.form || notice) errorSummaryRef.current?.focus();
   }, [errors, done, notice]);
+
+  useEffect(() => {
+    if (done) return;
+    const form = formRef.current;
+    if (!form) return;
+    if (!window.matchMedia('(hover: none) and (pointer: coarse)').matches) return;
+
+    const vv = window.visualViewport;
+    let timer = 0;
+
+    const settle = () => {
+      const layout = window.innerHeight;
+      const visual = vv?.height ?? layout;
+      if (keyboardInset(layout, visual) <= 0) return;
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement) || !form.contains(active)) return;
+      if (!active.matches('input, textarea, select')) return;
+      if (active.closest('[aria-hidden="true"]')) return;
+      const scroller = form.closest<HTMLElement>('[data-testid="bug-report-screen"]');
+      if (!scroller) return;
+      const target = active.closest<HTMLElement>(`.${CSS.escape(styles.field)}`) ?? active;
+      const rect = target.getBoundingClientRect();
+      const delta = scrollDeltaToClear(rect.top, rect.height, 12, visual - ACCESSORY_PX);
+      if (delta !== 0) scroller.scrollBy({ top: delta, left: 0, behavior: 'auto' });
+    };
+
+    const schedule = (delay: number) => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(settle, delay);
+    };
+
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (!target.matches('input, textarea, select')) return;
+      if (target.closest('[aria-hidden="true"]')) return;
+      schedule(320);
+    };
+
+    const onViewport = () => schedule(80);
+
+    form.addEventListener('focusin', onFocusIn);
+    vv?.addEventListener('resize', onViewport);
+    window.addEventListener('orientationchange', onViewport);
+
+    return () => {
+      window.clearTimeout(timer);
+      form.removeEventListener('focusin', onFocusIn);
+      vv?.removeEventListener('resize', onViewport);
+      window.removeEventListener('orientationchange', onViewport);
+    };
+  }, [done]);
 
   function onPickFiles(event: ChangeEvent<HTMLInputElement>) {
     const picked = [...(event.target.files ?? [])];

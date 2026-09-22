@@ -1,12 +1,21 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import Image from 'next/image';
 
 import { BugReportForm, BugReportSuccess } from '../../components/bug-report/bug-report-form';
+import { BugReportViewport } from '../../components/bug-report/bug-report-viewport';
 import { JsonLd } from '../../components/seo/json-ld';
 import styles from '../../components/bug-report/bug-report.module.css';
 import { pageMetadata, publicPage, subpageJsonLd } from '../../lib/seo';
 
 const page = publicPage('/reportarbug');
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  // Chrome shrinks the layout viewport with the keyboard. iOS Safari
+  // ignores this; the form scrolls the focused field itself.
+  interactiveWidget: 'resizes-content',
+};
 
 export async function generateMetadata({
   searchParams,
@@ -27,6 +36,7 @@ export default async function ReportarBugPage({
 
   return (
     <div className={styles.page} data-testid="bug-report-screen">
+      <BugReportViewport />
       <JsonLd data={subpageJsonLd(page)} />
       <a className={styles.skip} href="#reporte">
         Saltar al formulario

@@ -7,7 +7,16 @@
   --paper: #fafaf7;
   --line: rgba(42, 26, 20, 0.14);
   --error: #6b2b22;
-  min-height: 100dvh;
+  /* Pinned to the visual viewport (BugReportViewport). The document itself
+     does not scroll, so iOS has nothing to pan under the autofill pill. */
+  position: fixed;
+  top: var(--vv-top, 0px);
+  right: 0;
+  left: 0;
+  height: var(--vvh, 100svh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--paper);
   color: var(--ink);
   font-size: 1rem;
@@ -30,21 +39,36 @@
 
 .skip {
   position: absolute;
-  left: 16px;
-  top: 12px;
   z-index: 40;
-  transform: translateY(-160%);
   background: var(--sun);
   color: var(--ink);
   font-weight: 700;
   text-decoration: none;
-  padding: 12px 16px;
   border-radius: 999px;
-  min-height: 44px;
+  /* Off-screen until focused, without translate or filter. Those promote a
+     compositing layer, and iOS Safari then anchors the autofill bar to that
+     layer instead of to the top of the keyboard. */
+  clip: rect(0, 0, 0, 0);
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
 }
 
 .skip:focus {
-  transform: none;
+  left: 16px;
+  top: 12px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 12px 16px;
+  min-height: 44px;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
 }
 
 .header {
@@ -303,6 +327,15 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .control,
+  .fileInput {
+    /* Native focus scroll does not include the autofill pill. */
+    scroll-margin-top: 56px;
+    scroll-margin-bottom: 80px;
+  }
 }
 
 @media (min-width: 720px) {
