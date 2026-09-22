@@ -6,9 +6,15 @@ export function TryLink({ testId }: { testId: string }) {
   return (
     <a className={styles.cta} href={APP_URL} rel="noopener noreferrer" data-testid={testId}>
       {HERO.cta}
-      <span aria-hidden="true" className={styles.ctaArrow}>
-        →
-      </span>
+      {/* Decorative stand-in for the old arrow. The link name stays the CTA text. */}
+      <img
+        className={styles.ctaMascot}
+        src="/brand/mascot-corriendo.png"
+        alt=""
+        aria-hidden="true"
+        width={630}
+        height={560}
+      />
     </a>
   );
 }

@@ -166,8 +166,12 @@
   background: var(--sun-active);
 }
 
-.ctaArrow {
-  font-weight: 700;
+.ctaMascot {
+  height: 1.4em;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  flex: none;
 }
 
 .heroInner {
