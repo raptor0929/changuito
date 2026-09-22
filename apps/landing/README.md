@@ -52,6 +52,7 @@ El kit completo vive en `apps/branding/` (manuals, logo, mascota, pattern, motio
 | `public/brand/animacion-cargando.gif` | `apps/branding/motion/animacion-cargando.gif` (hero) |
 | `public/brand/mascot-idle.png` | `apps/branding/mascot/mascota-idle.png` (hero si `prefers-reduced-motion`) |
 | `public/brand/mascot-exito.png` | `apps/branding/mascot/mascota-exito.png` |
+| `public/brand/mascota-corriendo.png` | `apps/branding/mascot/mascota-corriendo.png` (CTA, en el lugar de la flecha) |
 | `public/brand/lockup-stacked.png` | `apps/branding/logo/lockup-stacked-mascota-y-wordmark.png` |
 | `public/og.png` | pose idle ancha del zip de landing (1280×720), solo Open Graph |
 | `app/icon.svg` | `apps/branding/logo/sol-mayo.svg` |

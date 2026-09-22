@@ -167,8 +167,9 @@
 }
 
 .ctaMascot {
-  height: 34px;
+  height: 1.4em;
   width: auto;
+  object-fit: contain;
   display: block;
   flex: none;
 }
