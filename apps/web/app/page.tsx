@@ -44,15 +44,6 @@ export default function Home() {
         <HumanGate siteKey={siteKey}>
           <Chat />
         </HumanGate>
-        <p className="report-bug">
-          <a
-            href="https://www.changuito.me/reportarbug"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Reportar un bug
-          </a>
-        </p>
       </main>
     </WalletProvider>
   );

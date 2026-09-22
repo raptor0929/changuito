@@ -1,6 +1,7 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 
+import { ViewportLock } from '../components/ViewportLock';
 import './globals.css';
 
 const inter = Inter({
@@ -9,6 +10,15 @@ const inter = Inter({
   display: 'swap',
   variable: '--font-inter',
 });
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  // Chrome resizes the layout viewport with the keyboard. iOS ignores this
+  // and is covered by ViewportLock reading visualViewport.
+  interactiveWidget: 'resizes-content',
+};
 
 export const metadata: Metadata = {
   title: {
@@ -22,7 +32,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es-AR" className={inter.variable}>
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <ViewportLock />
+        {children}
+      </body>
     </html>
   );
 }

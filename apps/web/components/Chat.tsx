@@ -24,6 +24,7 @@ import { OrderPanel } from './OrderPanel';
 import { PaymentModal } from './PaymentModal';
 import { ProductGrid } from './ProductGrid';
 import { MarkdownText } from './MarkdownText';
+import { ReportBug } from './ReportBug';
 import { ToolTrail } from './ToolTrail';
 
 export function Chat() {
@@ -52,11 +53,22 @@ function ChatCore({
   // One open order at a time. It outlives the modal: the user leaves to finish
   // the basket at the store, and has to find this again when they come back.
   const [order, setOrder] = useState<OpenedOrder | null>(null);
-  const bottom = useRef<HTMLDivElement>(null);
+  const thread = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    const el = thread.current;
+    if (!el) return;
+    // The page itself does not scroll. Jumping with scrollIntoView walks
+    // ancestors and, on iOS, pans the visual viewport so the composer
+    // disappears under the keyboard. Scroll the thread only.
+    // The empty greeting is read from the top; pinning to the end would
+    // hide "Hola" behind the fold of a short phone.
+    if (state.blocks.length === 0) {
+      el.scrollTop = 0;
+      return;
+    }
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [state.blocks]);
 
   // `disabled` blurs the composer the moment a turn starts, and nothing gives
@@ -85,7 +97,14 @@ function ChatCore({
     // server-rendered with the initial state, so compact CSS applies before
     // hydration and the shell can target it with :has().
     <div className={state.blocks.length === 0 ? 'chat is-empty' : 'chat'}>
-      <div className="thread" role="log" aria-live="polite" aria-busy={state.streaming}>
+      <div
+        ref={thread}
+        className="thread"
+        data-testid="chat-thread"
+        role="log"
+        aria-live="polite"
+        aria-busy={state.streaming}
+      >
         {state.blocks.length === 0 ? <Greeting onPick={submit} /> : null}
 
         {state.blocks.map((b) => {
@@ -143,7 +162,7 @@ function ChatCore({
             Buscando en el súper…
           </p>
         ) : null}
-        <div ref={bottom} />
+        <ReportBug />
       </div>
 
       {gated ? (
@@ -170,8 +189,11 @@ function ChatCore({
         </div>
       ) : null}
 
+      {order ? <OrderPanel order={order} onDismiss={() => setOrder(null)} /> : null}
+
       <form
         className="composer"
+        data-testid="composer"
         onSubmit={(e) => {
           e.preventDefault();
           submit(draft);
@@ -189,7 +211,8 @@ function ChatCore({
             }
           }}
           placeholder={COMPOSER_PLACEHOLDERS[placeholderIdx] ?? COMPOSER_PLACEHOLDERS[0]}
-          rows={3}
+          rows={2}
+          enterKeyHint="send"
           disabled={state.streaming || gated}
           autoFocus
         />
@@ -198,7 +221,7 @@ function ChatCore({
             Parar
           </button>
         ) : (
-          <button type="submit" className="btn" disabled={!draft.trim() || gated}>
+          <button type="submit" className="btn" data-testid="composer-send" disabled={!draft.trim() || gated}>
             Enviar
           </button>
         )}
@@ -208,8 +231,6 @@ function ChatCore({
           </p>
         ) : null}
       </form>
-
-      {order ? <OrderPanel order={order} onDismiss={() => setOrder(null)} /> : null}
 
       {paying ? (
         <PaymentModal
@@ -241,7 +262,7 @@ const GREETING_STEPS = [
 
 function Greeting({ onPick }: { onPick: (text: string) => void }) {
   return (
-    <div className="greeting">
+    <div className="greeting" data-testid="greeting">
       <h2>Hola 👋</h2>
       <ol className="greeting-timeline" aria-label="Cómo funciona Changuito">
         {GREETING_STEPS.map((step, i) => (

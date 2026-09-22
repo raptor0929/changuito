@@ -7,6 +7,7 @@ import {
   HUMAN_REQUIRED_EVENT,
   type ClientGateDecision,
 } from '../lib/human-gate-ui';
+import { ReportBug } from './ReportBug';
 
 declare global {
   interface Window {
@@ -340,6 +341,7 @@ export function HumanGate({
           {COPY.retry}
         </button>
       ) : null}
+      <ReportBug />
     </section>
   );
 }
