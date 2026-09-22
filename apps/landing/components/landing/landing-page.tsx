@@ -1,5 +1,4 @@
 import {
-  APP_URL,
   BENEFITS,
   BENEFITS_TITLE,
   BOFU,
@@ -51,10 +50,10 @@ export function LandingPage() {
               {/* GIF plays by default. Reduced motion swaps to the locked still via CSS. */}
               <img
                 className={`${styles.mascot} ${styles.mascotMotion}`}
-                src="/brand/animacion-busqueda.gif"
-                alt="Changuito va y vuelve buscando el súper"
+                src="/brand/animacion-cargando.gif"
+                alt="Le caen los productos al carrito de Changuito"
                 width={480}
-                height={320}
+                height={360}
                 fetchPriority="high"
               />
               <img
@@ -144,10 +143,10 @@ export function LandingPage() {
               <div className={styles.payMascotFrame}>
                 <img
                   className={`${styles.payMascot} ${styles.mascotMotion}`}
-                  src="/brand/animacion-busqueda.gif"
-                  alt="Changuito va y vuelve buscando el súper"
+                  src="/brand/animacion-cargando.gif"
+                  alt="Le caen los productos al carrito de Changuito"
                   width={480}
-                  height={320}
+                  height={360}
                 />
                 <img
                   className={`${styles.payMascot} ${styles.mascotStill}`}
@@ -214,9 +213,10 @@ export function LandingPage() {
                   </a>
                 </li>
                 <li>
-                  <a className={styles.footerLink} href={APP_URL} rel="noopener noreferrer">
+                  {/* Beta: domain stays as text so the footer does not open the shopper. */}
+                  <span className={styles.footerLabel} data-testid="landing-footer-app">
                     {FOOTER.appLabel}
-                  </a>
+                  </span>
                 </li>
               </ul>
             </nav>

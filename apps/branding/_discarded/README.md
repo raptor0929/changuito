@@ -4,7 +4,7 @@
 
 No usar en la landing, en marketing de consumo, ni en piezas públicas.
 
-El héroe de la landing usa `motion/animacion-busqueda.gif` (búsqueda ida y vuelta).
+El héroe de la landing usa `motion/animacion-cargando.gif` (productos que caen en el carrito).
 Con `prefers-reduced-motion`, usar la pose estática **idle** o **corriendo**. Nunca éxito.
 
 Si el PDF del manual todavía nombra la pose éxito, manda el markdown: esa pose salió de la lista de situaciones aprobadas.

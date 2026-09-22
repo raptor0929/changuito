@@ -7,7 +7,18 @@
   --paper: #fafaf7;
   --line: rgba(42, 26, 20, 0.14);
   --error: #6b2b22;
-  min-height: 100dvh;
+  /* Pinned to the visual viewport (BugReportViewport). The document itself
+     does not scroll, so iOS has nothing to pan under the autofill pill. */
+  position: fixed;
+  top: var(--vv-top, 0px);
+  right: 0;
+  left: 0;
+  height: var(--vvh, 100svh);
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--paper);
   color: var(--ink);
   font-size: 1rem;
@@ -30,24 +41,40 @@
 
 .skip {
   position: absolute;
-  left: 16px;
-  top: 12px;
   z-index: 40;
-  transform: translateY(-160%);
   background: var(--sun);
   color: var(--ink);
   font-weight: 700;
   text-decoration: none;
-  padding: 12px 16px;
   border-radius: 999px;
-  min-height: 44px;
+  /* Off-screen until focused, without translate or filter. Those promote a
+     compositing layer, and iOS Safari then anchors the autofill bar to that
+     layer instead of to the top of the keyboard. */
+  clip: rect(0, 0, 0, 0);
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
 }
 
 .skip:focus {
-  transform: none;
+  left: 16px;
+  top: 12px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 12px 16px;
+  min-height: 44px;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
 }
 
 .header {
+  flex: none;
   border-bottom: 1px solid rgba(42, 26, 20, 0.08);
 }
 
@@ -78,9 +105,32 @@
 }
 
 .main {
+  flex: none;
+  width: 100%;
   max-width: 40rem;
   margin: 0 auto;
   padding: 8px 16px 12px;
+  box-sizing: border-box;
+}
+
+/* Success sits in the space under the header, not glued to it. */
+.confirm {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  max-width: 40rem;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 32px 16px 12vh;
+  box-sizing: border-box;
+}
+
+.confirm .card {
+  margin-top: 0;
+  width: 100%;
+  padding: 28px 20px 24px;
 }
 
 .title {
@@ -99,7 +149,10 @@
 
 .card {
   margin-top: 8px;
-  padding: 10px 12px 12px;
+  /* .page clips overflow. The focus ring is a 3px outline plus 3px offset,
+     so this padding is the gutter that keeps the rounded stroke inside the
+     clip. 8px is the ring plus a pixel of antialiasing. */
+  padding: 12px 14px 14px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--paper);
@@ -134,13 +187,20 @@
 .control {
   width: 100%;
   min-height: 44px;
-  padding: 8px 12px;
+  /* Inset lives on the control. 8px 12px left the glyphs on the espresso
+     stroke. 20px inline keeps letters off the border and the focus ring. */
+  padding: 14px 20px;
   border: 2px solid rgba(42, 26, 20, 0.28);
   border-radius: 12px;
   background: #fff;
   color: var(--ink);
   font: inherit;
   font-size: 1rem;
+}
+
+select.control {
+  /* The native chevron paints inside the end padding. */
+  padding-inline-end: 44px;
 }
 
 .textarea {
@@ -232,8 +292,16 @@
   align-items: center;
   min-height: 44px;
   margin-top: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--ink);
+  font: inherit;
   font-weight: 700;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 .fileInput {
@@ -305,9 +373,19 @@
   border: 0;
 }
 
+@media (hover: none) and (pointer: coarse) {
+  .control,
+  .fileInput {
+    /* Native focus scroll does not include the autofill pill. */
+    scroll-margin-top: 56px;
+    scroll-margin-bottom: 80px;
+  }
+}
+
 @media (min-width: 720px) {
   .headerInner,
-  .main {
+  .main,
+  .confirm {
     padding-left: 24px;
     padding-right: 24px;
   }
@@ -325,9 +403,19 @@
     height: 48px;
   }
 
-  .main {
+  .main,
+  .confirm {
     padding-top: 12px;
     padding-bottom: 16px;
+  }
+
+  .confirm {
+    padding-top: 32px;
+    padding-bottom: 10vh;
+  }
+
+  .confirm .card {
+    padding: 36px 32px 32px;
   }
 
   .title {
@@ -341,7 +429,7 @@
 
   .card {
     margin-top: 12px;
-    padding: 12px 16px 14px;
+    padding: 14px 16px 16px;
   }
 
   .form {

@@ -182,11 +182,13 @@ test('public pages keep one h1 and key images have alt text', () => {
   const home = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
   const whitelist = readFileSync(join(root, 'app/whitelist/page.tsx'), 'utf8');
   const bug = readFileSync(join(root, 'app/reportarbug/page.tsx'), 'utf8');
+  const bugPanel = readFileSync(join(root, 'components/bug-report/bug-report-panel.tsx'), 'utf8');
   assert.equal(home.match(/<h1[\s>]/g)?.length, 1);
   assert.equal(whitelist.match(/<h1[\s>]/g)?.length, 1);
-  assert.equal(bug.match(/<h1[\s>]/g)?.length, 1);
+  assert.equal(bug.match(/<h1[\s>]/g)?.length ?? 0, 0);
+  assert.equal(bugPanel.match(/<h1[\s>]/g)?.length, 1);
   assert.equal(home.includes('<h4'), false);
-  assert.match(home, /alt="Changuito va y vuelve buscando el súper"/);
+  assert.match(home, /alt="Le caen los productos al carrito de Changuito"/);
   assert.match(bug, /src="\/brand\/mascot-error.png"/);
   assert.match(bug, /alt="Changuito"/);
   assert.equal(home.includes('mascot-error'), false);

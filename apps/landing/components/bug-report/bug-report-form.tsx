@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent, type RefObject } from 'react';
 
 import {
   bytesToBase64,
@@ -9,6 +9,7 @@ import {
   formatBytes,
   unreadableFileMessage,
 } from '../../lib/bug-report/attachments.ts';
+import { ACCESSORY_PX, keyboardInset, scrollDeltaToClear } from '../../lib/bug-report/keyboard-inset.ts';
 import { SEVERITIES } from '../../lib/bug-report/options.ts';
 import styles from './bug-report.module.css';
 
@@ -18,27 +19,27 @@ type FieldErrors = Partial<
 
 type SelectedFile = { id: string; file: File };
 
-export function BugReportSuccess({ autoFocus = false }: { autoFocus?: boolean }) {
-  const titleRef = useRef<HTMLHeadingElement>(null);
-
-  useEffect(() => {
-    if (autoFocus) titleRef.current?.focus();
-  }, [autoFocus]);
-
+export function BugReportSuccess({
+  titleRef,
+  onAgain,
+}: {
+  titleRef: RefObject<HTMLHeadingElement | null>;
+  onAgain: () => void;
+}) {
   return (
     <div className={styles.success} data-testid="bug-report-success">
-      <h2 ref={titleRef} className={styles.successTitle} tabIndex={-1}>
+      <h1 ref={titleRef} className={styles.successTitle} tabIndex={-1}>
         Listo, lo recibimos
-      </h2>
+      </h1>
       <p className={styles.successLead}>Gracias por avisar. Lo vamos a mirar.</p>
-      <a className={styles.again} href="/reportarbug">
-        Contar otro
-      </a>
+      <button type="button" className={styles.again} data-testid="bug-report-again" onClick={onAgain}>
+        Reportar otro error
+      </button>
     </div>
   );
 }
 
-export function BugReportForm({ notice }: { notice?: string }) {
+export function BugReportForm({ notice, onSuccess }: { notice?: string; onSuccess: () => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [description, setDescription] = useState('');
@@ -47,7 +48,6 @@ export function BugReportForm({ notice }: { notice?: string }) {
   const [files, setFiles] = useState<SelectedFile[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, setPending] = useState(false);
-  const [done, setDone] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const errorSummaryRef = useRef<HTMLParagraphElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,14 +55,64 @@ export function BugReportForm({ notice }: { notice?: string }) {
   const baseId = useId();
 
   useEffect(() => {
-    if (done) return;
     const invalid = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
     if (invalid) {
       invalid.focus();
       return;
     }
     if (errors.form || notice) errorSummaryRef.current?.focus();
-  }, [errors, done, notice]);
+  }, [errors, notice]);
+
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    if (!window.matchMedia('(hover: none) and (pointer: coarse)').matches) return;
+
+    const vv = window.visualViewport;
+    let timer = 0;
+
+    const settle = () => {
+      const layout = window.innerHeight;
+      const visual = vv?.height ?? layout;
+      if (keyboardInset(layout, visual) <= 0) return;
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement) || !form.contains(active)) return;
+      if (!active.matches('input, textarea, select')) return;
+      if (active.closest('[aria-hidden="true"]')) return;
+      const scroller = form.closest<HTMLElement>('[data-testid="bug-report-screen"]');
+      if (!scroller) return;
+      const target = active.closest<HTMLElement>(`.${CSS.escape(styles.field)}`) ?? active;
+      const rect = target.getBoundingClientRect();
+      const delta = scrollDeltaToClear(rect.top, rect.height, 12, visual - ACCESSORY_PX);
+      if (delta !== 0) scroller.scrollBy({ top: delta, left: 0, behavior: 'auto' });
+    };
+
+    const schedule = (delay: number) => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(settle, delay);
+    };
+
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (!target.matches('input, textarea, select')) return;
+      if (target.closest('[aria-hidden="true"]')) return;
+      schedule(320);
+    };
+
+    const onViewport = () => schedule(80);
+
+    form.addEventListener('focusin', onFocusIn);
+    vv?.addEventListener('resize', onViewport);
+    window.addEventListener('orientationchange', onViewport);
+
+    return () => {
+      window.clearTimeout(timer);
+      form.removeEventListener('focusin', onFocusIn);
+      vv?.removeEventListener('resize', onViewport);
+      window.removeEventListener('orientationchange', onViewport);
+    };
+  }, []);
 
   function onPickFiles(event: ChangeEvent<HTMLInputElement>) {
     const picked = [...(event.target.files ?? [])];
@@ -127,7 +177,7 @@ export function BugReportForm({ notice }: { notice?: string }) {
       const payload = (await response.json()) as { ok?: boolean; errors?: FieldErrors };
       if (payload.ok) {
         setErrors({});
-        setDone(true);
+        onSuccess();
         return;
       }
       setErrors(payload.errors ?? { form: 'No pudimos recibir el reporte. Probá de nuevo en un rato.' });
@@ -137,8 +187,6 @@ export function BugReportForm({ notice }: { notice?: string }) {
       setPending(false);
     }
   }
-
-  if (done) return <BugReportSuccess autoFocus />;
 
   const formNotice = errors.form ?? notice;
   const nameErrorId = `${baseId}-name-error`;

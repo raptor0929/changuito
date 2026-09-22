@@ -126,6 +126,31 @@ async function upstash(auth: RedisAuth, command: string[], fetchImpl: typeof fet
   return payload.result;
 }
 
+/**
+ * JSON `appendWaitlist_` already reads. The script is not in this repo.
+ * `kind` keeps the row on the waitlist sheet. `whatsappGroup` is the beta-group
+ * answer (sheet column `grupo_whatsapp`). `feedback` is not sent.
+ *
+ * `webhookSecret` is auth only. Google Apps Script web apps do not reliably
+ * copy `Authorization` into `e.headers`, so the same secret rides in the body.
+ * The script must read it for auth and must not write it onto the sheet row.
+ */
+export function waitlistWebhookPayload(entry: WaitlistEntry, secret?: string): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    kind: 'waitlist',
+    name: entry.name,
+    email: entry.email,
+    source: entry.source,
+    otherDetail: entry.otherDetail ?? null,
+    whatsapp: entry.whatsapp,
+    whatsappGroup: entry.whatsappGroup,
+    createdAt: entry.createdAt,
+  };
+  if (entry.userAgent) payload.userAgent = entry.userAgent;
+  if (secret) payload.webhookSecret = secret;
+  return payload;
+}
+
 async function postWebhook(target: WebhookAuth, entry: WaitlistEntry, fetchImpl: typeof fetch): Promise<boolean> {
   try {
     const headers: Record<string, string> = {
@@ -133,22 +158,21 @@ async function postWebhook(target: WebhookAuth, entry: WaitlistEntry, fetchImpl:
       'X-Changuito-Waitlist': '1',
     };
     if (target.secret) headers.Authorization = `Bearer ${target.secret}`;
+    // fetch follows redirects by default. Apps Script answers 302 and then 200;
+    // the body after that redirect is what decides success.
     const response = await fetchImpl(target.url, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        name: entry.name,
-        email: entry.email,
-        source: entry.source,
-        otherDetail: entry.otherDetail ?? null,
-        contactForFeedback: entry.contactForFeedback,
-        whatsapp: entry.whatsapp ?? null,
-        createdAt: entry.createdAt,
-      }),
+      body: JSON.stringify(waitlistWebhookPayload(entry, target.secret)),
       signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) {
       console.error(`[waitlist] webhook status ${response.status}`);
+      return false;
+    }
+    const verdict = await webhookBodyVerdict(response);
+    if (!verdict.ok) {
+      logWebhookRejection(verdict.detail);
       return false;
     }
     return true;
@@ -156,6 +180,48 @@ async function postWebhook(target: WebhookAuth, entry: WaitlistEntry, fetchImpl:
     console.error('[waitlist] webhook failed', error instanceof Error ? error.message : 'unknown');
     return false;
   }
+}
+
+function logWebhookRejection(detail: string): void {
+  if (detail === 'unauthorized') {
+    console.error(
+      '[waitlist] webhook unauthorized. Apps Script did not accept the secret. WAITLIST_WEBHOOK_SECRET must match the script, and doPost must read webhookSecret from the JSON body (Authorization is not delivered). Redeploy a new version.',
+    );
+    return;
+  }
+  console.error(`[waitlist] webhook upstream rejected the signup (${detail})`);
+}
+
+/**
+ * HTTP 200 is not enough. Apps Script returns 200 with `{ ok: false }` when
+ * the secret is rejected or the sheet write fails. Success is `ok !== false`.
+ * A non-JSON body (204, Slack's plain "ok") still counts.
+ */
+async function webhookBodyVerdict(response: Response): Promise<{ ok: true } | { ok: false; detail: string }> {
+  const contentType = (response.headers.get('content-type') ?? '').toLowerCase();
+  const body = (await response.text()).replace(/^\uFEFF/, '').trim();
+  if (!body) return { ok: true };
+  const typedJson = contentType.includes('json');
+  const shapedJson = body.startsWith('{') || body.startsWith('[');
+  if (!typedJson && !shapedJson) return { ok: true };
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    return { ok: false, detail: 'invalid json' };
+  }
+  const detail = webhookRejectionDetail(payload);
+  if (detail) return { ok: false, detail };
+  return { ok: true };
+}
+
+function webhookRejectionDetail(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return undefined;
+  const record = payload as { ok?: unknown; error?: unknown };
+  if (record.ok !== false) return undefined;
+  if (typeof record.error === 'string' && record.error.trim()) return record.error.trim();
+  return 'upstream';
 }
 
 function isHttps(value: string): boolean {

@@ -35,7 +35,8 @@ test('the home header is the wordmark alone', () => {
   assert.match(page, /<BrandLockup className=\{styles\.bofuBrand\} \/>/);
   assert.match(page, /<BrandLockup className=\{styles\.footerBrand\} \/>/);
   assert.equal(page.includes('variant="wordmark"'), false);
-  assert.equal(page.includes('/brand/animacion-busqueda.gif'), true);
+  assert.equal(page.includes('/brand/animacion-cargando.gif'), true);
+  assert.equal(page.includes('animacion-busqueda'), false);
   assert.equal(header.includes('BrandLockup'), true);
   assert.equal(page.includes('BrandLockup'), true);
 });

@@ -262,7 +262,7 @@
 }
 
 /* Idle pose is a tall portrait. Cap it in the hero so reduced motion
-   uses the same slot as the search GIF instead of hanging below the button. */
+   uses the same slot as the loading GIF instead of hanging below the button. */
 .mascotFrame .mascotStill {
   max-height: 300px;
   object-fit: contain;
@@ -527,13 +527,17 @@
   justify-content: flex-end;
 }
 
-.footerLink {
+.footerLink,
+.footerLabel {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
   padding: 8px 10px;
   color: var(--ink);
   font-weight: 600;
+}
+
+.footerLink {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
