@@ -285,6 +285,7 @@ test('a filled honeypot looks successful and does not log or call the webhook', 
 
 test('the report page shows the error mascot and the home hero does not', () => {
   const page = readFileSync(join(root, 'app/reportarbug/page.tsx'), 'utf8');
+  const panel = readFileSync(join(root, 'components/bug-report/bug-report-panel.tsx'), 'utf8');
   const form = readFileSync(join(root, 'components/bug-report/bug-report-form.tsx'), 'utf8');
   const home = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
   const css = readFileSync(join(root, 'components/bug-report/bug-report.module.css'), 'utf8');
@@ -297,7 +298,17 @@ test('the report page shows the error mascot and the home hero does not', () => 
   assert.equal(page.split('/brand/mascot-error.png').length - 1, 1);
   assert.equal(page.includes('isotipo-mascota'), false);
   assert.equal(page.includes('>Changuito<'), false);
-  assert.match(page, /Contanos qué pasó/);
+  assert.match(page, /BugReportPanel/);
+  assert.match(panel, /Contanos qué pasó/);
+  assert.match(panel, /Si algo no anduvo, dejalo acá\./);
+  const success = form.slice(form.indexOf('export function BugReportSuccess'), form.indexOf('export function BugReportForm'));
+  assert.equal(success.includes('Contanos qué pasó'), false);
+  assert.equal(success.includes('Si algo no anduvo'), false);
+  const confirm = panel.slice(panel.indexOf('if (done)'), panel.indexOf('Contanos qué pasó'));
+  assert.match(confirm, /BugReportSuccess/);
+  assert.equal(confirm.includes('Si algo no anduvo'), false);
+  assert.match(form, /onSuccess/);
+  assert.match(form, /Contar otro/);
   assert.equal(page.includes('animacion-busqueda'), false);
   assert.equal(page.includes('mascot-exito'), false);
   assert.equal(page.includes('mascot-idle'), false);
@@ -332,7 +343,7 @@ test('the report page shows the error mascot and the home hero does not', () => 
   assert.match(form, /Adjuntá una foto o un video/);
   assert.match(form, /type="file"/);
 
-  const ui = `${page}\n${form}\n${css}\n${readFileSync(join(root, 'lib/bug-report/attachments.ts'), 'utf8')}`;
+  const ui = `${page}\n${panel}\n${form}\n${css}\n${readFileSync(join(root, 'lib/bug-report/attachments.ts'), 'utf8')}`;
   assert.equal(ui.includes('\u2014'), false);
   assert.equal(ui.includes('\u2013'), false);
 });
