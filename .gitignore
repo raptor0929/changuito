@@ -22,5 +22,8 @@ target/
 .vercel
 *.tsbuildinfo
 
+# Local waitlist signups when no Redis or webhook is configured
+apps/landing/.data/
+
 # Soroban writes one JSON per test on every run; useful locally, noise in git
 contracts/**/test_snapshots/

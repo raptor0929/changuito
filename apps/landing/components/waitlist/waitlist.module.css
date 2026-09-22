@@ -1,0 +1,255 @@
+.page {
+  --ink: #2a1a14;
+  --ink-soft: #4a332c;
+  --sun: #f4b942;
+  --sun-hover: #e3a82a;
+  --sun-active: #d39a1c;
+  --paper: #fafaf7;
+  --line: rgba(42, 26, 20, 0.14);
+  --error: #6b2b22;
+  min-height: 100dvh;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 1.0625rem;
+  line-height: 1.5;
+}
+
+.page ::selection {
+  background: var(--sun);
+  color: var(--ink);
+}
+
+.page :focus {
+  outline: none;
+}
+
+.page :focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.skip {
+  position: absolute;
+  left: 16px;
+  top: 12px;
+  z-index: 40;
+  transform: translateY(-160%);
+  background: var(--sun);
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+  padding: 12px 16px;
+  border-radius: 999px;
+  min-height: 44px;
+}
+
+.skip:focus {
+  transform: none;
+}
+
+.header {
+  border-bottom: 1px solid rgba(42, 26, 20, 0.08);
+}
+
+.headerInner {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 16px 20px;
+}
+
+.brandLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  min-width: 44px;
+  color: var(--ink);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.mark {
+  height: 48px;
+  width: auto;
+}
+
+.brandName {
+  font-size: 1.25rem;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+
+.main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 28px 20px 64px;
+}
+
+.card {
+  margin-top: 20px;
+  padding: 20px 16px 24px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--paper);
+}
+
+.title {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.lead {
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+  font-size: 1.125rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-weight: 700;
+}
+
+.hint {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.control {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 2px solid rgba(42, 26, 20, 0.28);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.control:focus-visible {
+  border-color: var(--ink);
+}
+
+.control[aria-invalid='true'] {
+  border-color: var(--error);
+}
+
+.fieldError {
+  margin: 0;
+  color: var(--error);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.formError {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(107, 43, 34, 0.08);
+  color: var(--error);
+  font-weight: 700;
+}
+
+.submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 4px;
+  padding: 12px 22px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--sun);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.submit:hover {
+  background: var(--sun-hover);
+}
+
+.submit:active {
+  background: var(--sun-active);
+}
+
+.submit:disabled {
+  background: var(--sun);
+  color: var(--ink);
+  cursor: progress;
+  opacity: 1;
+}
+
+.success {
+  margin: 0;
+}
+
+.successTitle {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+
+.successLead {
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+  font-size: 1.125rem;
+}
+
+.honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.other {
+  display: none;
+}
+
+.form:has(select[name='source'] option[value='Otros']:checked) .other {
+  display: flex;
+}
+
+@media (min-width: 720px) {
+  .headerInner,
+  .main {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .mark {
+    height: 56px;
+  }
+
+  .brandName {
+    font-size: 1.4rem;
+  }
+
+  .card {
+    padding: 28px 28px 32px;
+  }
+
+  .title {
+    font-size: 2.5rem;
+  }
+}
