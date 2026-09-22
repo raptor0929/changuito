@@ -13,7 +13,20 @@ import {
   type RenderCache,
 } from './render-tools';
 
-const MODEL = 'claude-sonnet-5';
+// Override to compare: AGENT_MODEL=claude-haiku-4-5-20251001 npm run dev
+const MODEL = process.env.AGENT_MODEL || 'claude-sonnet-5';
+
+/**
+ * Adaptive thinking and the effort control are Claude 5 features — Haiku 4.5
+ * rejects the request outright with "adaptive thinking is not supported on
+ * this model". It still thinks, it just wants a fixed budget instead. Swapping
+ * MODEL alone is not enough; the request shape has to follow.
+ */
+const isClaude5 = /^claude-(opus|sonnet|fable)-5/.test(MODEL);
+const THINKING = isClaude5
+  ? ({ type: 'adaptive', display: 'summarized' } as const)
+  : ({ type: 'enabled', budget_tokens: 2048 } as const);
+const EFFORT = isClaude5 ? { output_config: { effort: 'medium' as const } } : {};
 
 /** A basket takes a handful of searches. Past this the model is stuck, not working. */
 const MAX_HOPS = 12;
@@ -76,8 +89,8 @@ export async function runTurn(
     const stream = anthropic.messages.stream({
       model: MODEL,
       max_tokens: 8192,
-      thinking: { type: 'adaptive', display: 'summarized' },
-      output_config: { effort: 'medium' },
+      thinking: THINKING,
+      ...EFFORT,
       system,
       tools,
       messages: turn.messages,
@@ -87,6 +100,13 @@ export async function runTurn(
     stream.on('thinking', (delta) => emit({ t: 'thinking', delta }));
 
     const msg = await stream.finalMessage();
+    if (process.env.AGENT_USAGE) {
+      const u = msg.usage;
+      console.log(
+        `[usage] ${MODEL} hop=${hop} in=${u.input_tokens} out=${u.output_tokens} ` +
+          `cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0}`,
+      );
+    }
     turn.messages.push({ role: 'assistant', content: msg.content });
 
     if (msg.stop_reason === 'refusal') {
