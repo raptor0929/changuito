@@ -347,3 +347,13 @@ test('the report page shows the error mascot and the home hero does not', () => 
   assert.equal(ui.includes('\u2014'), false);
   assert.equal(ui.includes('\u2013'), false);
 });
+
+test('report fields pad the glyphs and leave room for the focus ring', () => {
+  const css = readFileSync(join(root, 'components/bug-report/bug-report.module.css'), 'utf8');
+  const control = css.slice(css.indexOf('.control {'), css.indexOf('select.control'));
+  assert.match(control, /padding:\s*14px 20px/);
+  assert.match(css, /select\.control\s*\{[^}]*padding-inline-end:\s*44px/s);
+  assert.match(css, /overflow-x:\s*hidden/);
+  assert.match(css, /padding:\s*12px 14px 14px/);
+  assert.match(css, /padding:\s*14px 16px 16px/);
+});

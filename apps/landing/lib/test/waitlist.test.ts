@@ -76,6 +76,15 @@ test('the source list is socials, events (with Nerdearla) and Otros — no Whats
   assert.equal(allowedSources().has('Threads'), false);
 });
 
+test('waitlist fields use the same inset as the bug report controls', () => {
+  const css = readFileSync(join(root, 'components/waitlist/waitlist.module.css'), 'utf8');
+  const control = css.slice(css.indexOf('.control {'), css.indexOf('select.control'));
+  assert.match(control, /padding:\s*14px 20px/);
+  assert.match(css, /select\.control\s*\{[^}]*padding-inline-end:\s*44px/s);
+  assert.equal(css.includes('\u2014'), false);
+  assert.equal(css.includes('\u2013'), false);
+});
+
 test('the waitlist form asks for a required WhatsApp and the beta group', () => {
   const form = readFileSync(join(root, 'components/waitlist/waitlist-form.tsx'), 'utf8');
   const page = readFileSync(join(root, 'app/whitelist/page.tsx'), 'utf8');

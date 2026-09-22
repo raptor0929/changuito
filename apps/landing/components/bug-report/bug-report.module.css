@@ -149,7 +149,10 @@
 
 .card {
   margin-top: 8px;
-  padding: 10px 12px 12px;
+  /* .page clips overflow. The focus ring is a 3px outline plus 3px offset,
+     so this padding is the gutter that keeps the rounded stroke inside the
+     clip. 8px is the ring plus a pixel of antialiasing. */
+  padding: 12px 14px 14px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--paper);
@@ -184,13 +187,20 @@
 .control {
   width: 100%;
   min-height: 44px;
-  padding: 8px 12px;
+  /* Inset lives on the control. 8px 12px left the glyphs on the espresso
+     stroke. 20px inline keeps letters off the border and the focus ring. */
+  padding: 14px 20px;
   border: 2px solid rgba(42, 26, 20, 0.28);
   border-radius: 12px;
   background: #fff;
   color: var(--ink);
   font: inherit;
   font-size: 1rem;
+}
+
+select.control {
+  /* The native chevron paints inside the end padding. */
+  padding-inline-end: 44px;
 }
 
 .textarea {
@@ -419,7 +429,7 @@
 
   .card {
     margin-top: 12px;
-    padding: 12px 16px 14px;
+    padding: 14px 16px 16px;
   }
 
   .form {
