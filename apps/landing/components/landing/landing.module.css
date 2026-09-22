@@ -521,13 +521,17 @@
   justify-content: flex-end;
 }
 
-.footerLink {
+.footerLink,
+.footerLabel {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
   padding: 8px 10px;
   color: var(--ink);
   font-weight: 600;
+}
+
+.footerLink {
   text-decoration: underline;
   text-underline-offset: 3px;
 }

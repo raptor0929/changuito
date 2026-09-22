@@ -1,8 +1,9 @@
 /**
- * Marketing copy and the only product handoff.
+ * Marketing copy.
  *
- * The landing may link to the app and nowhere else. Paths, query strings and
- * tokens do not belong on that URL — the app origin is the whole destination.
+ * APP_URL is the shopper origin. It stays for SEO and docs.
+ * During the controlled beta, visitor CTAs go to /whitelist on this site
+ * and must not navigate to APP_URL.
  */
 
 export const APP_URL = 'https://app.changuito.me';

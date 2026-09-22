@@ -10,7 +10,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 test('the try CTA uses the locked running mascot instead of an arrow', () => {
   const source = readFileSync(join(root, 'components/landing/try-link.tsx'), 'utf8');
   assert.equal(source.includes('→'), false);
-  assert.match(source, /href=\{APP_URL\}/);
+  assert.match(source, /href="\/whitelist"/);
+  assert.equal(source.includes('href={APP_URL}'), false);
+  assert.equal(source.includes('app.changuito.me'), false);
   assert.match(source, /\{HERO\.cta\}/);
   assert.match(source, /src="\/brand\/mascota-corriendo\.png"/);
   assert.match(source, /alt=""/);
@@ -20,6 +22,17 @@ test('the try CTA uses the locked running mascot instead of an arrow', () => {
   assert.match(css, /\.ctaMascot\s*\{[^}]*height:\s*1\.4em;/);
   assert.match(css, /\.ctaMascot\s*\{[^}]*object-fit:\s*contain;/);
   assert.equal(css.includes('.ctaArrow'), false);
+
+  const page = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
+  const header = readFileSync(join(root, 'components/landing/site-header.tsx'), 'utf8');
+  assert.equal(page.includes('APP_URL'), false);
+  assert.equal(page.includes('app.changuito.me'), false);
+  assert.match(page, /<span className=\{styles\.footerLabel\}/);
+  assert.match(page, /data-testid="landing-footer-app"/);
+  assert.equal(header.includes('APP_URL'), false);
+  assert.match(page, /testId="landing-cta-hero"/);
+  assert.match(page, /testId="landing-cta-bofu"/);
+  assert.match(header, /testId="landing-cta-header"/);
 
   const pub = readFileSync(join(root, 'public/brand/mascota-corriendo.png'));
   const locked = readFileSync(join(root, '../branding/mascot/mascota-corriendo.png'));
