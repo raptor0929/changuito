@@ -2,25 +2,20 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 
 import { BugReportForm, BugReportSuccess } from '../../components/bug-report/bug-report-form';
+import { JsonLd } from '../../components/seo/json-ld';
 import styles from '../../components/bug-report/bug-report.module.css';
-import { SITE_URL } from '../../lib/copy';
+import { pageMetadata, publicPage, subpageJsonLd } from '../../lib/seo';
 
-const title = 'Reportar un bug';
-const description = 'Contanos qué pasó. Si algo no anduvo, lo miramos.';
+const page = publicPage('/reportarbug');
 
-export const metadata: Metadata = {
-  title,
-  description,
-  alternates: { canonical: `${SITE_URL}/reportarbug` },
-  openGraph: {
-    title,
-    description,
-    url: `${SITE_URL}/reportarbug`,
-    siteName: 'Changuito',
-    locale: 'es_AR',
-    type: 'website',
-  },
-};
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ estado?: string }>;
+}): Promise<Metadata> {
+  const { estado } = await searchParams;
+  return pageMetadata(page, { noindex: Boolean(estado) });
+}
 
 export default async function ReportarBugPage({
   searchParams,
@@ -32,6 +27,7 @@ export default async function ReportarBugPage({
 
   return (
     <div className={styles.page} data-testid="bug-report-screen">
+      <JsonLd data={subpageJsonLd(page)} />
       <a className={styles.skip} href="#reporte">
         Saltar al formulario
       </a>

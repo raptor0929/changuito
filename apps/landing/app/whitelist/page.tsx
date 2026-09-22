@@ -1,26 +1,21 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 
+import { JsonLd } from '../../components/seo/json-ld';
 import { WaitlistForm } from '../../components/waitlist/waitlist-form';
 import styles from '../../components/waitlist/waitlist.module.css';
-import { SITE_URL } from '../../lib/copy';
+import { pageMetadata, publicPage, subpageJsonLd } from '../../lib/seo';
 
-const title = 'Sumate a la lista';
-const description = 'Te avisamos cuando puedas probar Changuito.';
+const page = publicPage('/whitelist');
 
-export const metadata: Metadata = {
-  title,
-  description,
-  alternates: { canonical: `${SITE_URL}/whitelist` },
-  openGraph: {
-    title,
-    description,
-    url: `${SITE_URL}/whitelist`,
-    siteName: 'Changuito',
-    locale: 'es_AR',
-    type: 'website',
-  },
-};
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ estado?: string }>;
+}): Promise<Metadata> {
+  const { estado } = await searchParams;
+  return pageMetadata(page, { noindex: Boolean(estado) });
+}
 
 export default async function WhitelistPage({
   searchParams,
@@ -32,6 +27,7 @@ export default async function WhitelistPage({
 
   return (
     <div className={styles.page} data-testid="whitelist-screen">
+      <JsonLd data={subpageJsonLd(page)} />
       <a className={styles.skip} href="#lista">
         Saltar al formulario
       </a>
