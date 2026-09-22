@@ -25,10 +25,21 @@ Elegí **uno** de estos destinos. Si están los dos, Redis es el registro y el w
 
 | Variable | Obligatoria | Para qué |
 |---|---|---|
-| `WAITLIST_WEBHOOK_URL` | una de las dos vías | `POST` JSON `{ name, email, source, otherDetail, createdAt }` a un HTTPS (Notion, Sheets, Slack, Make). `http` solo en `localhost`. |
+| `WAITLIST_WEBHOOK_URL` | una de las dos vías | `POST` JSON `{ name, email, source, otherDetail, contactForFeedback, whatsapp, createdAt }` a un HTTPS (Notion, Sheets, Slack, Make). `http` solo en `localhost`. |
 | `WAITLIST_WEBHOOK_SECRET` | no | Si está, va como `Authorization: Bearer …`. |
 | `KV_REST_API_URL` o `UPSTASH_REDIS_REST_URL` | la otra vía | El mismo Redis REST que ya usa el shopper. La landing es otro proyecto de Vercel: hay que conectar la integración ahí, no se hereda sola. |
 | `KV_REST_API_TOKEN` o `UPSTASH_REDIS_REST_TOKEN` | junto con la URL | Token REST. Nunca commitearlo. |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | en producción | Site key pública de Cloudflare Turnstile (widget en el formulario). |
+| `TURNSTILE_SECRET_KEY` | en producción | Secret key de Turnstile (solo servidor; verifica el token antes de guardar). Nunca commitearla. |
+
+### Cloudflare Turnstile
+
+El formulario de `/whitelist` manda un token de Turnstile con el alta. El servidor lo verifica contra `siteverify` antes de persistir. El honeypot (`company`) y el rate-limit siguen activos; el CAPTCHA es adicional.
+
+- **Producción:** si faltan `NEXT_PUBLIC_TURNSTILE_SITE_KEY` o `TURNSTILE_SECRET_KEY`, el alta se rechaza (mismo espíritu que un sink sin configurar).
+- **Local / no-production:** si las keys no están, el submit se acepta sin widget (se loguea un aviso una vez) para que `next dev` siga funcionando.
+
+Creá un widget en el [dashboard de Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) y pegá las dos keys en el proyecto de Vercel de la landing.
 
 La clave de Redis es `changuito:landing:waitlist` (hash por email, `HSETNX`), para no pisar las sesiones del shopper si comparten base.
 
@@ -67,7 +78,6 @@ El kit completo vive en `apps/branding/` (manuals, logo, mascota, pattern, motio
 | `public/brand/wordmark.png` | sin uso en la UI. El lettering con Sol de Mayo no es el logo. |
 | `public/og.png` | pose idle ancha del zip de landing (1280×720), solo Open Graph |
 | `public/brand/isotipo-mascota.png` | `apps/branding/logo/isotipo-mascota.png` (solo la mascota, header de `/whitelist`) |
-| `app/whitelist/icon.png` | el mismo isotipo, ícono de la ruta `/whitelist` |
-| `app/favicon.ico`, `app/icon.png`, `app/apple-icon.png` | cara de la bolsa recortada de `apps/branding/mascot/mascota-idle.png` (16/32/48, 32 y 180). Los mismos archivos están en `apps/web/app`. |
+| `app/favicon.ico`, `app/icon.png`, `app/apple-icon.png` | mascota idle completa (`mascota-idle.png`) encajada en un cuadrado con margen transparente (16/32/48, 32 y 180). Sin recorte de cara. Los mismos archivos están en `apps/web/app`. `/whitelist` hereda estos íconos (no hay `app/whitelist/icon.png`). |
 
 El header, el pie y el cierre del home muestran la mascota idle y la palabra «Changuito» en Inter. `/whitelist` usa el isotipo y la misma palabra en texto. Ninguno usa el lettering. El fondo es `#FAFAF7` plano: el patrón mate-pan no se tilea.

@@ -5,9 +5,10 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Tab and home-screen icons are a square crop of the idle bag face.
- * Source: apps/branding/mascot/mascota-idle.png. Not the wordmark, not the
- * full-body lockup, and not the discarded éxito pose.
+ * Tab and home-screen icons are the full idle mascot (bag + pan/verdes/mate +
+ * wheels) letterboxed into a square with a little transparent margin.
+ * Source: apps/branding/mascot/mascota-idle.png. Not a face-only crop, not
+ * Sol de Mayo, not the wordmark, and not the discarded éxito pose.
  */
 
 const landing = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -31,8 +32,9 @@ function icoSizes(buf: Buffer): number[] {
   return sizes;
 }
 
-test('both apps serve the idle mascot as favicon, tab icon, and apple touch icon', () => {
+test('both apps serve the full idle mascot fitted in a square as favicon icons', () => {
   assert.equal(existsSync(join(landing, 'app/icon.svg')), false);
+  assert.equal(existsSync(join(landing, 'app/whitelist/icon.png')), false);
   assert.equal(existsSync(join(landing, '../branding/mascot/mascota-idle.png')), true);
   assert.equal(existsSync(join(landing, '../branding/mascot/mascota-exito.png')), false);
 

@@ -10,14 +10,11 @@ export const SOCIAL_SOURCES = [
   'TikTok',
   'YouTube',
   'Facebook',
-  'WhatsApp',
   'Telegram',
-  'Threads',
 ] as const;
 
-export const NERDEARLA_SOURCE = 'Nerdearla';
-
 export const EVENT_SOURCES = [
+  'Nerdearla',
   'AI Founder Marketplace',
   'Astra Commons: Buenos Aires',
   'BrowserStack Meetup Buenos Aires: Master Accessibility & AI in QA',
@@ -29,7 +26,6 @@ export const OTHER_SOURCE = 'Otros';
 
 export const SOURCE_GROUPS = [
   { id: 'social', label: 'Redes sociales', options: SOCIAL_SOURCES },
-  { id: 'nerdearla', label: 'Nerdearla', options: [NERDEARLA_SOURCE] as const },
   { id: 'events', label: 'Eventos', options: EVENT_SOURCES },
   { id: 'other', label: 'Otros', options: [OTHER_SOURCE] as const },
 ] as const;
