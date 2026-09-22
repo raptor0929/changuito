@@ -66,7 +66,15 @@ test('hero copy matches the locked brief', () => {
   );
   assert.equal(HERO.pay, 'Pagá con tarjeta o USDC.');
   assert.equal(HERO.cta, 'Probar Changuito');
+  assert.equal('secondary' in HERO, false);
   assert.equal(PAYMENTS.assurance, NO_CHARGE);
+  const page = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
+  const css = readFileSync(join(root, 'components/landing/landing.module.css'), 'utf8');
+  assert.equal(page.includes('Ver cómo funciona'), false);
+  assert.equal(page.includes('textLink'), false);
+  assert.equal(css.includes('.textLink'), false);
+  assert.equal(page.includes('id="como-funciona"'), true);
+  assert.equal(page.includes('/brand/animacion-busqueda.gif'), true);
 });
 
 test('landing copy stays free of jargon and a refund promise', () => {

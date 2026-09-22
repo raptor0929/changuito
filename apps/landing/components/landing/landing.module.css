@@ -195,7 +195,7 @@
   max-width: 1120px;
   margin: 0 auto;
   /* Desktop: the mascot shares the action-row baseline. A deep bottom
-     pad used to leave it floating above an empty band under the scroll cue.
+     pad used to leave it floating above an empty band under the try button.
      Narrow viewports override this block. */
   padding: 48px 24px 24px;
   display: grid;
@@ -229,20 +229,8 @@
 
 .heroActions {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px 20px;
   margin-top: 32px;
-}
-
-.textLink {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  color: var(--ink);
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 4px;
 }
 
 .mascotFrame {
@@ -268,7 +256,7 @@
 }
 
 /* Idle pose is a tall portrait. Cap it in the hero so reduced motion
-   uses the same slot as the search GIF instead of hanging below the cue. */
+   uses the same slot as the search GIF instead of hanging below the button. */
 .mascotFrame .mascotStill {
   max-height: 300px;
   object-fit: contain;
@@ -649,6 +637,7 @@
     margin-top: 16px;
   }
 
+
   .mascotFrame {
     justify-self: center;
     justify-content: center;
@@ -702,7 +691,7 @@
   }
 }
 
-/* iPhone 13/14 and similar (~390×844): keep the mascot directly under the text link. */
+/* iPhone 13/14 and similar (~390×844): keep the mascot directly under the try button. */
 @media (max-width: 480px) {
   .page {
     --header-h: 52px;
@@ -757,7 +746,6 @@
 
   .heroActions {
     margin-top: 8px;
-    gap: 2px 12px;
   }
 
   .cta {

@@ -27,7 +27,7 @@ test('desktop hero keeps the mascot on the action-row baseline', () => {
   assert.match(still, /max-height:\s*300px/);
 });
 
-test('mobile keeps the mascot tight under the scroll cue', () => {
+test('mobile keeps the mascot tight under the try button', () => {
   const narrow = css.indexOf('@media (max-width: 480px)');
   assert.notEqual(narrow, -1);
   const hero = block('.heroInner {', narrow);

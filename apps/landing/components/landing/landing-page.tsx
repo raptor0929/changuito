@@ -45,10 +45,6 @@ export function LandingPage() {
               <p className={styles.payLine}>{HERO.pay}</p>
               <div className={styles.heroActions}>
                 <TryLink testId="landing-cta-hero" />
-                <a className={styles.textLink} href="#como-funciona">
-                  {HERO.secondary}
-                  <span aria-hidden="true"> ↓</span>
-                </a>
               </div>
             </div>
             <div className={styles.mascotFrame}>
