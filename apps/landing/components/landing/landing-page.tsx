@@ -8,16 +8,22 @@ import {
   HERO,
   NAV,
   PAYMENTS,
+  SOCIAL,
   STEPS,
   STEPS_TITLE,
 } from '../../lib/copy';
 import { BrandLockup } from './brand-lockup';
 import { FaqList } from './faq-list';
-import { CheckIcon, StepIcon } from './icons';
+import { CheckIcon, InstagramIcon, StepIcon, XIcon } from './icons';
 import { SiteHeader } from './site-header';
 import { TryLink } from './try-link';
 
 import styles from './landing.module.css';
+
+const SOCIAL_ICONS = {
+  x: XIcon,
+  instagram: InstagramIcon,
+} as const;
 
 export function LandingPage() {
   return (
@@ -191,27 +197,48 @@ export function LandingPage() {
           <a className={styles.logoLink} href="/">
             <BrandLockup className={styles.footerBrand} />
           </a>
-          <nav aria-label="Pie" className={styles.footerNavWrap}>
-            <ul className={styles.footerNav}>
-              {NAV.map((link) => (
-                <li key={link.href}>
-                  <a className={styles.footerLink} href={link.href}>
-                    {link.label}
+          <div className={styles.footerMeta}>
+            <nav aria-label="Pie" className={styles.footerNavWrap}>
+              <ul className={styles.footerNav}>
+                {NAV.map((link) => (
+                  <li key={link.href}>
+                    <a className={styles.footerLink} href={link.href}>
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+                <li>
+                  <a className={styles.footerLink} href="/">
+                    {FOOTER.siteLabel}
                   </a>
                 </li>
-              ))}
-              <li>
-                <a className={styles.footerLink} href="/">
-                  {FOOTER.siteLabel}
-                </a>
-              </li>
-              <li>
-                <a className={styles.footerLink} href={APP_URL} rel="noopener noreferrer">
-                  {FOOTER.appLabel}
-                </a>
-              </li>
+                <li>
+                  <a className={styles.footerLink} href={APP_URL} rel="noopener noreferrer">
+                    {FOOTER.appLabel}
+                  </a>
+                </li>
+              </ul>
+            </nav>
+            <ul className={styles.footerSocial} data-testid="landing-social">
+              {SOCIAL.map((link) => {
+                const Icon = SOCIAL_ICONS[link.icon];
+                return (
+                  <li key={link.href}>
+                    <a
+                      className={styles.socialLink}
+                      href={link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={link.ariaLabel}
+                    >
+                      <Icon className={styles.socialIcon} />
+                      <span>{link.label}</span>
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
-          </nav>
+          </div>
         </div>
         <p className={styles.fine}>{FOOTER.legal}</p>
         <p className={styles.fine}>{FOOTER.copyright}</p>

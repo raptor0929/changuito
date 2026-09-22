@@ -141,6 +141,8 @@ async function postWebhook(target: WebhookAuth, entry: WaitlistEntry, fetchImpl:
         email: entry.email,
         source: entry.source,
         otherDetail: entry.otherDetail ?? null,
+        contactForFeedback: entry.contactForFeedback,
+        whatsapp: entry.whatsapp ?? null,
         createdAt: entry.createdAt,
       }),
       signal: AbortSignal.timeout(8000),
