@@ -84,7 +84,7 @@ Si `BUG_REPORT_WEBHOOK_URL` está configurada, el servidor hace `POST` JSON. Si 
 | `BUG_REPORT_WEBHOOK_URL` | no | `POST` JSON con `kind: "bug"`, el relato en `error`, cómo repetirlo en `pasos`, y `adjuntos` (foto o video en base64). `http` solo en `localhost`. |
 | `BUG_REPORT_WEBHOOK_SECRET` | no | Si está, va como `Authorization: Bearer …`. |
 
-La mascota de esa página es `public/brand/mascot-error.png` (el carrito idle con ojos en X y gesto hacia abajo). No se usa en el hero ni en los GIF de búsqueda.
+La mascota de esa página es `public/brand/mascot-error.png` (el carrito idle con ojos en X y gesto hacia abajo). No se usa en el hero ni en el GIF de carga.
 
 El adjunto es opcional: hasta 3 archivos, 3 MB en total, JPG, PNG, WEBP, GIF, MP4, WEBM o MOV. El tope entra en el cuerpo del request (el base64 lo agranda) y en lo que Apps Script sube a Drive. Cada ítem va `{ name, mimeType, base64 }`. El script los sube y escribe las URLs en la columna `adjuntos`.
 
@@ -117,7 +117,7 @@ El kit completo vive en `apps/branding/` (manuals, logo, mascota, pattern, motio
 
 | Público | Origen |
 |---|---|
-| `public/brand/animacion-busqueda.gif` | `apps/branding/motion/animacion-busqueda.gif` (hero y pagos, ida y vuelta) |
+| `public/brand/animacion-cargando.gif` | `apps/branding/motion/animacion-cargando.gif` (hero y pagos: le caen los productos al carrito) |
 | `public/brand/mascot-idle.png` | `apps/branding/mascot/mascota-idle.png` (movimiento reducido, y marca del header, pie y cierre) |
 | `public/brand/mascota-corriendo.png` | `apps/branding/mascot/mascota-corriendo.png` (CTA, en el lugar de la flecha) |
 | `public/brand/wordmark.png` | `apps/branding/logo/wordmark.png` (lettering chunky con Sol de Mayo). Header de `/reportarbug`, junto a la mascota de error. El mismo archivo está en `apps/web/public/brand`. |

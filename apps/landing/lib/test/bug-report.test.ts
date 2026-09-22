@@ -310,14 +310,17 @@ test('the report page shows the error mascot and the home hero does not', () => 
   assert.match(form, /onSuccess/);
   assert.match(form, /Reportar otro error/);
   assert.equal(page.includes('animacion-busqueda'), false);
+  assert.equal(page.includes('animacion-cargando'), false);
   assert.equal(page.includes('mascot-exito'), false);
   assert.equal(page.includes('mascot-idle'), false);
   assert.equal(form.includes('mascot-exito'), false);
   assert.equal(form.includes('animacion-busqueda'), false);
+  assert.equal(form.includes('animacion-cargando'), false);
   assert.match(home, /href="\/reportarbug"/);
   assert.match(home, /Reportar un bug/);
   assert.equal(home.includes('mascot-error'), false);
-  assert.equal(home.includes('/brand/animacion-busqueda.gif'), true);
+  assert.equal(home.includes('/brand/animacion-cargando.gif'), true);
+  assert.equal(home.includes('animacion-busqueda'), false);
 
   const mascot = readFileSync(join(root, 'public/brand/mascot-error.png'));
   const idle = readFileSync(join(root, 'public/brand/mascot-idle.png'));

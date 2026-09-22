@@ -50,10 +50,10 @@ export function LandingPage() {
               {/* GIF plays by default. Reduced motion swaps to the locked still via CSS. */}
               <img
                 className={`${styles.mascot} ${styles.mascotMotion}`}
-                src="/brand/animacion-busqueda.gif"
-                alt="Changuito va y vuelve buscando el súper"
+                src="/brand/animacion-cargando.gif"
+                alt="Le caen los productos al carrito de Changuito"
                 width={480}
-                height={320}
+                height={360}
                 fetchPriority="high"
               />
               <img
@@ -143,10 +143,10 @@ export function LandingPage() {
               <div className={styles.payMascotFrame}>
                 <img
                   className={`${styles.payMascot} ${styles.mascotMotion}`}
-                  src="/brand/animacion-busqueda.gif"
-                  alt="Changuito va y vuelve buscando el súper"
+                  src="/brand/animacion-cargando.gif"
+                  alt="Le caen los productos al carrito de Changuito"
                   width={480}
-                  height={320}
+                  height={360}
                 />
                 <img
                   className={`${styles.payMascot} ${styles.mascotStill}`}
