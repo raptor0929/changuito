@@ -49,9 +49,8 @@ El kit completo vive en `apps/branding/` (manuals, logo, mascota, pattern, motio
 | Público | Origen |
 |---|---|
 | `public/brand/wordmark.png` | `apps/branding/logo/wordmark.png` |
-| `public/brand/animacion-cargando.gif` | `apps/branding/motion/animacion-cargando.gif` (hero) |
-| `public/brand/mascot-idle.png` | `apps/branding/mascot/mascota-idle.png` (hero si `prefers-reduced-motion`) |
-| `public/brand/mascot-exito.png` | `apps/branding/mascot/mascota-exito.png` |
+| `public/brand/animacion-busqueda.gif` | `apps/branding/motion/animacion-busqueda.gif` (hero y pagos, ida y vuelta) |
+| `public/brand/mascot-idle.png` | `apps/branding/mascot/mascota-idle.png` (`prefers-reduced-motion`) |
 | `public/brand/mascota-corriendo.png` | `apps/branding/mascot/mascota-corriendo.png` (CTA, en el lugar de la flecha) |
 | `public/brand/lockup-stacked.png` | `apps/branding/logo/lockup-stacked-mascota-y-wordmark.png` |
 | `public/og.png` | pose idle ancha del zip de landing (1280×720), solo Open Graph |

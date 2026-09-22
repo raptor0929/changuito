@@ -246,9 +246,10 @@ Sobre fotografía: solo si hay zona limpia o se usa versión monocromo con buen 
 | **Idle** | Default, onboarding, empty states neutros |
 | **Corriendo** | Loading de navegación, “buscando”, energía |
 | **Esperando** | Waiting / hold / “un toque” |
-| **Éxito** | Compra OK, confirmación, check |
 | **Comparando** | Comparación de precios / pensamiento |
 | **Lleno** | Carrito armado, checkout listo |
+
+La pose **éxito** (destellos y medalla de girasol con check) no está aprobada para marketing de consumo. No usarla en la landing ni en piezas públicas. El archivo está en `apps/branding/_discarded/`.
 
 ### Motion (GIF / Lottie-ready)
 Existen animaciones aprobadas en el Brand Kit (`motion/`): cargando, búsqueda ida-vuelta (half-speed), comparando-pensamiento (burbuja chica), pago-confirmado.  

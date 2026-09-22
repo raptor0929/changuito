@@ -16,7 +16,6 @@ public/
       idle.png
       corriendo.png
       esperando.png
-      exito.png
       comparando.png
       lleno.png
     pattern/

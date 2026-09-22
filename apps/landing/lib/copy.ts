@@ -56,12 +56,12 @@ export const BENEFITS = [
     body: 'Armá el súper sin pensar. Changuito empuja el carrito con vos.',
   },
   {
-    title: 'Real',
-    body: 'Precios reales de supermercado.',
+    title: 'Sin pensar mucho',
+    body: 'Contale para qué ocasión preparás la comida y para cuántas personas, y Changuito se encarga de cada detalle por vos.',
   },
   {
     title: 'Local',
-    body: 'Hecho para cómo se compra acá: pan, verdes, mate y todo el súper.',
+    body: 'Changuito te ayuda a ahorrar comparando precios entre varios supermercados y armándote el carrito como más te convenga.',
   },
 ] as const;
 
