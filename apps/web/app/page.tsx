@@ -18,7 +18,15 @@ export default function Home() {
               height={583}
             />
             <div className="brand-copy">
-              <h1 className="brand-name">Changuito</h1>
+              <h1 className="brand-name">
+                <img
+                  className="brand-wordmark"
+                  src="/brand/wordmark.png"
+                  alt="Changuito"
+                  width={1097}
+                  height={249}
+                />
+              </h1>
               <p className="tagline">
                 Contale a Changuito lo que necesitás y dejá que se encargue de planear todo.
               </p>

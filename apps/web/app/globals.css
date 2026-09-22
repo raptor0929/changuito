@@ -92,16 +92,20 @@ a:hover { color: var(--chg-arcilla); }
 
 .brand-name {
   margin: 0;
-  color: var(--text);
-  font-weight: 800;
-  font-size: 1.35rem;
-  letter-spacing: -0.03em;
-  line-height: 1;
+  line-height: 0;
+}
+
+/* Canonical lettering. The name is the image, not Inter. */
+.brand-wordmark {
+  display: block;
+  height: 28px;
+  width: auto;
+  max-width: 100%;
 }
 
 @media (max-width: 520px) {
-  .brand-name {
-    font-size: 1.15rem;
+  .brand-wordmark {
+    height: 22px;
   }
 }
 
@@ -678,8 +682,8 @@ a:hover { color: var(--chg-arcilla); }
     height: 36px;
   }
 
-  .shell:has(.chat.is-empty) .brand-name {
-    font-size: 1.05rem;
+  .shell:has(.chat.is-empty) .brand-wordmark {
+    height: 20px;
   }
 
   .shell:has(.chat.is-empty) .tagline {
