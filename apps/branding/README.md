@@ -1,6 +1,6 @@
 # Changuito — Branding
 
-Assets y manuals para `apps/web` (landing www.changuito.me) y lanzamiento social.
+Kit en `apps/branding/` (hermano de `apps/web` y `apps/landing`). Assets y manuals para la landing (www.changuito.me) y el lanzamiento social.
 
 ## Estructura
 
