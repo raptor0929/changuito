@@ -54,11 +54,20 @@ test('footer social profiles point at @appchanguito', () => {
       },
     ],
   );
+  assert.equal(SOCIAL.filter((link) => link.href === 'https://x.com/appchanguito').length, 1);
+  assert.equal(SOCIAL.filter((link) => link.href.includes('twitter.com')).length, 0);
   const page = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
   assert.equal(page.includes('SOCIAL'), true);
   assert.equal(page.includes('landing-social'), true);
   assert.equal(page.includes('target="_blank"'), true);
   assert.equal(page.includes('noopener noreferrer'), true);
+  assert.equal(page.includes('XIcon'), false);
+  assert.equal(page.includes('https://x.com/appchanguito'), false);
+  assert.equal(page.split('SOCIAL.map').length - 1, 1);
+  assert.equal(page.includes('landing-footer-app'), false);
+  assert.equal(page.includes('FOOTER.appLabel'), false);
+  const css = readFileSync(join(root, 'components/landing/landing.module.css'), 'utf8');
+  assert.equal(css.includes('.footerLabel'), false);
 });
 
 test('hero copy matches the locked brief', () => {

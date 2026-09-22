@@ -27,8 +27,9 @@ test('the try CTA uses the locked running mascot instead of an arrow', () => {
   const header = readFileSync(join(root, 'components/landing/site-header.tsx'), 'utf8');
   assert.equal(page.includes('APP_URL'), false);
   assert.equal(page.includes('app.changuito.me'), false);
-  assert.match(page, /<span className=\{styles\.footerLabel\}/);
-  assert.match(page, /data-testid="landing-footer-app"/);
+  assert.equal(page.includes('footerLabel'), false);
+  assert.equal(page.includes('landing-footer-app'), false);
+  assert.equal(page.includes('FOOTER.appLabel'), false);
   assert.equal(header.includes('APP_URL'), false);
   assert.match(page, /testId="landing-cta-hero"/);
   assert.match(page, /testId="landing-cta-bofu"/);
