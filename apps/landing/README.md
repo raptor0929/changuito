@@ -54,6 +54,6 @@ El kit completo vive en `apps/branding/` (manuals, logo, mascota, pattern, motio
 | `public/brand/mascota-corriendo.png` | `apps/branding/mascot/mascota-corriendo.png` (CTA, en el lugar de la flecha) |
 | `public/brand/lockup-stacked.png` | `apps/branding/logo/lockup-stacked-mascota-y-wordmark.png` |
 | `public/og.png` | pose idle ancha del zip de landing (1280×720), solo Open Graph |
-| `app/icon.svg` | `apps/branding/logo/sol-mayo.svg` |
+| `app/favicon.ico`, `app/icon.png`, `app/apple-icon.png` | derivados de `apps/branding/mascot/mascota-idle.png` (pestaña 16/32/48, icono 32, home screen 180). El Sol de Mayo no es el favicon. Los mismos archivos están en `apps/web/app`. |
 
 El header usa solo el wordmark. El fondo es `#FAFAF7` plano: el patrón mate-pan no se tilea.
