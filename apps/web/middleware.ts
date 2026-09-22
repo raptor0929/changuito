@@ -6,6 +6,7 @@ import {
   HUMAN_COOKIE,
   humanGateMode,
   readCookie,
+  turnstileSecret,
   verifyHumanToken,
 } from './lib/human-gate';
 
@@ -38,8 +39,12 @@ export async function middleware(req: NextRequest) {
       );
     }
     if (mode === 'enforce') {
-      const secret = (process.env.TURNSTILE_SECRET_KEY ?? '').trim();
-      const token = readCookie(req.headers.get('cookie'), HUMAN_COOKIE);
+      const secret = turnstileSecret();
+      // Prefer the framework parser. Fall back to the header so a quoted or
+      // encoded value still counts. Both have to agree with requireHuman.
+      const token =
+        req.cookies.get(HUMAN_COOKIE)?.value ||
+        readCookie(req.headers.get('cookie'), HUMAN_COOKIE);
       const ok = await verifyHumanToken(token, secret);
       if (!ok) {
         return NextResponse.json(

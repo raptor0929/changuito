@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
+import {
+  clientGateDecision,
+  HUMAN_REQUIRED_EVENT,
+  type ClientGateDecision,
+} from '../lib/human-gate-ui';
+
 declare global {
   interface Window {
     turnstile?: {
@@ -10,118 +16,218 @@ declare global {
         opts: {
           sitekey: string;
           callback: (token: string) => void;
-          'error-callback'?: () => void;
+          'error-callback'?: (code?: string) => void;
           'expired-callback'?: () => void;
+          'timeout-callback'?: () => void;
           appearance?: 'always' | 'execute' | 'interaction-only';
           theme?: 'light' | 'dark' | 'auto';
+          size?: 'normal' | 'compact' | 'flexible';
+          retry?: 'auto' | 'never';
         },
       ) => string;
+      reset: (id: string) => void;
       remove: (id: string) => void;
     };
   }
 }
 
-const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '';
+type HumanStatus = { ok?: boolean; mode?: string; siteKey?: string };
 
-/** Dev without Turnstile must never sit on "Un segundo…" forever. */
-const DEV_FAIL_OPEN_MS = 1500;
+const COPY = {
+  checkingTitle: 'Un segundo…',
+  checkingBody: 'Confirmamos que sos una persona antes de armar el súper.',
+  widgetTitle: 'Confirmá que sos una persona',
+  widgetBody: 'Es un paso corto. Después podés armar el súper.',
+  blockedTitle: 'Hace falta una verificación',
+  blockedBody: 'Ahora no podemos confirmar que sos una persona. Reintentá en un rato.',
+  retry: 'Reintentar',
+  startFailed: 'No pudimos iniciar la verificación. Reintentá.',
+  widgetFailed: 'La verificación falló. Probá de nuevo.',
+  widgetExpired: 'La verificación venció. Probá de nuevo.',
+  cookieMissing: 'La verificación no quedó guardada en este navegador. Probá de nuevo.',
+  verifyFailed: 'No pudimos verificar que sos una persona.',
+  stillNeeded: 'Confirmá que sos una persona para seguir.',
+} as const;
+
+async function fetchStatus(): Promise<HumanStatus> {
+  const res = await fetch('/api/human', {
+    method: 'GET',
+    headers: { accept: 'application/json' },
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+  return (await res.json()) as HumanStatus;
+}
 
 /**
- * Wraps the shopper UI. Completes Turnstile once, sets httpOnly cookie via
- * /api/human, then unlocks chat/APIs. Dev without keys: unlock immediately.
+ * The cookie is httpOnly, so the only proof it stuck is a follow-up GET.
+ * One short retry covers browsers that apply Set-Cookie a tick late.
  */
-export function HumanGate({ children }: { children: ReactNode }) {
+async function cookieIsDurable(): Promise<boolean> {
+  for (const delayMs of [0, 300]) {
+    if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    try {
+      const status = await fetchStatus();
+      if (status.mode === 'open' || status.ok === true) return true;
+    } catch {
+      /* try the second read */
+    }
+  }
+  return false;
+}
+
+/**
+ * Wraps the shopper UI. Turnstile runs once, /api/human sets the httpOnly
+ * cookie, and chat stays hidden until that cookie reads back as valid.
+ * Local/dev without keys: the server says mode=open and the chat unlocks.
+ * Production never unlocks just because the site key is missing from the bundle.
+ */
+export function HumanGate({
+  children,
+  siteKey = '',
+}: {
+  children: ReactNode;
+  siteKey?: string;
+}) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needWidget, setNeedWidget] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [activeKey, setActiveKey] = useState(siteKey.trim());
+  const [mountId, setMountId] = useState(0);
+  const [slow, setSlow] = useState(false);
   const host = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | null>(null);
+  const activeKeyRef = useRef(activeKey);
+  activeKeyRef.current = activeKey;
 
-  const exchange = useCallback(async (token?: string) => {
-    const res = await fetch('/api/human', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify(token ? { token } : {}),
-      credentials: 'same-origin',
+  const applyStatus = useCallback((status: HumanStatus) => {
+    const key = (status.siteKey || siteKey || activeKeyRef.current).trim();
+    if (key) setActiveKey(key);
+    const decision: ClientGateDecision = clientGateDecision({
+      mode: status.mode,
+      ok: status.ok,
+      siteKey: key,
     });
-    if (!res.ok) {
-      const json = (await res.json().catch(() => ({}))) as { message?: string };
-      throw new Error(json.message ?? 'No pudimos verificar que sos una persona.');
+    if (decision.action === 'unlock') {
+      setReady(true);
+      setNeedWidget(false);
+      setBlocked(false);
+      setError(null);
+      if (status.mode === 'open') {
+        console.warn(
+          '[changuito] human-gate abierto en local (sin Turnstile). En producción hace falta NEXT_PUBLIC_TURNSTILE_SITE_KEY + TURNSTILE_SECRET_KEY.',
+        );
+        // Best-effort cookie so later hops look the same. Chat does not wait on it.
+        void fetch('/api/human', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify({}),
+          credentials: 'same-origin',
+          cache: 'no-store',
+        }).catch((err: unknown) => {
+          console.warn('[changuito] human-gate cookie mint falló (chat igual abierto):', err);
+        });
+      }
+      return;
     }
-    setReady(true);
+    setReady(false);
+    if (decision.action === 'widget') {
+      setActiveKey(decision.siteKey);
+      setNeedWidget(true);
+      setBlocked(false);
+      setError(null);
+      return;
+    }
     setNeedWidget(false);
+    setBlocked(true);
+    setError(decision.reason === 'unconfigured' ? COPY.startFailed : null);
+  }, [siteKey]);
+
+  const refresh = useCallback(async () => {
+    const status = await fetchStatus();
+    applyStatus(status);
+  }, [applyStatus]);
+
+  const exchange = useCallback(async (token: string) => {
+    setBusy(true);
     setError(null);
+    try {
+      const res = await fetch('/api/human', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ token }),
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as { message?: string };
+        throw new Error(json.message ?? COPY.verifyFailed);
+      }
+      const stored = await cookieIsDurable();
+      if (!stored) throw new Error(COPY.cookieMissing);
+      setReady(true);
+      setNeedWidget(false);
+      setBlocked(false);
+      setError(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : COPY.widgetFailed);
+      if (widgetId.current && window.turnstile) {
+        try {
+          window.turnstile.reset(widgetId.current);
+        } catch {
+          /* widget already gone */
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-
-    // Local / no Turnstile: never leave the user on the waiting screen.
-    const failOpen = window.setTimeout(() => {
-      if (cancelled || SITE_KEY) return;
-      console.warn(
-        '[changuito] human-gate: timeout sin Turnstile, abriendo el chat igual.',
-      );
-      setReady(true);
-    }, DEV_FAIL_OPEN_MS);
-
-    (async () => {
+    void (async () => {
       try {
-        const res = await fetch('/api/human', {
-          method: 'GET',
-          headers: { accept: 'application/json' },
-          credentials: 'same-origin',
-        });
-        const json = (await res.json()) as { ok?: boolean; mode?: string };
-        if (cancelled) return;
-
-        // Open mode (dev sin keys): unlock YA. Cookie mint is best-effort.
-        if (json.mode === 'open') {
-          window.clearTimeout(failOpen);
-          setReady(true);
-          console.warn(
-            '[changuito] human-gate abierto en local (sin Turnstile). En producción hace falta NEXT_PUBLIC_TURNSTILE_SITE_KEY + TURNSTILE_SECRET_KEY.',
-          );
-          void exchange().catch((err: unknown) => {
-            console.warn('[changuito] human-gate cookie mint falló (chat igual abierto):', err);
-          });
-          return;
-        }
-
-        if (json.ok) {
-          window.clearTimeout(failOpen);
-          setReady(true);
-          return;
-        }
-
-        if (!SITE_KEY) {
-          // Prod-closed without a site key: show error, but failOpen timer still
-          // covers hung GETs in local builds that somehow aren't mode=open.
-          setError('Falta la verificación humana (Turnstile).');
-          return;
-        }
-        window.clearTimeout(failOpen);
-        setNeedWidget(true);
+        const status = await fetchStatus();
+        if (!cancelled) applyStatus(status);
       } catch {
         if (cancelled) return;
-        if (!SITE_KEY) {
-          // Network blip in local: open chat rather than trap the shopper.
-          window.clearTimeout(failOpen);
-          setReady(true);
-          return;
-        }
-        setError('No pudimos iniciar la verificación.');
+        // A down API is not a pass. Local without keys still unlocks when
+        // the server answers mode=open. Production stays on this screen.
+        setReady(false);
+        setNeedWidget(false);
+        setBlocked(true);
+        setError(COPY.startFailed);
       }
     })();
-
     return () => {
       cancelled = true;
-      window.clearTimeout(failOpen);
     };
-  }, [exchange]);
+  }, [applyStatus, mountId]);
 
   useEffect(() => {
-    if (!needWidget || !SITE_KEY || !host.current) return;
+    if (ready || needWidget || blocked) return;
+    const timer = window.setTimeout(() => setSlow(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [ready, needWidget, blocked, mountId]);
+
+  useEffect(() => {
+    const onNeed = () => {
+      setReady(false);
+      setError(COPY.stillNeeded);
+      void refresh().catch(() => {
+        setBlocked(true);
+        setNeedWidget(false);
+        setError(COPY.startFailed);
+      });
+    };
+    window.addEventListener(HUMAN_REQUIRED_EVENT, onNeed);
+    return () => window.removeEventListener(HUMAN_REQUIRED_EVENT, onNeed);
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!needWidget || !activeKey || !host.current) return;
 
     let cancelled = false;
 
@@ -136,16 +242,19 @@ export function HumanGate({ children }: { children: ReactNode }) {
         widgetId.current = null;
       }
       widgetId.current = window.turnstile.render(host.current, {
-        sitekey: SITE_KEY,
-        appearance: 'interaction-only',
+        sitekey: activeKey,
+        // Managed mode. `always` keeps the widget on screen so a phone that
+        // needs a tap is not left with an invisible challenge and no callback.
+        appearance: 'always',
+        size: 'flexible',
         theme: 'light',
+        retry: 'auto',
         callback: (token) => {
-          void exchange(token).catch((err: unknown) => {
-            setError(err instanceof Error ? err.message : 'Verificación fallida.');
-          });
+          void exchange(token);
         },
-        'error-callback': () => setError('Turnstile falló. Probá de nuevo.'),
-        'expired-callback': () => setError('La verificación expiró. Probá de nuevo.'),
+        'error-callback': () => setError(COPY.widgetFailed),
+        'expired-callback': () => setError(COPY.widgetExpired),
+        'timeout-callback': () => setError(COPY.widgetFailed),
       });
     };
 
@@ -153,15 +262,21 @@ export function HumanGate({ children }: { children: ReactNode }) {
       mount();
     } else {
       const existing = document.querySelector<HTMLScriptElement>('script[data-chg-turnstile]');
-      if (existing) {
+      // A failed script never fires load again. Drop it so Reintentar can fetch a new one.
+      if (existing && existing.dataset.chgFailed !== '1') {
         existing.addEventListener('load', mount);
       } else {
-        const s = document.createElement('script');
-        s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-        s.async = true;
-        s.dataset.chgTurnstile = '1';
-        s.onload = mount;
-        document.head.appendChild(s);
+        existing?.remove();
+        const script = document.createElement('script');
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.async = true;
+        script.dataset.chgTurnstile = '1';
+        script.onload = mount;
+        script.onerror = () => {
+          script.dataset.chgFailed = '1';
+          setError(COPY.startFailed);
+        };
+        document.head.appendChild(script);
       }
     }
 
@@ -176,12 +291,21 @@ export function HumanGate({ children }: { children: ReactNode }) {
         widgetId.current = null;
       }
     };
-  }, [needWidget, exchange]);
+  }, [needWidget, activeKey, exchange, mountId]);
+
+  const onRetry = () => {
+    setError(null);
+    setSlow(false);
+    setMountId((n) => n + 1);
+  };
 
   if (ready) return <>{children}</>;
 
+  const title = needWidget ? COPY.widgetTitle : blocked ? COPY.blockedTitle : COPY.checkingTitle;
+  const body = needWidget ? COPY.widgetBody : blocked ? COPY.blockedBody : COPY.checkingBody;
+
   return (
-    <div className="human-gate" role="status" aria-live="polite">
+    <section className="human-gate" data-testid="human-gate" aria-labelledby="human-gate-title" aria-busy={busy || (!needWidget && !blocked)}>
       <img
         className="human-gate-mascot"
         src="/brand/mascot-idle.png"
@@ -190,10 +314,25 @@ export function HumanGate({ children }: { children: ReactNode }) {
         width={120}
         height={120}
       />
-      <h2>Un segundo…</h2>
-      <p>Confirmamos que sos una persona antes de armar el súper.</p>
-      {error ? <p className="human-gate-error">{error}</p> : null}
-      <div ref={host} className="human-gate-widget" />
-    </div>
+      <h2 id="human-gate-title">{title}</h2>
+      <p>{body}</p>
+      {error ? (
+        <p className="human-gate-error" role="alert" data-testid="human-gate-error">
+          {error}
+        </p>
+      ) : null}
+      <div ref={host} className="human-gate-widget" data-testid="human-gate-widget" />
+      {needWidget || blocked || error || slow ? (
+        <button
+          type="button"
+          className="btn human-gate-retry"
+          data-testid="human-gate-retry"
+          onClick={onRetry}
+          disabled={busy}
+        >
+          {COPY.retry}
+        </button>
+      ) : null}
+    </section>
   );
 }

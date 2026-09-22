@@ -2,8 +2,11 @@ import { Chat } from '../components/Chat';
 import { HumanGate } from '../components/HumanGate';
 import { WalletProvider } from '../components/WalletProvider';
 import { WalletWidget } from '../components/WalletWidget';
+import { turnstileSiteKey } from '../lib/human-gate';
 
 export default function Home() {
+  // Runtime read, not the client bundle. The widget key is public.
+  const siteKey = turnstileSiteKey();
   return (
     <WalletProvider>
       <main className="shell">
@@ -26,7 +29,7 @@ export default function Home() {
           </div>
           <WalletWidget />
         </header>
-        <HumanGate>
+        <HumanGate siteKey={siteKey}>
           <Chat />
         </HumanGate>
         <p className="report-bug">

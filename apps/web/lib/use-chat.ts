@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { applyEvent, endTurn, initialState, sendUser, type ChatState } from './chat-state';
+import { notifyHumanRequired, SOLO_HUMANOS } from './human-gate-ui';
 import { LOGIN_REQUIRED, LOGIN_REQUIRED_MESSAGE } from './login-constants';
 import { parseEvents, type ChatRequest } from './protocol';
 
@@ -54,6 +55,12 @@ export function useChat() {
         let message = `El servidor respondió ${res.status}.`;
         try {
           const json = (await res.json()) as { error?: string; message?: string };
+          if (json.error === SOLO_HUMANOS) {
+            // The gate draws the widget. A red bubble here just invites another send.
+            notifyHumanRequired();
+            setState((s) => endTurn(s));
+            return;
+          }
           if (json.error === LOGIN_REQUIRED) {
             setLoginRequired(true);
             message = json.message ?? LOGIN_REQUIRED_MESSAGE;
