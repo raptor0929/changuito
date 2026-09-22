@@ -1,0 +1,27 @@
+{
+  "name": "@changuito/landing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Marketing landing for www.changuito.me. The shopper app lives in @changuito/web.",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "next dev -p 3125",
+    "build": "next build",
+    "start": "next start -p 3125",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test \"lib/test/*.test.ts\""
+  },
+  "dependencies": {
+    "next": "16.3.5",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "@types/react": "19.2.0",
+    "@types/react-dom": "19.2.0",
+    "typescript": "5.9.3"
+  }
+}

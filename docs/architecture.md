@@ -176,7 +176,7 @@ account that can be hurt is the caller's own.
 
 ```
 changuito/
-├── apps/web/                Next.js app — the agent, the UI, the API routes
+├── apps/web/                Next.js shopper — the agent, the UI, the API routes
 │   ├── app/api/             chat (SSE), balance, faucet, quote, settle
 │   ├── components/          Chat, ProductGrid, CartCard, PaymentModal,
 │   │                          OrderPanel, WalletWidget, WalletProvider
@@ -188,6 +188,8 @@ changuito/
 │       ├── order.ts         basket → the five args escrow.open takes
 │       ├── stellar.ts       RPC, friendbot, unit maths, explorer links
 │       └── server/          the resolver key — server-only
+├── apps/landing/            marketing site for www.changuito.me (no shopper routes)
+├── apps/branding/           brand kit, sibling of the two apps (not a workspace package)
 ├── contracts/
 │   ├── escrow/              open, settle, refund, events — 19 tests
 │   └── mock_usdc/           SEP-41 token, admin-gated mint

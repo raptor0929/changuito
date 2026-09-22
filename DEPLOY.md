@@ -375,3 +375,28 @@ still happens, set the Build Command override to
 and harmless — it is a `console.warn`, not a throw. The provider mounts during
 SSR on purpose; making it client-only would trade this warning for a hydration
 mismatch.
+
+---
+
+## Part 3 — www.changuito.me
+
+The marketing site is a second Vercel project. It is `apps/landing`
+(`@changuito/landing`), not a route inside `apps/web`. Do not point
+`www.changuito.me` at the shopper project, and do not point `app.changuito.me`
+at the landing.
+
+| Setting | Value |
+|---|---|
+| Framework preset | Next.js |
+| Root directory | `apps/landing` |
+| Install / build | defaults (install from the repo root, `next build` in this package) |
+| Node.js version | **22.x** |
+| Environment variables | none |
+
+Details, including the manual install/build commands if Vercel does not detect
+the workspace, are in [apps/landing/README.md](apps/landing/README.md). Locally:
+
+```bash
+npm run dev -w @changuito/landing     # http://localhost:3125
+npm run build -w @changuito/landing
+```
