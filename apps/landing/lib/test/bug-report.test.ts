@@ -110,7 +110,7 @@ test('webhook sink posts the report and the optional secret', async () => {
     },
     fetch: async (url: RequestInfo | URL, init?: RequestInit) => {
       calls.push({ url: String(url), init: init ?? {} });
-      return new Response(null, { status: 204 });
+      return Response.json({ ok: true });
     },
   });
   assert.deepEqual(result, { ok: true, sink: 'webhook' });
@@ -133,6 +133,7 @@ test('webhook sink posts the report and the optional secret', async () => {
     pasos: 'En el carrito',
     adjuntos: [],
     origen: 'www.changuito.me/reportarbug',
+    webhookSecret: 'shhh',
   });
 });
 
@@ -163,10 +164,12 @@ test('a small image is forwarded as adjuntos with kind bug', async () => {
   const payload = JSON.parse(String(calls[0].init.body)) as {
     kind: string;
     userAgent: string;
+    webhookSecret?: string;
     adjuntos: { name: string; mimeType: string; base64: string }[];
   };
   assert.equal(payload.kind, 'bug');
   assert.equal(payload.userAgent, 'Mozilla/5.0 test');
+  assert.equal(Object.hasOwn(payload, 'webhookSecret'), false);
   assert.equal(payload.adjuntos.length, 1);
   assert.equal(payload.adjuntos[0].name, 'captura.png');
   assert.equal(payload.adjuntos[0].mimeType, 'image/png');
@@ -229,6 +232,43 @@ test('the log records attachment names and not the base64 body', async () => {
   assert.equal(lines.length, 1);
   assert.equal(lines[0].includes(png), false);
   assert.equal(lines[0].includes('captura.png'), true);
+});
+
+test('a webhook HTTP 200 with ok false is not a saved report', async () => {
+  const errors: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    errors.push(args.map((part) => String(part)).join(' '));
+  };
+  const saved = validateBugReport(valid, CREATED);
+  assert.equal(saved.ok, true);
+  if (!saved.ok) return;
+  const env = {
+    NODE_ENV: 'production' as const,
+    BUG_REPORT_WEBHOOK_URL: 'https://hooks.ejemplo.com/bugs',
+    BUG_REPORT_WEBHOOK_SECRET: 'shhh',
+  };
+  try {
+    const unauthorized = await saveBugReport(saved.entry, {
+      env,
+      fetch: async () => Response.json({ ok: false, error: 'unauthorized' }),
+    });
+    assert.deepEqual(unauthorized, { ok: false, reason: 'upstream' });
+
+    const upstream = await saveBugReport(saved.entry, {
+      env,
+      fetch: async () =>
+        new Response('{"ok":false,"error":"sheet write failed"}', {
+          status: 200,
+          headers: { 'Content-Type': 'text/plain' },
+        }),
+    });
+    assert.deepEqual(upstream, { ok: false, reason: 'upstream' });
+  } finally {
+    console.error = original;
+  }
+  assert.equal(errors.some((line) => line.includes('webhook unauthorized')), true);
+  assert.equal(errors.some((line) => line.includes('webhook upstream rejected the report')), true);
 });
 
 test('a failed webhook does not pretend the report was delivered', async () => {
