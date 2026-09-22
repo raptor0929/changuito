@@ -140,8 +140,18 @@ test('landing copy stays free of jargon and a refund promise', () => {
 test('the landing serves the loading GIF and not the éxito pose', () => {
   const page = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
   const css = readFileSync(join(root, 'components/landing/landing.module.css'), 'utf8');
-  assert.equal(page.split('/brand/animacion-cargando.gif').length - 1, 2);
-  assert.equal(page.split('Le caen los productos al carrito de Changuito').length - 1, 2);
+  assert.equal(page.split('/brand/animacion-cargando.gif').length - 1, 1);
+  assert.equal(page.split('Le caen los productos al carrito de Changuito').length - 1, 1);
+  const payments = page.slice(
+    page.indexOf('data-testid="landing-payments"'),
+    page.indexOf('data-testid="landing-faq"'),
+  );
+  assert.equal(payments.includes('<img'), false);
+  assert.equal(payments.includes('payMascot'), false);
+  assert.equal(payments.includes('animacion-'), false);
+  assert.equal(payments.includes('mascot-'), false);
+  assert.equal(css.includes('.payLayout'), false);
+  assert.equal(css.includes('.payMascot'), false);
   assert.equal(page.includes('animacion-busqueda'), false);
   assert.equal(page.includes('mascot-exito'), false);
   assert.equal(page.includes('mascot-idle.png'), true);
