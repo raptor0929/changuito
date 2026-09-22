@@ -230,6 +230,59 @@
   display: flex;
 }
 
+.fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fieldset[aria-invalid='true'] .radio {
+  outline: 2px solid var(--error);
+  outline-offset: 2px;
+}
+
+.radioRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+
+.radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 4px 2px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.radio input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--ink);
+  flex-shrink: 0;
+}
+
+.whatsapp {
+  display: none;
+}
+
+.form:has(input[name='contactForFeedback'][value='si']:checked) .whatsapp {
+  display: flex;
+}
+
+.turnstile {
+  display: flex;
+  justify-content: flex-start;
+  min-height: 65px;
+}
+
 @media (min-width: 720px) {
   .headerInner,
   .main {

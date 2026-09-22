@@ -5,6 +5,17 @@ export const runtime = 'nodejs';
 const TOO_BIG = { ok: false, errors: { form: 'El mensaje es muy largo.' } };
 const UNREADABLE = { ok: false, errors: { form: 'No pudimos leer el formulario.' } };
 
+type BodyFields = {
+  name: unknown;
+  email: unknown;
+  source: unknown;
+  otherDetail: unknown;
+  contactForFeedback: unknown;
+  whatsapp: unknown;
+  company: unknown;
+  turnstileToken: unknown;
+};
+
 export async function POST(request: Request) {
   const parsed = await readBody(request);
   if (!parsed.ok) return parsed.response;
@@ -27,10 +38,7 @@ export async function POST(request: Request) {
 
 async function readBody(
   request: Request,
-): Promise<
-  | { ok: true; formPost: boolean; body: { name: unknown; email: unknown; source: unknown; otherDetail: unknown; company: unknown } }
-  | { ok: false; response: Response }
-> {
+): Promise<{ ok: true; formPost: boolean; body: BodyFields } | { ok: false; response: Response }> {
   const type = request.headers.get('content-type') ?? '';
   if (type.includes('application/x-www-form-urlencoded') || type.includes('multipart/form-data')) {
     const form = await request.formData();
@@ -42,7 +50,10 @@ async function readBody(
         email: form.get('email'),
         source: form.get('source'),
         otherDetail: form.get('otherDetail'),
+        contactForFeedback: form.get('contactForFeedback'),
+        whatsapp: form.get('whatsapp'),
         company: form.get('company'),
+        turnstileToken: form.get('cf-turnstile-response') ?? form.get('turnstileToken'),
       },
     };
   }
@@ -63,7 +74,10 @@ async function readBody(
         email: body.email,
         source: body.source,
         otherDetail: body.otherDetail,
+        contactForFeedback: body.contactForFeedback,
+        whatsapp: body.whatsapp,
         company: body.company,
+        turnstileToken: body.turnstileToken ?? body['cf-turnstile-response'],
       },
     };
   } catch {

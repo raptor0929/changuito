@@ -16,6 +16,7 @@ import {
   NO_CHARGE,
   PAYMENTS,
   SITE_URL,
+  SOCIAL,
   STEPS,
   STEPS_TITLE,
 } from '../copy.ts';
@@ -32,6 +33,29 @@ test('the only app handoff is https://app.changuito.me', () => {
   assert.equal(url.username, '');
   assert.equal(url.password, '');
   assert.equal(new URL(SITE_URL).hostname, 'www.changuito.me');
+});
+
+test('footer social profiles point at @appchanguito', () => {
+  assert.deepEqual(
+    SOCIAL.map((link) => ({ href: link.href, label: link.label, ariaLabel: link.ariaLabel })),
+    [
+      {
+        href: 'https://x.com/appchanguito',
+        label: 'X',
+        ariaLabel: 'Changuito en X',
+      },
+      {
+        href: 'https://instagram.com/appchanguito',
+        label: 'Instagram',
+        ariaLabel: 'Changuito en Instagram',
+      },
+    ],
+  );
+  const page = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
+  assert.equal(page.includes('SOCIAL'), true);
+  assert.equal(page.includes('landing-social'), true);
+  assert.equal(page.includes('target="_blank"'), true);
+  assert.equal(page.includes('noopener noreferrer'), true);
 });
 
 test('hero copy matches the locked brief', () => {
@@ -56,6 +80,7 @@ test('landing copy stays free of jargon and a refund promise', () => {
     FAQ,
     BOFU,
     FOOTER,
+    SOCIAL,
     DESCRIPTION,
   }).toLowerCase();
   for (const word of [
