@@ -1,0 +1,50 @@
+{
+  "name": "Changuito",
+  "version": "1.5",
+  "colors": {
+    "espresso": {
+      "hex": "#2A1A14",
+      "rgb": [
+        42,
+        26,
+        20
+      ],
+      "css": "--chg-espresso",
+      "tailwind": "chg-espresso",
+      "role": "text, frame, wordmark"
+    },
+    "sunflower": {
+      "hex": "#F4B942",
+      "rgb": [
+        244,
+        185,
+        66
+      ],
+      "css": "--chg-sunflower",
+      "tailwind": "chg-sunflower",
+      "role": "CTA, mascot body"
+    },
+    "arcilla": {
+      "hex": "#E07A5F",
+      "rgb": [
+        224,
+        122,
+        95
+      ],
+      "css": "--chg-arcilla",
+      "tailwind": "chg-arcilla",
+      "role": "accent"
+    },
+    "offwhite": {
+      "hex": "#FAFAF7",
+      "rgb": [
+        250,
+        250,
+        247
+      ],
+      "css": "--chg-offwhite",
+      "tailwind": "chg-offwhite",
+      "role": "background"
+    }
+  }
+}

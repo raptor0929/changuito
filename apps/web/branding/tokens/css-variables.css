@@ -1,0 +1,17 @@
+:root {
+  --chg-espresso: #2A1A14;
+  --chg-sunflower: #F4B942;
+  --chg-arcilla: #E07A5F;
+  --chg-offwhite: #FAFAF7;
+}
+body {
+  background: var(--chg-offwhite);
+  color: var(--chg-espresso);
+  font-family: Inter, Nunito, system-ui, sans-serif;
+}
+.btn-chg {
+  background: var(--chg-sunflower);
+  color: var(--chg-espresso);
+  border-radius: 999px;
+  font-weight: 600;
+}
