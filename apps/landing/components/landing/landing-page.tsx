@@ -1,5 +1,4 @@
 import {
-  APP_URL,
   BENEFITS,
   BENEFITS_TITLE,
   BOFU,
@@ -214,9 +213,10 @@ export function LandingPage() {
                   </a>
                 </li>
                 <li>
-                  <a className={styles.footerLink} href={APP_URL} rel="noopener noreferrer">
+                  {/* Beta: domain stays as text so the footer does not open the shopper. */}
+                  <span className={styles.footerLabel} data-testid="landing-footer-app">
                     {FOOTER.appLabel}
-                  </a>
+                  </span>
                 </li>
               </ul>
             </nav>

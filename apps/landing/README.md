@@ -2,7 +2,7 @@
 
 Landing de marketing para **www.changuito.me**. Es un proyecto Next.js aparte de `apps/web` (el shopper, en app.changuito.me).
 
-No comparte rutas con el shopper. El único enlace de producto es `https://app.changuito.me`.
+No comparte rutas con el shopper. Durante la beta controlada, los botones «Probar Changuito» van a `/whitelist`. `APP_URL` (`https://app.changuito.me`) queda para SEO y docs, sin navegación desde la landing.
 
 ## Vercel
 
