@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { test } from 'node:test';
@@ -74,7 +75,7 @@ test('hero copy matches the locked brief', () => {
   assert.equal(page.includes('textLink'), false);
   assert.equal(css.includes('.textLink'), false);
   assert.equal(page.includes('id="como-funciona"'), true);
-  assert.equal(page.includes('/brand/animacion-busqueda.gif'), true);
+  assert.equal(page.includes('/brand/animacion-cargando.gif'), true);
 });
 
 test('landing copy stays free of jargon and a refund promise', () => {
@@ -136,20 +137,30 @@ test('landing copy stays free of jargon and a refund promise', () => {
   );
 });
 
-test('the landing serves búsqueda ida-vuelta and not the éxito pose', () => {
+test('the landing serves the loading GIF and not the éxito pose', () => {
   const page = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
-  assert.equal(page.includes('/brand/animacion-busqueda.gif'), true);
+  const css = readFileSync(join(root, 'components/landing/landing.module.css'), 'utf8');
+  assert.equal(page.split('/brand/animacion-cargando.gif').length - 1, 2);
+  assert.equal(page.split('Le caen los productos al carrito de Changuito').length - 1, 2);
+  assert.equal(page.includes('animacion-busqueda'), false);
   assert.equal(page.includes('mascot-exito'), false);
-  assert.equal(page.includes('animacion-cargando'), false);
   assert.equal(page.includes('mascot-idle.png'), true);
-  assert.equal(existsSync(join(root, 'public/brand/animacion-busqueda.gif')), true);
+  assert.equal(existsSync(join(root, 'public/brand/animacion-busqueda.gif')), false);
   assert.equal(existsSync(join(root, 'public/brand/mascot-idle.png')), true);
   assert.equal(existsSync(join(root, 'public/brand/mascot-exito.png')), false);
-  assert.equal(existsSync(join(root, 'public/brand/animacion-cargando.gif')), false);
+  const served = readFileSync(join(root, 'public/brand/animacion-cargando.gif'));
   const branding = join(root, '../branding');
+  const master = readFileSync(join(branding, 'motion/animacion-cargando.gif'));
+  assert.equal(createHash('md5').update(served).digest('hex'), '662fec0a1f1102d26f8fd85c06b24c4f');
+  assert.equal(createHash('md5').update(master).digest('hex'), '662fec0a1f1102d26f8fd85c06b24c4f');
+  assert.equal(served.readUInt16LE(6), 480);
+  assert.equal(served.readUInt16LE(8), 360);
   assert.equal(existsSync(join(branding, 'mascot/mascota-exito.png')), false);
   assert.equal(existsSync(join(branding, '_discarded/mascota-exito.png')), true);
   assert.equal(existsSync(join(branding, 'motion/animacion-busqueda.gif')), true);
+  const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
+  assert.match(reduced, /\.mascotMotion\s*\{[^}]*display:\s*none/);
+  assert.match(reduced, /\.mascotStill\s*\{[^}]*display:\s*block/);
 });
 
 test('source does not reintroduce the refund line or a tiled pattern', () => {
