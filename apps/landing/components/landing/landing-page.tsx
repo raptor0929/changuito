@@ -121,42 +121,22 @@ export function LandingPage() {
           data-testid="landing-payments"
         >
           <div className={styles.sectionInner}>
-            <div className={styles.payLayout}>
-              <div>
-                <h2 id="pagos-titulo" className={styles.h2}>
-                  {PAYMENTS.title}
-                </h2>
-                <p className={styles.lead}>{PAYMENTS.lead}</p>
-                <ul className={styles.payGrid}>
-                  {PAYMENTS.methods.map((method) => (
-                    <li key={method.title} className={styles.card}>
-                      <h3 className={styles.cardTitle}>{method.title}</h3>
-                      <p className={styles.cardBody}>{method.body}</p>
-                    </li>
-                  ))}
-                </ul>
-                <p className={styles.assurance}>
-                  <CheckIcon className={styles.assuranceIcon} />
-                  <span>{PAYMENTS.assurance}</span>
-                </p>
-              </div>
-              <div className={styles.payMascotFrame}>
-                <img
-                  className={`${styles.payMascot} ${styles.mascotMotion}`}
-                  src="/brand/animacion-cargando.gif"
-                  alt="Le caen los productos al carrito de Changuito"
-                  width={480}
-                  height={360}
-                />
-                <img
-                  className={`${styles.payMascot} ${styles.mascotStill}`}
-                  src="/brand/mascot-idle.png"
-                  alt="Mascota de Changuito, un carrito sonriente con el súper"
-                  width={397}
-                  height={583}
-                />
-              </div>
-            </div>
+            <h2 id="pagos-titulo" className={styles.h2}>
+              {PAYMENTS.title}
+            </h2>
+            <p className={styles.lead}>{PAYMENTS.lead}</p>
+            <ul className={styles.payGrid}>
+              {PAYMENTS.methods.map((method) => (
+                <li key={method.title} className={styles.card}>
+                  <h3 className={styles.cardTitle}>{method.title}</h3>
+                  <p className={styles.cardBody}>{method.body}</p>
+                </li>
+              ))}
+            </ul>
+            <p className={styles.assurance}>
+              <CheckIcon className={styles.assuranceIcon} />
+              <span>{PAYMENTS.assurance}</span>
+            </p>
           </div>
         </section>
 

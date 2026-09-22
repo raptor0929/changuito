@@ -373,22 +373,6 @@
   line-height: 1.5;
 }
 
-.payLayout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(180px, 280px);
-  gap: 40px;
-  align-items: center;
-}
-
-.payMascotFrame {
-  min-width: 0;
-}
-
-.payMascot {
-  width: 100%;
-  height: auto;
-}
-
 .assurance {
   display: flex;
   align-items: flex-start;
@@ -668,14 +652,8 @@
     padding: 56px 20px;
   }
 
-  .benefits,
-  .payLayout {
+  .benefits {
     grid-template-columns: 1fr;
-  }
-
-  .payMascot {
-    width: min(100%, 240px);
-    margin-inline: auto;
   }
 }
 
