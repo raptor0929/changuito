@@ -50,10 +50,10 @@ export function LandingPage() {
               {/* GIF plays by default. Reduced motion swaps to the locked still via CSS. */}
               <img
                 className={`${styles.mascot} ${styles.mascotMotion}`}
-                src="/brand/animacion-cargando.gif"
-                alt="Changuito carga el carrito: los productos caen adentro"
+                src="/brand/animacion-busqueda.gif"
+                alt="Changuito va y vuelve buscando el súper"
                 width={480}
-                height={360}
+                height={320}
                 fetchPriority="high"
               />
               <img
@@ -140,14 +140,22 @@ export function LandingPage() {
                   <span>{PAYMENTS.assurance}</span>
                 </p>
               </div>
-              <Image
-                src="/brand/mascot-exito.png"
-                alt="Changuito sonriendo con el carrito lleno"
-                width={719}
-                height={612}
-                sizes="(max-width: 860px) 70vw, 280px"
-                className={styles.payMascot}
-              />
+              <div className={styles.payMascotFrame}>
+                <img
+                  className={`${styles.payMascot} ${styles.mascotMotion}`}
+                  src="/brand/animacion-busqueda.gif"
+                  alt="Changuito va y vuelve buscando el súper"
+                  width={480}
+                  height={320}
+                />
+                <img
+                  className={`${styles.payMascot} ${styles.mascotStill}`}
+                  src="/brand/mascot-idle.png"
+                  alt="Mascota de Changuito, un carrito sonriente con el súper"
+                  width={397}
+                  height={583}
+                />
+              </div>
             </div>
           </div>
         </section>

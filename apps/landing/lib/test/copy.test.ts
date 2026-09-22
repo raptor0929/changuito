@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -79,7 +79,16 @@ test('landing copy stays free of jargon and a refund promise', () => {
   assert.equal(BENEFITS.length, 3);
   assert.deepEqual(
     BENEFITS.map((item) => item.title),
-    ['Simple', 'Real', 'Local'],
+    ['Simple', 'Sin pensar mucho', 'Local'],
+  );
+  assert.equal(BENEFITS[0].body, 'Armá el súper sin pensar. Changuito empuja el carrito con vos.');
+  assert.equal(
+    BENEFITS[1].body,
+    'Contale para qué ocasión preparás la comida y para cuántas personas, y Changuito se encarga de cada detalle por vos.',
+  );
+  assert.equal(
+    BENEFITS[2].body,
+    'Changuito te ayuda a ahorrar comparando precios entre varios supermercados y armándote el carrito como más te convenga.',
   );
   assert.equal(FAQ.length, 4);
   assert.equal(FAQ[2].q, '¿Qué pasa si falla la compra?');
@@ -92,7 +101,22 @@ test('landing copy stays free of jargon and a refund promise', () => {
     FAQ[0].a,
     'No. Es un asistente de IA para el súper: le pedís en tu idioma lo que necesitás — una receta, una juntada, la lista de la semana — y Changuito busca, calcula y te arma el carrito.',
   );
-  assert.equal(BENEFITS[1].body, 'Precios reales de supermercado.');
+});
+
+test('the landing serves búsqueda ida-vuelta and not the éxito pose', () => {
+  const page = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
+  assert.equal(page.includes('/brand/animacion-busqueda.gif'), true);
+  assert.equal(page.includes('mascot-exito'), false);
+  assert.equal(page.includes('animacion-cargando'), false);
+  assert.equal(page.includes('mascot-idle.png'), true);
+  assert.equal(existsSync(join(root, 'public/brand/animacion-busqueda.gif')), true);
+  assert.equal(existsSync(join(root, 'public/brand/mascot-idle.png')), true);
+  assert.equal(existsSync(join(root, 'public/brand/mascot-exito.png')), false);
+  assert.equal(existsSync(join(root, 'public/brand/animacion-cargando.gif')), false);
+  const branding = join(root, '../branding');
+  assert.equal(existsSync(join(branding, 'mascot/mascota-exito.png')), false);
+  assert.equal(existsSync(join(branding, '_discarded/mascota-exito.png')), true);
+  assert.equal(existsSync(join(branding, 'motion/animacion-busqueda.gif')), true);
 });
 
 test('source does not reintroduce the refund line or a tiled pattern', () => {
