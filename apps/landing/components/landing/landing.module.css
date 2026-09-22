@@ -177,11 +177,14 @@
 .heroInner {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 56px 24px 80px;
+  /* Desktop: the mascot shares the action-row baseline. A deep bottom
+     pad used to leave it floating above an empty band under the scroll cue.
+     Narrow viewports override this block. */
+  padding: 48px 24px 24px;
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
-  gap: 40px;
-  align-items: center;
+  gap: 24px 32px;
+  align-items: end;
 }
 
 .h1 {
@@ -226,11 +229,11 @@
 }
 
 .mascotFrame {
-  justify-self: end;
-  width: min(100%, 480px);
+  justify-self: start;
+  width: min(100%, 440px);
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  align-items: flex-end;
+  justify-content: flex-start;
 }
 
 .mascot,
@@ -245,6 +248,14 @@
   width: auto;
   max-width: 100%;
   max-height: 560px;
+}
+
+/* Idle pose is a tall portrait. Cap it in the hero so reduced motion
+   uses the same slot as the search GIF instead of hanging below the cue. */
+.mascotFrame .mascotStill {
+  max-height: 300px;
+  object-fit: contain;
+  object-position: left bottom;
 }
 
 .section {
@@ -574,6 +585,11 @@
     justify-content: center;
     width: min(100%, 360px);
     margin-top: 0;
+  }
+
+  .mascotFrame .mascotStill {
+    max-height: 240px;
+    object-position: center top;
   }
 
   .section {
