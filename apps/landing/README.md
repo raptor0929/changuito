@@ -67,6 +67,8 @@ El kit completo vive en `apps/branding/` (manuals, logo, mascota, pattern, motio
 | `public/brand/mascota-corriendo.png` | `apps/branding/mascot/mascota-corriendo.png` (CTA, en el lugar de la flecha) |
 | `public/brand/lockup-stacked.png` | `apps/branding/logo/lockup-stacked-mascota-y-wordmark.png` |
 | `public/og.png` | pose idle ancha del zip de landing (1280×720), solo Open Graph |
+| `public/brand/isotipo-mascota.png` | `apps/branding/logo/isotipo-mascota.png` (solo la mascota, header de `/whitelist`) |
+| `app/whitelist/icon.png` | el mismo isotipo, ícono de la ruta `/whitelist` |
 | `app/icon.svg` | `apps/branding/logo/sol-mayo.svg` |
 
-El header usa solo el wordmark. El fondo es `#FAFAF7` plano: el patrón mate-pan no se tilea.
+El header del home usa solo el wordmark. El de `/whitelist` usa el isotipo y la palabra Changuito en Inter, no el asset de lettering. El fondo es `#FAFAF7` plano: el patrón mate-pan no se tilea.

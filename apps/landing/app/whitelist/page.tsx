@@ -37,15 +37,16 @@ export default async function WhitelistPage({
       </a>
       <header className={styles.header}>
         <div className={styles.headerInner}>
-          <a className={styles.logoLink} href="/" data-testid="whitelist-wordmark">
+          <a className={styles.brandLink} href="/" data-testid="whitelist-brand">
             <Image
-              src="/brand/wordmark.png"
-              alt="Changuito"
-              width={1097}
-              height={249}
+              src="/brand/isotipo-mascota.png"
+              alt=""
+              width={337}
+              height={467}
               priority
-              className={styles.wordmark}
+              className={styles.mark}
             />
+            <span className={styles.brandName}>Changuito</span>
           </a>
         </div>
       </header>

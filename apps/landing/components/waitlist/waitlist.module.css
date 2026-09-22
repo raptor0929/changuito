@@ -57,16 +57,27 @@
   padding: 16px 20px;
 }
 
-.logoLink {
+.brandLink {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
+  gap: 10px;
+  min-height: 48px;
   min-width: 44px;
+  color: var(--ink);
+  font-weight: 800;
+  text-decoration: none;
 }
 
-.wordmark {
-  height: 36px;
+.mark {
+  height: 48px;
   width: auto;
+}
+
+.brandName {
+  font-size: 1.25rem;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
 }
 
 .main {
@@ -226,8 +237,12 @@
     padding-right: 24px;
   }
 
-  .wordmark {
-    height: 40px;
+  .mark {
+    height: 56px;
+  }
+
+  .brandName {
+    font-size: 1.4rem;
   }
 
   .card {

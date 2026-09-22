@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { EVENT_SOURCES, OTHER_SOURCE, SOCIAL_SOURCES, SOURCE_GROUPS, allowedSources } from '../waitlist/options.ts';
 import { saveWaitlistEntry } from '../waitlist/persist.ts';
@@ -9,6 +13,23 @@ import { submitWaitlist } from '../waitlist/submit.ts';
 import { validateWaitlist } from '../waitlist/validate.ts';
 
 const CREATED = '2026-09-22T12:00:00.000Z';
+const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+
+test('the whitelist header is the mascot cutout plus the name in text', () => {
+  const page = readFileSync(join(root, 'app/whitelist/page.tsx'), 'utf8');
+  assert.equal(page.includes('wordmark'), false);
+  assert.match(page, /src="\/brand\/isotipo-mascota\.png"/);
+  assert.match(page, /alt=""/);
+  assert.match(page, />Changuito</);
+
+  const css = readFileSync(join(root, 'components/waitlist/waitlist.module.css'), 'utf8');
+  assert.equal(css.includes('wordmark'), false);
+
+  const hash = (file: string) => createHash('sha256').update(readFileSync(file)).digest('hex');
+  const master = hash(join(root, '../branding/logo/isotipo-mascota.png'));
+  assert.equal(hash(join(root, 'public/brand/isotipo-mascota.png')), master);
+  assert.equal(hash(join(root, 'app/whitelist/icon.png')), master);
+});
 
 const valid = {
   name: 'Martina López',
