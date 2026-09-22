@@ -1,5 +1,3 @@
-import Image from 'next/image';
-
 import {
   APP_URL,
   BENEFITS,
@@ -13,6 +11,7 @@ import {
   STEPS,
   STEPS_TITLE,
 } from '../../lib/copy';
+import { BrandLockup } from './brand-lockup';
 import { FaqList } from './faq-list';
 import { CheckIcon, StepIcon } from './icons';
 import { SiteHeader } from './site-header';
@@ -176,13 +175,7 @@ export function LandingPage() {
 
         <section className={styles.bofu} aria-labelledby="cierre-titulo" data-testid="landing-bofu">
           <div className={styles.bofuInner}>
-            <Image
-              src="/brand/lockup-stacked.png"
-              alt="Changuito"
-              width={384}
-              height={605}
-              className={styles.lockup}
-            />
+            <BrandLockup className={styles.bofuBrand} />
             <h2 id="cierre-titulo" className={styles.h2}>
               {BOFU.title}
             </h2>
@@ -196,13 +189,7 @@ export function LandingPage() {
       <footer className={styles.footer} data-testid="landing-footer">
         <div className={styles.footerInner}>
           <a className={styles.logoLink} href="/">
-            <Image
-              src="/brand/wordmark.png"
-              alt="Changuito"
-              width={1097}
-              height={249}
-              className={styles.footerMark}
-            />
+            <BrandLockup className={styles.footerBrand} />
           </a>
           <nav aria-label="Pie" className={styles.footerNavWrap}>
             <ul className={styles.footerNav}>

@@ -5,9 +5,9 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Tab and home-screen icons are a square crop of the locked idle mascot.
- * Source: apps/branding/mascot/mascota-idle.png. Not the Sol de Mayo, and
- * not the discarded éxito pose.
+ * Tab and home-screen icons are a square crop of the idle bag face.
+ * Source: apps/branding/mascot/mascota-idle.png. Not the wordmark, not the
+ * full-body lockup, and not the discarded éxito pose.
  */
 
 const landing = join(dirname(fileURLToPath(import.meta.url)), '../..');

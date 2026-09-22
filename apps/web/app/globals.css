@@ -66,7 +66,18 @@ a { color: var(--brand); }
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
 }
-.masthead h1 { font-size: 28px; margin: 0; letter-spacing: -0.02em; }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+.brand-mark {
+  height: 44px;
+  width: auto;
+  display: block;
+}
+.masthead h1 { font-size: 28px; margin: 0; letter-spacing: -0.02em; font-weight: 800; }
 .tagline { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
 
 /* The thread scrolls; the composer does not. Chasing a moving input box while

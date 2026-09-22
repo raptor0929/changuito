@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import Image from 'next/image';
 
 import { NAV } from '../../lib/copy';
+import { BrandLockup } from './brand-lockup';
 import { TryLink } from './try-link';
 import styles from './landing.module.css';
 
@@ -27,15 +27,8 @@ export function SiteHeader() {
   return (
     <header className={styles.header} data-testid="landing-header">
       <div className={styles.headerInner}>
-        <a className={styles.logoLink} href="/">
-          <Image
-            src="/brand/wordmark.png"
-            alt="Changuito"
-            width={1097}
-            height={249}
-            priority
-            className={styles.wordmark}
-          />
+        <a className={styles.logoLink} href="/" data-testid="landing-brand">
+          <BrandLockup />
         </a>
         <button
           ref={buttonRef}
