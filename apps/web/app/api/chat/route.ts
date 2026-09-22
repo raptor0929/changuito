@@ -27,9 +27,17 @@ export async function POST(req: Request): Promise<Response> {
   if (!body.sessionId || typeof body.message !== 'string' || !body.message.trim()) {
     return Response.json({ error: 'sessionId and a non-empty message are required.' }, { status: 400 });
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
+
+  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+  const hasOllama = Boolean(process.env.OLLAMA_URL?.trim());
+  const provider = (process.env.AGENT_PROVIDER ?? '').trim().toLowerCase();
+  const ollamaOk = hasOllama && (provider === 'ollama' || provider === 'auto' || provider === '');
+  if (!hasAnthropic && !ollamaOk) {
     return Response.json(
-      { error: 'ANTHROPIC_API_KEY is not set. See DEPLOY.md — the agent cannot run without it.' },
+      {
+        error:
+          'Falta un modelo: seteá ANTHROPIC_API_KEY, o OLLAMA_URL con AGENT_PROVIDER=ollama en .env.local. Ver DEPLOY.md.',
+      },
       { status: 500 },
     );
   }

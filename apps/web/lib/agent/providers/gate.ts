@@ -228,26 +228,36 @@ export function memoryGate(): Gate {
       inFlight++;
 
       let released = false;
-      return {
-        release: async (outcome) => {
-          // Idempotent: the loop releases on both the success path and in a
-          // `finally`, and double-decrementing would let an extra turn in.
-          if (released) return;
-          released = true;
-          inFlight--;
+      const releaseOnce = async (outcome: 'ok' | 'fail') => {
+        // Idempotent: the loop releases on both the success path and in a
+        // `finally`, and double-decrementing would let an extra turn in.
+        if (released) return;
+        released = true;
+        clearTimeout(expire);
+        inFlight--;
 
-          if (outcome === 'ok') {
-            breaker = { fails: 0, openUntil: 0 };
-          } else {
-            const fails = breaker.fails + 1;
-            breaker = {
-              fails,
-              openUntil: fails >= FAIL_THRESHOLD ? Date.now() + OPEN_SECONDS * 1000 : 0,
-            };
-            // A failure means the probe's answer is stale, whatever it said.
-            cached = undefined;
-          }
-        },
+        if (outcome === 'ok') {
+          breaker = { fails: 0, openUntil: 0 };
+        } else {
+          const fails = breaker.fails + 1;
+          breaker = {
+            fails,
+            openUntil: fails >= FAIL_THRESHOLD ? Date.now() + OPEN_SECONDS * 1000 : 0,
+          };
+          // A failure means the probe's answer is stale, whatever it said.
+          cached = undefined;
+        }
+      };
+
+      // Same backstop as Redis TTL: a cancelled browser stream can leave the
+      // lane stuck forever in the single-process gate.
+      const expire = setTimeout(() => {
+        void releaseOnce('fail');
+      }, LEASE_SECONDS * 1000);
+      expire.unref?.();
+
+      return {
+        release: releaseOnce,
       };
     },
   };

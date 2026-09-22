@@ -62,18 +62,18 @@ export function OrderPanel({ order, onDismiss }: { order: OpenedOrder; onDismiss
         </header>
         <p className="pay-note">
           {settled
-            ? `${outcome.amountDisplay} USDC salieron del contrato hacia la tesorería. Retirá el pedido en el super.`
-            : `${outcome.amountDisplay} USDC volvieron a tu billetera. No se cobró nada.`}
+            ? `${outcome.amountDisplay} USDC quedaron confirmados. Retirá el pedido en el súper.`
+            : `${outcome.amountDisplay} USDC volvieron a tu saldo. No se cobró nada.`}
         </p>
         <ul className="tx-list">
           <li>
-            <span>Garantía</span>
+            <span>Reserva</span>
             <a href={explorer.tx(order.hash)} target="_blank" rel="noopener noreferrer">
               ver transacción ↗
             </a>
           </li>
           <li>
-            <span>{settled ? 'Liquidación' : 'Reembolso'}</span>
+            <span>{settled ? 'Confirmación' : 'Reembolso'}</span>
             <a href={outcome.txUrl} target="_blank" rel="noopener noreferrer">
               ver transacción ↗
             </a>
@@ -83,7 +83,7 @@ export function OrderPanel({ order, onDismiss }: { order: OpenedOrder; onDismiss
           // The preimage, not just the hash: 32 bytes on a block explorer prove
           // nothing unless you can see what was hashed into them.
           <details className="receipt">
-            <summary>Comprobante en cadena</summary>
+            <summary>Comprobante del pago</summary>
             <pre>{outcome.receipt}</pre>
             <p className="pay-fine-line">sha256 = {outcome.receiptHash}</p>
           </details>
@@ -100,14 +100,14 @@ export function OrderPanel({ order, onDismiss }: { order: OpenedOrder; onDismiss
   return (
     <section className="order-panel" aria-live="polite">
       <header className="order-head">
-        <strong>Fondos en garantía · {amount} USDC</strong>
+        <strong>Pago reservado · {amount} USDC</strong>
         <a href={explorer.tx(order.hash)} target="_blank" rel="noopener noreferrer">
           ver transacción ↗
         </a>
       </header>
       <p className="pay-note">
-        Tu USDC está bloqueado en el contrato. Completá el carrito de {order.totalDisplay} en el
-        super y volvé acá para liberarlo — o pedí el reembolso si no se pudo.
+        Tu pago quedó reservado. Completá el carrito de {order.totalDisplay} en el súper y volvé
+        acá para confirmarlo, o pedí el reembolso si no se pudo.
       </p>
       {error ? <p className="pay-error">{error}</p> : null}
       <div className="modal-actions">
@@ -127,7 +127,7 @@ export function OrderPanel({ order, onDismiss }: { order: OpenedOrder; onDismiss
           onClick={() => void close('settle')}
           disabled={closing !== null}
         >
-          {closing === 'settle' ? 'Liquidando…' : 'Ya lo completé'}
+          {closing === 'settle' ? 'Confirmando…' : 'Ya lo completé'}
         </button>
         <button
           type="button"

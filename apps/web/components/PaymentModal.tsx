@@ -9,7 +9,6 @@ import type { QuoteResponse } from '../app/api/quote/route.ts';
 import { DEPLOYMENTS } from '../lib/deployments.ts';
 import { basketHash, newOrderId, openArgs, toHex, type OpenedOrder } from '../lib/order.ts';
 import { pollarEnabled, shortAddress } from '../lib/pollar.ts';
-import { explorer } from '../lib/stellar.ts';
 import { useBalances } from '../lib/use-balances.ts';
 
 /**
@@ -81,7 +80,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
   const held = balance ? BigInt(balance.usdc) : 0n;
   // Only a balance we actually read can be short. Without a wallet the balance
   // is unknown, not zero, and "no te alcanza" would be a lie under a button
-  // that says "Conectar billetera".
+  // that says "Empezá a comprar".
   const short = balance !== null && quote !== null && held < amountUnits;
 
   async function pay() {
@@ -169,7 +168,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
           </div>
           <div className="pay-total">
             <dt>A pagar</dt>
-            <dd>{quote ? `${quote.display} USDC` : quoteError ? '—' : 'cotizando…'}</dd>
+            <dd>{quote ? `${quote.display} USDC` : quoteError ? '-' : 'cotizando…'}</dd>
           </div>
           {quote ? (
             <div className="pay-fine">
@@ -179,7 +178,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
           ) : null}
           <div className="pay-fine">
             <dt>Tu saldo</dt>
-            <dd>{balance ? `${balance.usdcDisplay} USDC` : '—'}</dd>
+            <dd>{balance ? `${balance.usdcDisplay} USDC` : '-'}</dd>
           </div>
         </dl>
 
@@ -187,22 +186,22 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
         {failure ? <p className="pay-error">{failure}</p> : null}
         {short ? (
           <p className="pay-warn">
-            No te alcanza el saldo. Fondeá desde la billetera arriba y volvé a intentar.
+            No te alcanza el saldo. Cargá USDC arriba y volvé a intentar.
           </p>
         ) : null}
         {address && balance && !balance.funded ? (
-          <p className="pay-warn">Tu cuenta no tiene XLM para la comisión. Usá “Fondear”.</p>
+          <p className="pay-warn">Te falta saldo para la comisión de la red. Usá “Cargar USDC”.</p>
         ) : null}
 
         <p className="pay-note">
-          El monto queda bloqueado en un contrato de garantía en Stellar testnet, no se transfiere
-          todavía. Si el carrito no se concreta, vuelve a tu billetera.
+          El monto queda reservado hasta que completes la compra en el súper. Si no se concreta,
+          vuelve a tu saldo. Pagá con tarjeta o USDC.
         </p>
 
         <div className="modal-actions">
           {!address ? (
             <button type="button" className="btn" onClick={openLoginModal}>
-              Conectar billetera
+              Empezá a comprar
             </button>
           ) : (
             <button
@@ -213,7 +212,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
               disabled={!quote || !verified || short || phase === 'signing'}
             >
               {phase === 'signing'
-                ? 'Firmando…'
+                ? 'Confirmando…'
                 : !verified
                   ? 'Verificando sesión…'
                   : `Pagar ${quote ? quote.display : ''} USDC`}
@@ -230,16 +229,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
         </div>
 
         {address ? (
-          <p className="pay-fine-line">
-            Desde {shortAddress(address)} hacia el escrow{' '}
-            <a
-              href={explorer.contract(DEPLOYMENTS.escrowId)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {shortAddress(DEPLOYMENTS.escrowId)}
-            </a>
-          </p>
+          <p className="pay-fine-line">Desde {shortAddress(address)}</p>
         ) : null}
       </section>
     </div>

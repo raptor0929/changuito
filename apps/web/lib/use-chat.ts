@@ -12,6 +12,10 @@ import { parseEvents, type ChatRequest } from './protocol';
  * EventSource can only GET. The cost is doing the frame splitting ourselves,
  * which `parseEvents` handles — a frame can be cut anywhere, including inside
  * a JSON string, so the leftover has to survive to the next chunk.
+ *
+ * Only one in-flight turn is allowed. A second send is ignored until the user
+ * hits Parar (abort) or the stream ends — spam would otherwise pile up on the
+ * local model lane and look like "Ollama is broken".
  */
 export function useChat() {
   const [state, setState] = useState<ChatState>(initialState);
@@ -20,10 +24,15 @@ export function useChat() {
   const snapshot = useRef<ChatState['snapshot']>(undefined);
   const sessionId = useRef<string>('');
   const abort = useRef<AbortController | null>(null);
+  /** Sync lock — React state alone still lets a double-Enter race a second fetch. */
+  const inFlight = useRef(false);
 
   const send = useCallback(async (message: string) => {
     const text = message.trim();
     if (!text) return;
+    if (inFlight.current) return;
+    inFlight.current = true;
+
     sessionId.current ||= crypto.randomUUID();
     setState((s) => (s.streaming ? s : sendUser(s, text)));
 
@@ -33,12 +42,22 @@ export function useChat() {
       const body: ChatRequest = { sessionId: sessionId.current, message: text, snapshot: snapshot.current };
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream, application/json' },
         body: JSON.stringify(body),
         signal: controller.signal,
+        credentials: 'same-origin',
       });
       if (!res.ok || !res.body) {
-        throw new Error(`El servidor respondió ${res.status}.`);
+        let message = `El servidor respondió ${res.status}.`;
+        try {
+          const json = (await res.json()) as { error?: string; message?: string };
+          if (json.message) {
+            message = json.message;
+          }
+        } catch {
+          /* not JSON */
+        }
+        throw new Error(message);
       }
 
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -63,10 +82,13 @@ export function useChat() {
       setState((s) => endTurn(s, err instanceof Error ? err.message : 'Algo falló.'));
     } finally {
       abort.current = null;
+      inFlight.current = false;
     }
   }, []);
 
-  const stop = useCallback(() => abort.current?.abort(), []);
+  const stop = useCallback(() => {
+    abort.current?.abort();
+  }, []);
 
   return { state, send, stop };
 }

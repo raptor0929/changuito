@@ -16,14 +16,32 @@ export default function Home() {
               width={397}
               height={583}
             />
-            <div>
-              <h1>Changuito</h1>
-              <p className="tagline">Supermercado por MCP, pago en USDC sobre Stellar.</p>
+            <div className="brand-copy">
+              <h1 className="brand-wordmark">
+                <img
+                  src="/brand/wordmark.png"
+                  alt="Changuito"
+                  width={1097}
+                  height={249}
+                />
+              </h1>
+              <p className="tagline">
+                Contale a Changuito lo que necesitás y dejá que se encargue de planear todo.
+              </p>
             </div>
           </div>
           <WalletWidget />
         </header>
         <Chat />
+        <p className="report-bug">
+          <a
+            href="https://www.changuito.me/reportarbug"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Reportar un bug
+          </a>
+        </p>
       </main>
     </WalletProvider>
   );

@@ -24,7 +24,7 @@ import { messagesToOpenAi, parseSseChunks, ReplyAccumulator, toolsToOpenAi } fro
  * `OLLAMA_KEEP_ALIVE=-1` on the server is what makes this rare, by keeping the
  * model resident between requests.
  */
-const FIRST_BYTE_MS = 8_000;
+const FIRST_BYTE_MS = Number(process.env.OLLAMA_FIRST_BYTE_MS) || 45_000;
 
 export function ollamaProvider(cfg: OllamaConfig): Provider {
   return {
@@ -40,6 +40,9 @@ export function ollamaProvider(cfg: OllamaConfig): Provider {
         model: cfg.model,
         stream: true,
         max_tokens: 8192,
+        // Keep the weights resident between turns so the first-byte timer
+        // does not fire while Ollama pages 5GB back into RAM.
+        keep_alive: process.env.OLLAMA_KEEP_ALIVE || '-1',
         messages: messagesToOpenAi(system, req.messages),
         tools: toolsToOpenAi(req.tools),
         // Note what is *not* here: `num_ctx`. Ollama's OpenAI-compatible
