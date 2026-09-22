@@ -134,7 +134,9 @@ masthead widget uses it instead of the wallet's own asset list.
 ## Layout
 
 ```
-apps/web/            the Next.js app — chat, wallet, payment, API routes
+apps/web/            the shopper — chat, wallet, payment, API routes (app.changuito.me)
+apps/landing/        marketing site only (www.changuito.me). See apps/landing/README.md
+apps/branding/       brand kit (not an npm package): logo, mascot, manuals, social
 packages/mcp/        the supermarket MCP server (vendored, 520 tests)
 packages/*-bindings/ generated TypeScript clients for the two contracts
 contracts/escrow/    open / settle / refund, with events

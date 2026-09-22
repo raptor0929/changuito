@@ -3,13 +3,9 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import Image from 'next/image';
 
+import { NAV } from '../../lib/copy';
 import { TryLink } from './try-link';
 import styles from './landing.module.css';
-
-const LINKS = [
-  { href: '#como-funciona', label: 'Cómo funciona' },
-  { href: '#faq', label: 'FAQ' },
-] as const;
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
@@ -33,7 +29,7 @@ export function SiteHeader() {
       <div className={styles.headerInner}>
         <a className={styles.logoLink} href="/">
           <Image
-            src="/brand/logo/wordmark@2x.png"
+            src="/brand/wordmark.png"
             alt="Changuito"
             width={1097}
             height={249}
@@ -60,7 +56,7 @@ export function SiteHeader() {
           data-testid="landing-nav"
         >
           <ul className={styles.navList}>
-            {LINKS.map((link) => (
+            {NAV.map((link) => (
               <li key={link.href}>
                 <a className={styles.navLink} href={link.href} onClick={() => setOpen(false)}>
                   {link.label}
@@ -81,9 +77,21 @@ function MenuGlyph({ open }: { open: boolean }) {
   return (
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" className={styles.menuGlyph}>
       {open ? (
-        <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+        <path
+          d="M6 6l12 12M18 6L6 18"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        />
       ) : (
-        <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+        <path
+          d="M4 7h16M4 12h16M4 17h16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        />
       )}
     </svg>
   );

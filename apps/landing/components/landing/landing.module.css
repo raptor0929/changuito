@@ -4,30 +4,19 @@
   --sun: #f4b942;
   --sun-hover: #e3a82a;
   --sun-active: #d39a1c;
+  --clay: #e07a5f;
   --paper: #fafaf7;
   --line: rgba(42, 26, 20, 0.14);
   min-height: 100dvh;
   background: var(--paper);
   color: var(--ink);
-  color-scheme: light;
-  font-family: var(--font-inter), Inter, system-ui, sans-serif;
   font-size: 1.0625rem;
   line-height: 1.5;
 }
 
-:global(html):has(.page) {
-  background: #fafaf7;
-  color-scheme: light;
-}
-
-:global(body):has(.page) {
-  background: #fafaf7;
-  color: #2a1a14;
-}
-
 .page ::selection {
-  background: #f4b942;
-  color: #2a1a14;
+  background: var(--sun);
+  color: var(--ink);
 }
 
 .page :focus {
@@ -35,7 +24,7 @@
 }
 
 .page :focus-visible {
-  outline: 3px solid #2a1a14;
+  outline: 3px solid var(--ink);
   outline-offset: 3px;
 }
 
@@ -184,23 +173,24 @@
 .heroInner {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 48px 24px 80px;
+  padding: 56px 24px 80px;
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
-  gap: 32px;
+  gap: 40px;
   align-items: center;
 }
 
 .h1 {
   margin: 0;
-  font-size: clamp(2.75rem, 5vw, 4.25rem);
+  font-size: clamp(3.25rem, 6.2vw, 5rem);
   font-weight: 800;
-  letter-spacing: -0.035em;
-  line-height: 1.02;
+  letter-spacing: -0.04em;
+  line-height: 0.98;
+  text-wrap: balance;
 }
 
 .sub {
-  margin: 20px 0 0;
+  margin: 24px 0 0;
   max-width: 36ch;
   font-size: 1.25rem;
   line-height: 1.45;
@@ -218,15 +208,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 20px;
-  margin-top: 28px;
-}
-
-.micro {
-  margin: 12px 0 0;
-  max-width: 36ch;
-  font-size: 0.9375rem;
-  line-height: 1.45;
-  color: var(--ink-soft);
+  margin-top: 32px;
 }
 
 .textLink {
@@ -240,15 +222,24 @@
 }
 
 .mascotFrame {
-  position: relative;
-  width: min(100%, 460px);
-  aspect-ratio: 1;
   justify-self: end;
+  width: min(100%, 480px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .mascot {
-  object-fit: cover;
-  object-position: center;
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.mascotStill {
+  display: none;
+  width: auto;
+  max-width: 100%;
+  max-height: 560px;
 }
 
 .section {
@@ -272,6 +263,7 @@
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1.1;
+  text-wrap: balance;
 }
 
 .lead {
@@ -302,6 +294,7 @@
 
 .payGrid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 32px;
 }
 
 .card {
@@ -312,6 +305,10 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.benefitCard {
+  border-top: 4px solid var(--clay);
 }
 
 .stepHead {
@@ -333,7 +330,7 @@
 }
 
 .stepIcon {
-  color: var(--ink);
+  color: var(--clay);
 }
 
 .cardTitle {
@@ -349,13 +346,20 @@
   line-height: 1.5;
 }
 
-.payIntro {
-  display: flex;
+.payLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(180px, 280px);
+  gap: 40px;
   align-items: center;
-  gap: 16px;
 }
 
-.refund {
+.payMascot {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.assurance {
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -368,7 +372,7 @@
   line-height: 1.45;
 }
 
-.refundIcon {
+.assuranceIcon {
   flex: none;
   margin-top: 2px;
 }
@@ -376,6 +380,7 @@
 .faqList {
   margin-top: 8px;
   border-top: 1px solid var(--line);
+  max-width: 760px;
 }
 
 .faqItem {
@@ -431,6 +436,7 @@
   text-align: center;
 }
 
+.bofu .h2,
 .bofu .lead {
   margin-inline: auto;
 }
@@ -533,41 +539,52 @@
 
   .heroInner {
     grid-template-columns: 1fr;
-    justify-items: center;
-    text-align: center;
-    padding: 32px 20px 56px;
+    justify-items: start;
+    padding: 20px 20px 32px;
   }
 
-  .sub,
-  .micro {
-    margin-inline: auto;
+  .h1 {
+    font-size: clamp(2.25rem, 8vw, 3.25rem);
+  }
+
+  .sub {
+    margin-top: 12px;
+    font-size: 1.0625rem;
+  }
+
+  .payLine {
+    margin-top: 8px;
   }
 
   .heroActions {
-    justify-content: center;
+    margin-top: 16px;
   }
 
   .mascotFrame {
     justify-self: center;
-    width: min(100%, 360px);
+    justify-content: center;
+    width: min(100%, 420px);
+    margin-top: 8px;
   }
 
   .section {
     padding: 56px 20px;
   }
 
-  .benefits {
+  .benefits,
+  .payLayout {
     grid-template-columns: 1fr;
+  }
+
+  .payMascot {
+    width: min(100%, 240px);
+    margin-inline: auto;
   }
 }
 
 @media (max-width: 700px) {
   .payGrid {
     grid-template-columns: 1fr;
-  }
-
-  .payIntro {
-    align-items: flex-start;
   }
 }
 
@@ -577,7 +594,85 @@
   }
 
   .headerInner {
-    padding: 12px 16px;
+    padding: 8px 16px;
+  }
+}
+
+/* iPhone 13/14 and similar (~390×844): headline, support, CTA and mascot in one screen. */
+@media (max-width: 480px) {
+  .page {
+    --header-h: 52px;
+  }
+
+  .header {
+    height: var(--header-h);
+    box-sizing: border-box;
+  }
+
+  .headerInner {
+    height: 100%;
+    padding: 4px 16px;
+    box-sizing: border-box;
+  }
+
+  .wordmark {
+    height: 26px;
+  }
+
+  .heroInner {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    box-sizing: border-box;
+    height: calc(100dvh - var(--header-h));
+    max-height: calc(100dvh - var(--header-h));
+    padding: 6px 16px 8px;
+    gap: 0;
+  }
+
+  .h1 {
+    font-size: 2rem;
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+  }
+
+  .sub {
+    margin-top: 6px;
+    font-size: 0.9375rem;
+    line-height: 1.3;
+  }
+
+  .payLine {
+    margin-top: 4px;
+    font-size: 0.9375rem;
+  }
+
+  .heroActions {
+    margin-top: 8px;
+    gap: 2px 12px;
+  }
+
+  .cta {
+    min-height: 44px;
+    padding: 10px 16px;
+  }
+
+  .mascotFrame {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    margin-top: 4px;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .mascotMotion,
+  .mascotStill {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
   }
 }
 
@@ -587,5 +682,13 @@
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+
+  .mascotMotion {
+    display: none;
+  }
+
+  .mascotStill {
+    display: block;
   }
 }

@@ -5,11 +5,14 @@ import {
   BENEFITS,
   BENEFITS_TITLE,
   BOFU,
+  FAQ_TITLE,
+  FOOTER,
   HERO,
+  NAV,
   PAYMENTS,
   STEPS,
   STEPS_TITLE,
-} from '../../lib/landing';
+} from '../../lib/copy';
 import { FaqList } from './faq-list';
 import { CheckIcon, StepIcon } from './icons';
 import { SiteHeader } from './site-header';
@@ -39,18 +42,26 @@ export function LandingPage() {
                 <TryLink testId="landing-cta-hero" />
                 <a className={styles.textLink} href="#como-funciona">
                   {HERO.secondary}
+                  <span aria-hidden="true"> ↓</span>
                 </a>
               </div>
-              <p className={styles.micro}>{HERO.refund}</p>
             </div>
             <div className={styles.mascotFrame}>
-              <Image
+              {/* GIF plays by default. Reduced motion swaps to the locked still via CSS. */}
+              <img
+                className={`${styles.mascot} ${styles.mascotMotion}`}
+                src="/brand/animacion-cargando.gif"
+                alt="Changuito carga el carrito: los productos caen adentro"
+                width={480}
+                height={360}
+                fetchPriority="high"
+              />
+              <img
+                className={`${styles.mascot} ${styles.mascotStill}`}
                 src="/brand/mascot-idle.png"
-                alt="Changuito, un carrito con pan, verdes y un mate"
-                fill
-                priority
-                sizes="(max-width: 860px) 90vw, 460px"
-                className={styles.mascot}
+                alt="Mascota de Changuito, un carrito sonriente con el súper"
+                width={397}
+                height={583}
               />
             </div>
           </div>
@@ -94,7 +105,7 @@ export function LandingPage() {
             </h2>
             <ul className={styles.benefits}>
               {BENEFITS.map((item) => (
-                <li key={item.title} className={styles.card}>
+                <li key={item.title} className={`${styles.card} ${styles.benefitCard}`}>
                   <h3 className={styles.cardTitle}>{item.title}</h3>
                   <p className={styles.cardBody}>{item.body}</p>
                 </li>
@@ -110,27 +121,34 @@ export function LandingPage() {
           data-testid="landing-payments"
         >
           <div className={styles.sectionInner}>
-            <div className={styles.payIntro}>
-              <img src="/brand/logo/sol-mayo.svg" alt="" width={64} height={64} />
+            <div className={styles.payLayout}>
               <div>
                 <h2 id="pagos-titulo" className={styles.h2}>
                   {PAYMENTS.title}
                 </h2>
                 <p className={styles.lead}>{PAYMENTS.lead}</p>
+                <ul className={styles.payGrid}>
+                  {PAYMENTS.methods.map((method) => (
+                    <li key={method.title} className={styles.card}>
+                      <h3 className={styles.cardTitle}>{method.title}</h3>
+                      <p className={styles.cardBody}>{method.body}</p>
+                    </li>
+                  ))}
+                </ul>
+                <p className={styles.assurance}>
+                  <CheckIcon className={styles.assuranceIcon} />
+                  <span>{PAYMENTS.assurance}</span>
+                </p>
               </div>
+              <Image
+                src="/brand/mascot-exito.png"
+                alt="Changuito sonriendo con el carrito lleno"
+                width={719}
+                height={612}
+                sizes="(max-width: 860px) 70vw, 280px"
+                className={styles.payMascot}
+              />
             </div>
-            <ul className={styles.payGrid}>
-              {PAYMENTS.methods.map((method) => (
-                <li key={method.title} className={styles.card}>
-                  <h3 className={styles.cardTitle}>{method.title}</h3>
-                  <p className={styles.cardBody}>{method.body}</p>
-                </li>
-              ))}
-            </ul>
-            <p className={styles.refund}>
-              <CheckIcon className={styles.refundIcon} />
-              <span>{PAYMENTS.refund}</span>
-            </p>
           </div>
         </section>
 
@@ -142,7 +160,7 @@ export function LandingPage() {
         >
           <div className={styles.sectionInner}>
             <h2 id="faq-titulo" className={styles.h2}>
-              FAQ
+              {FAQ_TITLE}
             </h2>
             <FaqList />
           </div>
@@ -151,7 +169,7 @@ export function LandingPage() {
         <section className={styles.bofu} aria-labelledby="cierre-titulo" data-testid="landing-bofu">
           <div className={styles.bofuInner}>
             <Image
-              src="/brand/logo/lockup-stacked@2x.png"
+              src="/brand/lockup-stacked.png"
               alt="Changuito"
               width={384}
               height={605}
@@ -171,7 +189,7 @@ export function LandingPage() {
         <div className={styles.footerInner}>
           <a className={styles.logoLink} href="/">
             <Image
-              src="/brand/logo/wordmark@2x.png"
+              src="/brand/wordmark.png"
               alt="Changuito"
               width={1097}
               height={249}
@@ -180,39 +198,28 @@ export function LandingPage() {
           </a>
           <nav aria-label="Pie" className={styles.footerNavWrap}>
             <ul className={styles.footerNav}>
+              {NAV.map((link) => (
+                <li key={link.href}>
+                  <a className={styles.footerLink} href={link.href}>
+                    {link.label}
+                  </a>
+                </li>
+              ))}
               <li>
-                <a className={styles.footerLink} href="#como-funciona">
-                  Cómo funciona
-                </a>
-              </li>
-              <li>
-                <a className={styles.footerLink} href="#pagos">
-                  Pagos
-                </a>
-              </li>
-              <li>
-                <a className={styles.footerLink} href="#faq">
-                  Ayuda
-                </a>
-              </li>
-              <li>
-                <a className={styles.footerLink} href="/" >
-                  www.changuito.me
+                <a className={styles.footerLink} href="/">
+                  {FOOTER.siteLabel}
                 </a>
               </li>
               <li>
                 <a className={styles.footerLink} href={APP_URL} rel="noopener noreferrer">
-                  app.changuito.me
+                  {FOOTER.appLabel}
                 </a>
               </li>
             </ul>
           </nav>
         </div>
-        <p className={styles.fine}>
-          Changuito te ayuda a armar el súper. No es un supermercado. Si la compra no se completa, te
-          devolvemos el pago.
-        </p>
-        <p className={styles.fine}>© 2026 Changuito</p>
+        <p className={styles.fine}>{FOOTER.legal}</p>
+        <p className={styles.fine}>{FOOTER.copyright}</p>
       </footer>
     </div>
   );

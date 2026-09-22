@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react';
 
-import { FAQ } from '../../lib/landing';
+import { FAQ } from '../../lib/copy';
 
 import styles from './landing.module.css';
 

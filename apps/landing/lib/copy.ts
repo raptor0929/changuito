@@ -6,6 +6,7 @@
  */
 
 export const APP_URL = 'https://app.changuito.me';
+export const SITE_URL = 'https://www.changuito.me';
 
 export const HERO = {
   h1Lead: 'Pedí el súper',
@@ -14,14 +15,21 @@ export const HERO = {
   pay: 'Pagá con tarjeta o USDC.',
   cta: 'Probar Changuito',
   secondary: 'Ver cómo funciona',
-  refund: 'Si la compra no se completa, te devolvemos el pago.',
 } as const;
+
+export const NAV = [
+  { href: '#como-funciona', label: 'Cómo funciona' },
+  { href: '#pagos', label: 'Pagos' },
+  { href: '#faq', label: 'Ayuda' },
+] as const;
+
+export const STEPS_TITLE = 'Así de simple';
 
 export const STEPS = [
   {
     icon: 'ask',
     title: 'Pedile lo que necesitás',
-    body: 'Contale el súper como se lo dirías a alguien en casa.',
+    body: 'En lenguaje natural: la lista, una receta o lo de la juntada. Changuito busca y calcula con IA.',
   },
   {
     icon: 'compare',
@@ -40,6 +48,8 @@ export const STEPS = [
   },
 ] as const;
 
+export const BENEFITS_TITLE = 'El súper, más simple';
+
 export const BENEFITS = [
   {
     title: 'Simple',
@@ -47,7 +57,7 @@ export const BENEFITS = [
   },
   {
     title: 'Real',
-    body: 'Precios reales de supermercado, no inventados.',
+    body: 'Precios reales de supermercado.',
   },
   {
     title: 'Local',
@@ -55,20 +65,25 @@ export const BENEFITS = [
   },
 ] as const;
 
+/** Yellow callout and one FAQ answer. Do not repeat this sentence anywhere else. */
+export const NO_CHARGE = 'Si la compra no se completa, no realizás ningún pago.';
+
 export const PAYMENTS = {
   title: 'Pagá como te quede cómodo',
-  lead: 'Tarjeta o USDC.',
+  lead: 'Pagá con tarjeta o USDC.',
   methods: [
     { title: 'Tarjeta', body: 'Pagá con tarjeta.' },
     { title: 'USDC', body: 'Pagá con USDC.' },
   ],
-  refund: 'Si la compra no se completa, te devolvemos el pago. Sin vueltas.',
+  assurance: NO_CHARGE,
 } as const;
+
+export const FAQ_TITLE = 'Preguntas frecuentes';
 
 export const FAQ = [
   {
     q: '¿Es una app del súper?',
-    a: 'No. Changuito te ayuda a comprar en el súper: compara productos, arma el carrito y te deja listo para pagar.',
+    a: 'No. Es un asistente de IA para el súper: le pedís en tu idioma lo que necesitás — una receta, una juntada, la lista de la semana — y Changuito busca, calcula y te arma el carrito.',
   },
   {
     q: '¿Cómo pago?',
@@ -76,7 +91,7 @@ export const FAQ = [
   },
   {
     q: '¿Qué pasa si falla la compra?',
-    a: 'Si la compra no se completa, te devolvemos el pago.',
+    a: NO_CHARGE,
   },
   {
     q: '¿Para quién es?',
@@ -89,5 +104,12 @@ export const BOFU = {
   lead: 'Changuito compara productos, arma el carrito y te deja listo para pagar.',
 } as const;
 
-export const BENEFITS_TITLE = 'El súper, más simple';
-export const STEPS_TITLE = 'Así de simple';
+export const FOOTER = {
+  legal: 'Changuito te ayuda a armar el súper. No es un supermercado.',
+  copyright: '© 2026 Changuito',
+  siteLabel: 'www.changuito.me',
+  appLabel: 'app.changuito.me',
+} as const;
+
+export const DESCRIPTION =
+  'Changuito compara productos, arma el carrito y te deja listo para pagar. Pagá con tarjeta o USDC.';
