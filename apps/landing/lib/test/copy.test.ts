@@ -13,6 +13,8 @@ import {
   DESCRIPTION,
   FAQ,
   FOOTER,
+  FOUNDER_TRUST,
+  FOUNDERS,
   HERO,
   NO_CHARGE,
   PAYMENTS,
@@ -89,6 +91,8 @@ test('landing copy stays free of jargon and a refund promise', () => {
     FAQ,
     BOFU,
     FOOTER,
+    FOUNDER_TRUST,
+    FOUNDERS,
     SOCIAL,
     DESCRIPTION,
   }).toLowerCase();
@@ -191,4 +195,46 @@ test('source does not reintroduce the refund line or a tiled pattern', () => {
   }
   walk(root);
   assert.deepEqual(hits, []);
+});
+
+test('founder trust copy is the chosen line, linked from the fine print', () => {
+  assert.equal(FOUNDER_TRUST, 'Hecho en 🇦🇷 por SimonethG y Fabio.');
+  assert.equal(FOUNDER_TRUST.includes('\u2014'), false);
+  assert.equal(FOUNDER_TRUST.includes('\u2013'), false);
+  assert.deepEqual(
+    FOUNDERS.map((person) => ({ name: person.name, href: person.href })),
+    [
+      { name: 'SimonethG', href: 'https://www.linkedin.com/in/simonethg/' },
+      { name: 'Fabio', href: 'https://www.linkedin.com/in/fabio-laura-yavi/' },
+    ],
+  );
+
+  const line = readFileSync(join(root, 'components/trust/founder-line.tsx'), 'utf8');
+  assert.equal(line.includes('Hecho en 🇦🇷 por'), true);
+  assert.equal(line.includes('target="_blank"'), true);
+  assert.equal(line.includes('rel="noopener noreferrer"'), true);
+  assert.equal(line.includes('aria-label'), false);
+  assert.equal(line.includes('Simoneth Gomez'), false);
+  assert.equal(line.includes('Fabio Laura'), false);
+
+  const home = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
+  const footer = home.slice(home.indexOf('<footer'));
+  const legalAt = footer.indexOf('{FOOTER.legal}');
+  const trustAt = footer.indexOf('<FounderLine');
+  const copyAt = footer.indexOf('{FOOTER.copyright}');
+  const navClose = footer.indexOf('</nav>');
+  assert.ok(navClose !== -1 && navClose < legalAt);
+  assert.ok(legalAt !== -1 && legalAt < trustAt && trustAt < copyAt);
+  assert.equal(footer.slice(0, navClose).includes('FounderLine'), false);
+
+  const whitelist = readFileSync(join(root, 'app/whitelist/page.tsx'), 'utf8');
+  const cardAt = whitelist.indexOf('styles.card');
+  const whitelistTrust = whitelist.indexOf('<FounderLine');
+  const mainClose = whitelist.indexOf('</main>');
+  assert.ok(cardAt !== -1 && cardAt < whitelistTrust && whitelistTrust < mainClose);
+
+  const bug = readFileSync(join(root, 'app/reportarbug/page.tsx'), 'utf8');
+  const panel = readFileSync(join(root, 'components/bug-report/bug-report-panel.tsx'), 'utf8');
+  assert.equal(bug.includes('FounderLine'), false);
+  assert.equal(panel.includes('FounderLine'), false);
 });

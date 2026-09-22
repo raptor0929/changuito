@@ -11,6 +11,7 @@ import {
   STEPS,
   STEPS_TITLE,
 } from '../../lib/copy';
+import { FounderLine } from '../trust/founder-line';
 import { BrandLockup } from './brand-lockup';
 import { FaqList } from './faq-list';
 import { CheckIcon, InstagramIcon, StepIcon, XIcon } from './icons';
@@ -242,6 +243,7 @@ export function LandingPage() {
           </div>
         </div>
         <p className={styles.fine}>{FOOTER.legal}</p>
+        <FounderLine className={styles.fine} />
         <p className={styles.fine}>{FOOTER.copyright}</p>
       </footer>
     </div>

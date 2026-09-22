@@ -111,6 +111,18 @@ export const FOOTER = {
   appLabel: 'app.changuito.me',
 } as const;
 
+/**
+ * Personal attribution for an early product. Not a registered company
+ * and not a job title. Link text is the visible label, so the accessible
+ * name matches the screen.
+ */
+export const FOUNDERS = [
+  { name: 'SimonethG', href: 'https://www.linkedin.com/in/simonethg/' },
+  { name: 'Fabio', href: 'https://www.linkedin.com/in/fabio-laura-yavi/' },
+] as const;
+
+export const FOUNDER_TRUST = `Hecho en 🇦🇷 por ${FOUNDERS[0].name} y ${FOUNDERS[1].name}.`;
+
 /** Public social profiles. Keep labels short; aria-labels carry the brand. */
 export const SOCIAL = [
   {
