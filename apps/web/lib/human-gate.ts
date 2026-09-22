@@ -16,32 +16,44 @@ export const HUMAN_TTL_MS = 12 * 60 * 60 * 1000; // 12h
 
 export type GateMode = 'open' | 'enforce' | 'closed';
 
-/**
- * Read one env value at runtime.
- *
- * Static `process.env.NEXT_PUBLIC_*` is inlined at build. When the site key
- * was absent at build, that expression becomes empty forever, even after the
- * var is added in Vercel, and production stays `closed`. Bracket access reads
- * the lambda's real environment.
- */
-export function readServerEnv(env: NodeJS.ProcessEnv, name: string): string {
-  const value = env[name];
+function nonempty(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+/**
+ * Turnstile env.
+ *
+ * Next and Vercel only ship a variable that the source mentions as
+ * `process.env.NAME`. A bracket lookup alone is invisible to that pass, so
+ * production reported both keys missing and the shopper never mounted the
+ * widget. The literal member expressions below are the ones the bundler sees.
+ * Bracket access still wins when the lambda has a runtime value the build
+ * did not inline.
+ *
+ * The secret is what makes the gate real. The site key is public and is what
+ * the widget needs; a missing site-key read must not flip production to
+ * `closed` when the secret is set, or every API 403s before Turnstile can run.
+ */
 export function turnstileSecret(env: NodeJS.ProcessEnv = process.env): string {
-  return readServerEnv(env, 'TURNSTILE_SECRET_KEY');
+  const own = nonempty(env.TURNSTILE_SECRET_KEY) || nonempty(env['TURNSTILE_SECRET_KEY']);
+  if (own) return own;
+  if (env !== process.env) return '';
+  return nonempty(process.env.TURNSTILE_SECRET_KEY);
 }
 
 export function turnstileSiteKey(env: NodeJS.ProcessEnv = process.env): string {
-  return readServerEnv(env, 'NEXT_PUBLIC_TURNSTILE_SITE_KEY');
+  const own =
+    nonempty(env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) ||
+    nonempty(env['NEXT_PUBLIC_TURNSTILE_SITE_KEY']) ||
+    nonempty(env.TURNSTILE_SITE_KEY);
+  if (own) return own;
+  if (env !== process.env) return '';
+  return nonempty(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 }
 
-/** Dev without keys: open (with warning). Prod without keys: closed. Keys set: enforce. */
+/** Dev without a secret: open. Prod without a secret: closed. Secret set: enforce. */
 export function humanGateMode(env: NodeJS.ProcessEnv = process.env): GateMode {
-  const secret = turnstileSecret(env);
-  const site = turnstileSiteKey(env);
-  if (secret && site) return 'enforce';
+  if (turnstileSecret(env)) return 'enforce';
   if (env.NODE_ENV === 'production') return 'closed';
   return 'open';
 }

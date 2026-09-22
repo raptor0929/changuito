@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import type { BalanceResponse } from '../app/api/balance/route.ts';
+import { SOLO_HUMANOS } from './human-gate-ui';
 
 export interface Balances {
   data: BalanceResponse | null;
@@ -36,7 +37,16 @@ export function useBalances(address: string | null): Balances {
       .then(async (res) => {
         const json = await res.json();
         if (cancelled) return;
-        if (!res.ok) throw new Error(json.error ?? `balance read failed (${res.status})`);
+        if (!res.ok) {
+          // The human gate already explains this. The raw code `solo_humanos`
+          // was showing up in red inside the wallet.
+          if (json.error === SOLO_HUMANOS) {
+            setData(null);
+            setError(null);
+            return;
+          }
+          throw new Error(json.message ?? json.error ?? `balance read failed (${res.status})`);
+        }
         setData(json as BalanceResponse);
         setError(null);
       })

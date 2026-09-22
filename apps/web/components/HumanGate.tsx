@@ -33,6 +33,13 @@ declare global {
 
 type HumanStatus = { ok?: boolean; mode?: string; siteKey?: string };
 
+/**
+ * Literal member read so Next inlines the public site key into this bundle.
+ * Without it the browser only had whatever the prerender baked in, which was
+ * empty, and Turnstile never mounted.
+ */
+const BUNDLED_SITE_KEY = (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '').trim();
+
 const COPY = {
   checkingTitle: 'Un segundo…',
   checkingBody: 'Confirmamos que sos una persona antes de armar el súper.',
@@ -94,7 +101,7 @@ export function HumanGate({
   const [needWidget, setNeedWidget] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [activeKey, setActiveKey] = useState(siteKey.trim());
+  const [activeKey, setActiveKey] = useState((siteKey || BUNDLED_SITE_KEY).trim());
   const [mountId, setMountId] = useState(0);
   const [slow, setSlow] = useState(false);
   const host = useRef<HTMLDivElement>(null);
@@ -103,7 +110,7 @@ export function HumanGate({
   activeKeyRef.current = activeKey;
 
   const applyStatus = useCallback((status: HumanStatus) => {
-    const key = (status.siteKey || siteKey || activeKeyRef.current).trim();
+    const key = (status.siteKey || siteKey || BUNDLED_SITE_KEY || activeKeyRef.current).trim();
     if (key) setActiveKey(key);
     const decision: ClientGateDecision = clientGateDecision({
       mode: status.mode,

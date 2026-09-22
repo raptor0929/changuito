@@ -25,7 +25,9 @@ export function clientGateDecision(input: {
   const siteKey = (input.siteKey ?? '').trim();
   if (input.mode === 'open') return { action: 'unlock' };
   if (input.mode === 'enforce' && input.ok === true) return { action: 'unlock' };
-  if (input.mode === 'enforce' && siteKey) return { action: 'widget', siteKey };
+  // A public site key means we can draw Turnstile. `closed` used to skip the
+  // widget entirely, which is the dead "reintentá en un rato" screen.
+  if (siteKey) return { action: 'widget', siteKey };
   if (input.mode === 'enforce') return { action: 'block', reason: 'unconfigured' };
   return { action: 'block', reason: 'closed' };
 }
