@@ -1,5 +1,6 @@
 import { allowSubmission, type RateBuckets } from './rate-limit.ts';
 import { saveWaitlistEntry, type SaveDeps } from './persist.ts';
+import { verifyTurnstile } from './turnstile.ts';
 import { validateWaitlist, type FieldErrors } from './validate.ts';
 
 export type SubmitBody = {
@@ -7,7 +8,10 @@ export type SubmitBody = {
   email: unknown;
   source: unknown;
   otherDetail: unknown;
+  contactForFeedback: unknown;
+  whatsapp: unknown;
   company: unknown;
+  turnstileToken: unknown;
 };
 
 export type SubmitResult =
@@ -23,11 +27,23 @@ export async function submitWaitlist(
 ): Promise<SubmitResult> {
   if (honeypotFilled(body.company)) return { ok: true };
 
+  const captcha = await verifyTurnstile(asText(body.turnstileToken), {
+    env: ctx.env,
+    fetch: ctx.fetch,
+    ip: ctx.ip,
+  });
+  if (!captcha.ok) {
+    const status = captcha.error === FORM_ERROR ? 503 : 400;
+    return { ok: false, status, errors: { form: captcha.error } };
+  }
+
   const input = {
     name: asText(body.name),
     email: asText(body.email),
     source: asText(body.source),
     otherDetail: asText(body.otherDetail),
+    contactForFeedback: asText(body.contactForFeedback),
+    whatsapp: asText(body.whatsapp),
   };
 
   const validated = validateWaitlist(input, new Date(ctx.now).toISOString());
