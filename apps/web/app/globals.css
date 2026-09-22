@@ -582,12 +582,19 @@ a:hover { color: var(--chg-arcilla); }
   display: block;
 }
 .human-gate-error {
-  color: var(--warn) !important;
+  /* Darker than brand arcilla so error text clears 4.5:1 on --bg. */
+  color: #7a2e12 !important;
   font-weight: 600;
 }
 .human-gate-widget {
-  min-height: 65px;
+  width: 100%;
+  max-width: 320px;
+  min-height: 70px;
   margin-top: 8px;
+}
+.human-gate-retry {
+  margin-top: 4px;
+  min-width: 44px;
 }
 
 

@@ -6,16 +6,41 @@
  * httpOnly cookie. APIs refuse without it in production.
  */
 
+import { SOLO_HUMANOS } from './human-gate-ui.ts';
+
+export { SOLO_HUMANOS, HUMAN_REQUIRED_EVENT, clientGateDecision, notifyHumanRequired } from './human-gate-ui.ts';
+export type { ClientGateDecision } from './human-gate-ui.ts';
+
 export const HUMAN_COOKIE = 'chg_human';
 export const HUMAN_TTL_MS = 12 * 60 * 60 * 1000; // 12h
-export const SOLO_HUMANOS = 'solo_humanos' as const;
 
 export type GateMode = 'open' | 'enforce' | 'closed';
 
+/**
+ * Read one env value at runtime.
+ *
+ * Static `process.env.NEXT_PUBLIC_*` is inlined at build. When the site key
+ * was absent at build, that expression becomes empty forever, even after the
+ * var is added in Vercel, and production stays `closed`. Bracket access reads
+ * the lambda's real environment.
+ */
+export function readServerEnv(env: NodeJS.ProcessEnv, name: string): string {
+  const value = env[name];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+export function turnstileSecret(env: NodeJS.ProcessEnv = process.env): string {
+  return readServerEnv(env, 'TURNSTILE_SECRET_KEY');
+}
+
+export function turnstileSiteKey(env: NodeJS.ProcessEnv = process.env): string {
+  return readServerEnv(env, 'NEXT_PUBLIC_TURNSTILE_SITE_KEY');
+}
+
 /** Dev without keys: open (with warning). Prod without keys: closed. Keys set: enforce. */
 export function humanGateMode(env: NodeJS.ProcessEnv = process.env): GateMode {
-  const secret = (env.TURNSTILE_SECRET_KEY ?? '').trim();
-  const site = (env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '').trim();
+  const secret = turnstileSecret(env);
+  const site = turnstileSiteKey(env);
   if (secret && site) return 'enforce';
   if (env.NODE_ENV === 'production') return 'closed';
   return 'open';
@@ -81,15 +106,51 @@ export async function verifyHumanToken(
 export function readCookie(header: string | null, name: string): string | null {
   if (!header) return null;
   for (const part of header.split(';')) {
-    const [k, ...rest] = part.trim().split('=');
-    if (k === name) return decodeURIComponent(rest.join('=') || '');
+    const eq = part.indexOf('=');
+    if (eq === -1) continue;
+    const k = part.slice(0, eq).trim();
+    if (k !== name) continue;
+    let value = part.slice(eq + 1).trim();
+    if (value.startsWith('"') && value.endsWith('"') && value.length >= 2) {
+      value = value.slice(1, -1);
+    }
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
   }
   return null;
 }
 
-export function humanCookieHeader(token: string, maxAgeSec = HUMAN_TTL_MS / 1000): string {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-  return `${HUMAN_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(maxAgeSec)}${secure}`;
+export type HumanCookieOptions = {
+  httpOnly: true;
+  secure: boolean;
+  sameSite: 'lax';
+  path: '/';
+  maxAge: number;
+};
+
+/**
+ * Host-only cookie (no Domain): it must stick to app.changuito.me and must
+ * not be shared with www. SameSite=Lax is sent on same-origin fetch, which
+ * is how /api/chat is called. Secure only in production so http://localhost
+ * can still store it.
+ */
+export function humanCookieOptions(env: NodeJS.ProcessEnv = process.env): HumanCookieOptions {
+  return {
+    httpOnly: true,
+    secure: env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: Math.floor(HUMAN_TTL_MS / 1000),
+  };
+}
+
+export function humanCookieHeader(token: string, env: NodeJS.ProcessEnv = process.env): string {
+  const opts = humanCookieOptions(env);
+  const secure = opts.secure ? '; Secure' : '';
+  return `${HUMAN_COOKIE}=${encodeURIComponent(token)}; Path=${opts.path}; HttpOnly; SameSite=Lax; Max-Age=${opts.maxAge}${secure}`;
 }
 
 /** Verify Turnstile token with Cloudflare siteverify. */
@@ -129,11 +190,14 @@ export async function requireHuman(req: Request, env: NodeJS.ProcessEnv = proces
     return null;
   }
   if (mode === 'closed') {
-    console.error('[changuito] human-gate CLOSED: Turnstile keys missing in production.');
+    console.error('[changuito] human-gate CLOSED: Turnstile keys missing in production.', {
+      hasSiteKey: Boolean(turnstileSiteKey(env)),
+      hasSecret: Boolean(turnstileSecret(env)),
+    });
     return soloHumanosResponse();
   }
 
-  const secret = (env.TURNSTILE_SECRET_KEY ?? '').trim();
+  const secret = turnstileSecret(env);
   const token = readCookie(req.headers.get('cookie'), HUMAN_COOKIE);
   const ok = await verifyHumanToken(token, secret);
   if (!ok) return soloHumanosResponse();
