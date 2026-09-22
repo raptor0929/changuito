@@ -33,7 +33,7 @@ export function BugReportSuccess({
       </h1>
       <p className={styles.successLead}>Gracias por avisar. Lo vamos a mirar.</p>
       <button type="button" className={styles.again} data-testid="bug-report-again" onClick={onAgain}>
-        Contar otro
+        Reportar otro error
       </button>
     </div>
   );

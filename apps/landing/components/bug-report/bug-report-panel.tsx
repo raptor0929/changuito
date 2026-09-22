@@ -7,7 +7,7 @@ import styles from './bug-report.module.css';
 
 /**
  * Form intro and confirmation are different screens.
- * The heading stays off the success view, and "Contar otro" brings the form back.
+ * The heading stays off the success view, and "Reportar otro error" brings the form back.
  */
 export function BugReportPanel({ initialDone, notice }: { initialDone: boolean; notice?: string }) {
   const [done, setDone] = useState(initialDone);
