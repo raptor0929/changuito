@@ -289,7 +289,11 @@ test('the report page shows the error mascot and the home hero does not', () => 
   const home = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
   const css = readFileSync(join(root, 'components/bug-report/bug-report.module.css'), 'utf8');
 
-  assert.match(page, /src="\/brand\/mascot-error\.png"/);
+  const header = page.slice(0, page.indexOf('</header>'));
+  assert.match(header, /src="\/brand\/mascot-error\.png"/);
+  assert.match(header, /data-testid="bug-report-mascot"/);
+  assert.equal(page.split('/brand/mascot-error.png').length - 1, 1);
+  assert.equal(page.includes('isotipo-mascota'), false);
   assert.match(page, /Contanos qué pasó/);
   assert.equal(page.includes('animacion-busqueda'), false);
   assert.equal(page.includes('mascot-exito'), false);

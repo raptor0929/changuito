@@ -245,7 +245,7 @@ export function BugReportForm({ notice }: { notice?: string }) {
           id={`${baseId}-description`}
           className={`${styles.control} ${styles.textarea}`}
           name="description"
-          rows={5}
+          rows={3}
           maxLength={2000}
           value={description}
           aria-invalid={errors.description ? true : undefined}
@@ -277,9 +277,9 @@ export function BugReportForm({ notice }: { notice?: string }) {
         </p>
         <textarea
           id={`${baseId}-context`}
-          className={`${styles.control} ${styles.textarea}`}
+          className={`${styles.control} ${styles.textarea} ${styles.textareaShort}`}
           name="context"
-          rows={3}
+          rows={2}
           maxLength={500}
           value={context}
           aria-invalid={errors.context ? true : undefined}
