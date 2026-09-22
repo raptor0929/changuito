@@ -419,7 +419,12 @@ a:hover { color: var(--chg-arcilla); }
   position: sticky;
   bottom: 0;
   z-index: 2;
-  padding: 10px 0 calc(10px + env(safe-area-inset-bottom, 0px));
+  /* .chat and .shell are overflow:hidden. The focus ring paints outside the
+     controls (3px outline + 2px offset on the field, 3px + 3px on Enviar).
+     Inline padding keeps that ring, including the left rounded corner, inside
+     the clip instead of shearing it off at the content edge. 8px is the ring
+     plus a pixel so antialiasing is not the new clip. */
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
   margin: 0;
   border-top: 1px solid var(--border);
   background: var(--bg);
@@ -852,7 +857,10 @@ a:hover { color: var(--chg-arcilla); }
   .shell:has(.chat.is-empty) .composer {
     column-gap: 6px;
     row-gap: 4px;
-    padding: 6px 0 calc(4px + env(safe-area-inset-bottom, 0px));
+    /* Same ring gutter as .composer. The empty bar used to be 4px on the
+       bottom, one pixel short of the field ring, so the lower stroke clipped
+       too. 6px clears a 5px ring without giving back the tight first screen. */
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
     margin: 0;
   }
 
