@@ -26,13 +26,19 @@ const EFFORT = isClaude5 ? { output_config: { effort: 'medium' as const } } : {}
 export function anthropicProvider(): Provider {
   // Built per turn rather than at module scope, as it was before: the API key
   // is read at construction, and a build without one should not fail at import.
-  const client = new Anthropic();
+  const hasKey = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+  const client = hasKey ? new Anthropic() : null;
 
   return {
     kind: 'anthropic',
     label: MODEL,
 
     async hop(req: HopRequest, cb: HopCallbacks): Promise<HopResult> {
+      if (!client) {
+        throw new Error(
+          'Falta ANTHROPIC_API_KEY. En local usá AGENT_PROVIDER=ollama con Ollama corriendo.',
+        );
+      }
       const stream = client.messages.stream({
         model: MODEL,
         max_tokens: 8192,

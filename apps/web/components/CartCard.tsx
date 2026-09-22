@@ -69,7 +69,7 @@ export function CartCard({
         <div className="cart-actions">
           {onPay ? (
             <button type="button" className="btn btn-pay" onClick={() => onPay(cart)}>
-              Confirmar y pagar en USDC
+              Pagá con USDC
             </button>
           ) : null}
           {handoffUrl ? (

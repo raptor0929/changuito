@@ -73,9 +73,14 @@ export async function runTurn(
     // The one mode that does not fall back. It exists so that "is the laptop
     // actually being used?" has an answer, which `auto` cannot give — `auto`
     // succeeds either way, by design.
+    const denial = brains.denial ?? 'unavailable';
+    const hint =
+      denial === 'busy'
+        ? 'Ollama está ocupado con otro pedido. Esperá un momento y probá de nuevo.'
+        : `El modelo local no está disponible (${denial}). Revisá que Ollama esté corriendo y probá de nuevo.`;
     emit({
       t: 'error',
-      message: `El modelo local no está disponible (${brains.denial}). Probá de nuevo o usá AGENT_PROVIDER=auto.`,
+      message: hint,
       recoverable: true,
     });
     return { brain: 'none' };
@@ -135,8 +140,13 @@ export async function runTurn(
       // Not a failure, so the breaker is not told about it: the machine did
       // nothing wrong, the turn just ran out of room for it.
       if (local && Date.now() - t0 > LOCAL_DEADLINE_MS) {
-        console.log('[loop] local model out of budget — finishing on the hosted model');
-        await retireLocal('ok');
+        if (brains.mode === 'ollama') {
+          // Strict local: no Anthropic fallback. Keep going on Ollama until hop/turn budgets.
+          console.log('[loop] local model past preferred deadline — staying on Ollama (AGENT_PROVIDER=ollama)');
+        } else {
+          console.log('[loop] local model out of budget — finishing on the hosted model');
+          await retireLocal('ok');
+        }
       }
 
       // Per hop, not per turn. What cannot be retried is a *hop's* partial
@@ -168,7 +178,8 @@ export async function runTurn(
           // left to fall back to, and the route turns it into one message.
           if (active.kind === 'anthropic') throw e;
 
-          console.warn(`[loop] local model failed: ${e instanceof Error ? e.message : e}`);
+          const detail = e instanceof Error ? e.message : String(e);
+          console.warn(`[loop] local model failed: ${detail}`);
           await retireLocal('fail');
 
           if (sawText) {
@@ -176,6 +187,19 @@ export async function runTurn(
             // twice, and there is no way to unsay the first half.
             emit({ t: 'error', message: 'Se cortó la respuesta. Probá de nuevo.', recoverable: true });
             return { brain: used.concat('interrupted').join(' → ') };
+          }
+
+          // Strict Ollama: never fall through to Anthropic (no API key locally).
+          if (brains.mode === 'ollama') {
+            const slow = /no output in|first-byte|aborted/i.test(detail);
+            emit({
+              t: 'error',
+              message: slow
+                ? 'Ollama tardó demasiado en arrancar. Esperá unos segundos y probá de nuevo (el modelo a veces está cargando).'
+                : `El modelo local falló (${detail}). Revisá Ollama (qwen3:8b) y probá de nuevo.`,
+              recoverable: true,
+            });
+            return { brain: used.concat('ollama-failed').join(' → ') };
           }
           // Round again. `local` is gone, so this picks the hosted model,
           // which either answers or throws — the loop cannot spin.

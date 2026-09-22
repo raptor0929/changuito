@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next';
 
 const config: NextConfig = {
+  allowedDevOrigins: ['127.0.0.1', 'localhost'],
   // `@changuito/mcp` is a workspace package of compiled ESM. It gets bundled
   // rather than marked external, because a symlinked workspace package that
   // Next treats as external is not traced into the lambda at all and fails at
