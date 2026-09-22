@@ -9,6 +9,7 @@ import {
   mintUserToken,
   verifyUserToken,
   guestTurnCounter,
+  LOGIN_CTA,
   LOGIN_REQUIRED_MESSAGE,
 } from '../login-gate.ts';
 
@@ -71,5 +72,6 @@ describe('login-gate', () => {
   it('login required copy is rioplatense', () => {
     assert.match(LOGIN_REQUIRED_MESSAGE, /iniciá sesión/i);
     assert.match(LOGIN_REQUIRED_MESSAGE, /Changuito/);
+    assert.equal(LOGIN_CTA, 'Iniciá sesión');
   });
 });
