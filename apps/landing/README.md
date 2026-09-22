@@ -91,9 +91,22 @@ El kit completo vive en `apps/branding/` (manuals, logo, mascota, pattern, motio
 | `public/brand/mascot-idle.png` | `apps/branding/mascot/mascota-idle.png` (movimiento reducido, y marca del header, pie y cierre) |
 | `public/brand/mascota-corriendo.png` | `apps/branding/mascot/mascota-corriendo.png` (CTA, en el lugar de la flecha) |
 | `public/brand/wordmark.png` | `apps/branding/logo/wordmark.png` (lettering chunky con Sol de Mayo). Header de `/reportarbug`, junto a la mascota de error. El mismo archivo está en `apps/web/public/brand`. |
-| `public/og.png` | pose idle ancha del zip de landing (1280×720), solo Open Graph |
+| `public/og.jpg` | pose idle ancha del zip de landing (1280×720, JPEG), Open Graph y Twitter. El archivo anterior se llamaba `og.png` pero los bytes eran JPEG, así que el content-type no coincidía. |
 | `public/brand/isotipo-mascota.png` | `apps/branding/logo/isotipo-mascota.png` (solo la mascota, header de `/whitelist`) |
 | `public/brand/mascot-error.png` | carrito idle con ojos en X y gesto hacia abajo. Solo `/reportarbug`. |
 | `app/favicon.ico`, `app/icon.png`, `app/apple-icon.png` | mascota idle completa (`mascota-idle.png`) encajada en un cuadrado con margen transparente (16/32/48, 32 y 180). Sin recorte de cara. Los mismos archivos están en `apps/web/app`. `/whitelist` hereda estos íconos (no hay `app/whitelist/icon.png`). |
 
 El header, el pie y el cierre del home muestran la mascota idle y la palabra «Changuito» en Inter. `/whitelist` usa el isotipo y la misma palabra en texto. `/reportarbug` usa la mascota de error y el wordmark en imagen. El fondo es `#FAFAF7` plano: el patrón mate-pan no se tilea.
+
+## SEO
+
+No hace falta ninguna variable de entorno. El HTML sale en `es-AR`. Next genera, en el build:
+
+| Ruta | Qué es |
+|---|---|
+| `/robots.txt` | permite indexar las páginas de marketing (también a buscadores y crawlers de respuesta) y deja afuera `/api/` |
+| `/sitemap.xml` | `/`, `/whitelist`, `/reportarbug` |
+| `/llms.txt` | resumen en texto, armado con el copy público |
+| `/manifest.webmanifest` | nombre, idioma e íconos |
+
+El shopper (`app.changuito.me`) tiene su propio `robots.txt` y no se toca desde acá. `?estado=` en la lista y en el reporte de bug no se indexa; el canonical queda en la URL limpia.
