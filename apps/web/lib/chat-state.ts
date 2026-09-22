@@ -168,3 +168,19 @@ export function endTurn(state: ChatState, message?: string): ChatState {
     : state.blocks;
   return { ...state, streaming: false, blocks };
 }
+
+/**
+ * Drop error bubbles whose text is exactly `message`.
+ * Same reference when nothing matches, so a no-op clear does not re-render.
+ */
+export function omitErrorMessage(state: ChatState, message: string): ChatState {
+  let changed = false;
+  const blocks = state.blocks.filter((b) => {
+    if (b.kind === 'error' && b.message === message) {
+      changed = true;
+      return false;
+    }
+    return true;
+  });
+  return changed ? { ...state, blocks } : state;
+}

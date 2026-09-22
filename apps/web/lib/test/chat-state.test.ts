@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { applyEvent, endTurn, initialState, resetIds, sendUser, type ChatState } from '../chat-state.ts';
+import { applyEvent, endTurn, initialState, omitErrorMessage, resetIds, sendUser, type ChatState } from '../chat-state.ts';
+import { LOGIN_REQUIRED_MESSAGE } from '../login-constants.ts';
 import type { UiEvent } from '../protocol.ts';
 
 const run = (events: UiEvent[], from: ChatState = initialState) => events.reduce(applyEvent, from);
@@ -145,6 +146,26 @@ describe('endTurn', () => {
     const s = endTurn(sendUser(initialState, 'hola'), 'Se cortó la conexión.');
     assert.equal(s.streaming, false);
     assert.equal(s.blocks.at(-1)?.kind, 'error');
+  });
+
+  it('drops the login-required line and leaves other errors in place', () => {
+    const gated = endTurn(sendUser(initialState, 'asado para 6'), LOGIN_REQUIRED_MESSAGE);
+    assert.equal(
+      gated.blocks.some((b) => b.kind === 'error' && b.message.includes('Para seguir, iniciá sesión')),
+      true,
+    );
+    const cleared = omitErrorMessage(gated, LOGIN_REQUIRED_MESSAGE);
+    assert.equal(
+      cleared.blocks.some((b) => b.kind === 'error' && /Para seguir, iniciá sesión/.test(b.message)),
+      false,
+    );
+    assert.equal(omitErrorMessage(cleared, LOGIN_REQUIRED_MESSAGE), cleared);
+
+    const withStock = endTurn(sendUser(cleared, 'milanesas'), 'sin stock');
+    const still = omitErrorMessage(withStock, LOGIN_REQUIRED_MESSAGE);
+    const errors = still.blocks.filter((b) => b.kind === 'error');
+    assert.equal(errors.length, 1);
+    if (errors[0]?.kind === 'error') assert.equal(errors[0].message, 'sin stock');
   });
 
   it('does nothing when the turn already ended, so `done` is not doubled', () => {
