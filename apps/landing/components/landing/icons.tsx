@@ -11,7 +11,7 @@ function stroke(className?: string) {
     strokeWidth: 2,
     strokeLinecap: 'round' as const,
     strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
+    'aria-hidden': true as const,
   };
 }
 

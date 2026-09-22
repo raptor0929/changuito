@@ -3,14 +3,10 @@
  *
  * The landing may link to the app and nowhere else. Paths, query strings and
  * tokens do not belong on that URL — the app origin is the whole destination.
- *
- * The unfinished-purchase line is not a refund promise. It appears only in the
- * payments callout and in one FAQ answer.
  */
 
 export const APP_URL = 'https://app.changuito.me';
-
-export const NO_CHARGE = 'Si la compra no se completa, no realizás ningún pago.';
+export const SITE_URL = 'https://www.changuito.me';
 
 export const HERO = {
   h1Lead: 'Pedí el súper',
@@ -20,6 +16,14 @@ export const HERO = {
   cta: 'Probar Changuito',
   secondary: 'Ver cómo funciona',
 } as const;
+
+export const NAV = [
+  { href: '#como-funciona', label: 'Cómo funciona' },
+  { href: '#pagos', label: 'Pagos' },
+  { href: '#faq', label: 'Ayuda' },
+] as const;
+
+export const STEPS_TITLE = 'Así de simple';
 
 export const STEPS = [
   {
@@ -44,6 +48,8 @@ export const STEPS = [
   },
 ] as const;
 
+export const BENEFITS_TITLE = 'El súper, más simple';
+
 export const BENEFITS = [
   {
     title: 'Simple',
@@ -59,15 +65,20 @@ export const BENEFITS = [
   },
 ] as const;
 
+/** Yellow callout and one FAQ answer. Do not repeat this sentence anywhere else. */
+export const NO_CHARGE = 'Si la compra no se completa, no realizás ningún pago.';
+
 export const PAYMENTS = {
   title: 'Pagá como te quede cómodo',
-  lead: 'Tarjeta o USDC.',
+  lead: 'Pagá con tarjeta o USDC.',
   methods: [
     { title: 'Tarjeta', body: 'Pagá con tarjeta.' },
     { title: 'USDC', body: 'Pagá con USDC.' },
   ],
   assurance: NO_CHARGE,
 } as const;
+
+export const FAQ_TITLE = 'Preguntas frecuentes';
 
 export const FAQ = [
   {
@@ -93,7 +104,12 @@ export const BOFU = {
   lead: 'Changuito compara productos, arma el carrito y te deja listo para pagar.',
 } as const;
 
-export const BENEFITS_TITLE = 'El súper, más simple';
-export const STEPS_TITLE = 'Así de simple';
+export const FOOTER = {
+  legal: 'Changuito te ayuda a armar el súper. No es un supermercado.',
+  copyright: '© 2026 Changuito',
+  siteLabel: 'www.changuito.me',
+  appLabel: 'app.changuito.me',
+} as const;
 
-export const FINE_PRINT = 'Changuito te ayuda a armar el súper. No es un supermercado.';
+export const DESCRIPTION =
+  'Changuito compara productos, arma el carrito y te deja listo para pagar. Pagá con tarjeta o USDC.';

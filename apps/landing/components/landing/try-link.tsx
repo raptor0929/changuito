@@ -1,4 +1,4 @@
-import { APP_URL, HERO } from '../../lib/landing';
+import { APP_URL, HERO } from '../../lib/copy';
 
 import styles from './landing.module.css';
 
