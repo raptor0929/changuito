@@ -202,9 +202,24 @@ a:hover { color: var(--chg-arcilla); }
   gap: 8px;
 }
 .thinking-mascot {
-  height: 1.6em;
+  height: 36px;
   width: auto;
+  max-width: 72px;
   display: block;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+/* Search GIF is 480×320. Idle pose is the still stand-in when motion is reduced. */
+.thinking-mascot-still {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinking-mascot-motion {
+    display: none;
+  }
+  .thinking-mascot-still {
+    display: block;
+  }
 }
 .is-error {
   align-self: stretch;

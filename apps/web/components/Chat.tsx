@@ -150,16 +150,26 @@ function ChatCore({
         })}
 
         {state.streaming && state.blocks.at(-1)?.kind === 'user' ? (
-          <p className="bubble is-agent thinking">
+          // Copy first, then the back-and-forth search GIF. The idle PNG is
+          // only the reduced-motion fallback (hidden in CSS until then).
+          <p className="bubble is-agent thinking" data-testid="search-loading">
+            <span>Buscando en el súper…</span>
             <img
-              className="thinking-mascot"
+              className="thinking-mascot thinking-mascot-motion"
+              src="/brand/animacion-busqueda.gif"
+              alt=""
+              aria-hidden="true"
+              width={54}
+              height={36}
+            />
+            <img
+              className="thinking-mascot thinking-mascot-still"
               src="/brand/mascot-idle.png"
               alt=""
               aria-hidden="true"
-              width={40}
-              height={40}
+              width={25}
+              height={36}
             />
-            Buscando en el súper…
           </p>
         ) : null}
         <ReportBug />
