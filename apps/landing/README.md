@@ -15,9 +15,22 @@ Crear un **proyecto nuevo**, no reusar el de `apps/web`.
 | Node.js | **22.x** (el repo pide `>=22.12`) |
 | Install command | default — Vercel instala desde la raíz del monorepo (`npm ci`) |
 | Build command | default — corre `next build` de este paquete |
-| Environment variables | ninguna. No hay secrets ni `NEXT_PUBLIC_*` |
+| Environment variables | ninguna obligatoria para el sitio. `/whitelist` necesita un destino durable — ver abajo |
 
 Dominio de producción: `www.changuito.me`. `app.changuito.me` sigue en el proyecto de `apps/web`.
+
+La lista de espera vive en `/whitelist`. No hace falta login de Vercel para mergear el código: el próximo deploy toma la ruta. Sin un destino configurado, producción responde que no pudo anotar a la persona (no finge el alta). En `next dev` / `next start` local, si no hay variables, el alta se agrega a `apps/landing/.data/waitlist.jsonl` (gitignored).
+
+Elegí **uno** de estos destinos. Si están los dos, Redis es el registro y el webhook recibe una copia.
+
+| Variable | Obligatoria | Para qué |
+|---|---|---|
+| `WAITLIST_WEBHOOK_URL` | una de las dos vías | `POST` JSON `{ name, email, source, otherDetail, createdAt }` a un HTTPS (Notion, Sheets, Slack, Make). `http` solo en `localhost`. |
+| `WAITLIST_WEBHOOK_SECRET` | no | Si está, va como `Authorization: Bearer …`. |
+| `KV_REST_API_URL` o `UPSTASH_REDIS_REST_URL` | la otra vía | El mismo Redis REST que ya usa el shopper. La landing es otro proyecto de Vercel: hay que conectar la integración ahí, no se hereda sola. |
+| `KV_REST_API_TOKEN` o `UPSTASH_REDIS_REST_TOKEN` | junto con la URL | Token REST. Nunca commitearlo. |
+
+La clave de Redis es `changuito:landing:waitlist` (hash por email, `HSETNX`), para no pisar las sesiones del shopper si comparten base.
 
 Si el dashboard no detecta el workspace y pide comandos a mano (el working directory es `apps/landing`):
 
