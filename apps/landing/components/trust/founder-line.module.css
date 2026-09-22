@@ -1,0 +1,12 @@
+/* Inline sentence links. No min-height and no padding: this is fine print,
+   not a footer nav row, including on a 390px screen. */
+.link {
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.link:hover {
+  color: var(--ink);
+}

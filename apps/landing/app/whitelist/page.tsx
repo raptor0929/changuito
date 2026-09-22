@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 
 import { JsonLd } from '../../components/seo/json-ld';
+import { FounderLine } from '../../components/trust/founder-line';
 import { WaitlistForm } from '../../components/waitlist/waitlist-form';
 import styles from '../../components/waitlist/waitlist.module.css';
 import { pageMetadata, publicPage, subpageJsonLd } from '../../lib/seo';
@@ -73,6 +74,7 @@ export default async function WhitelistPage({
             <WaitlistForm notice={estado === 'error' ? 'Revisá los datos e intentá de nuevo.' : undefined} />
           )}
         </div>
+        <FounderLine className={styles.fine} />
       </main>
     </div>
   );

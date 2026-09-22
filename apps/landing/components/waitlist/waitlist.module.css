@@ -83,6 +83,15 @@
   padding: 28px 20px 64px;
 }
 
+/* Same quiet weight as the home footer .fine. Sits under the form card. */
+.fine {
+  max-width: 1120px;
+  margin: 28px auto 0;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
 .card {
   margin-top: 20px;
   /* Focus ring is 3px outline + 3px offset. Keep this padding larger than
