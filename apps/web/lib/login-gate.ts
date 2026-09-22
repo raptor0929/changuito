@@ -12,14 +12,14 @@
 
 import { Redis } from '@upstash/redis';
 
-import { readCookie } from './human-gate';
+import { readCookie } from './human-gate.ts';
 import {
   FREE_TURNS,
   FREE_TURNS_PER_IP,
   LOGIN_REQUIRED,
   LOGIN_REQUIRED_MESSAGE,
   USER_COOKIE,
-} from './login-constants';
+} from './login-constants.ts';
 
 export {
   FREE_TURNS,
@@ -28,7 +28,7 @@ export {
   LOGIN_REQUIRED,
   LOGIN_REQUIRED_MESSAGE,
   USER_COOKIE,
-} from './login-constants';
+} from './login-constants.ts';
 
 const TTL_SECONDS = 60 * 60; // match turn-store: abandon after an hour
 const USER_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
