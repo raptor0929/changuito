@@ -3,7 +3,14 @@ import { readFile } from 'node:fs/promises';
 import { afterEach, describe, it } from 'node:test';
 
 import { DEPLOYMENTS } from '../deployments.ts';
-import { centsToUnits, ensureFunded, explorer, formatUsdc, unitsToCents } from '../stellar.ts';
+import {
+  centsToUnits,
+  ensureFunded,
+  explorer,
+  formatUsdc,
+  MIN_XLM,
+  unitsToCents,
+} from '../stellar.ts';
 
 const real = globalThis.fetch;
 afterEach(() => {
@@ -59,11 +66,57 @@ describe('ensureFunded', () => {
     assert.ok(calls.some((c) => c.includes('friendbot')), 'never called friendbot');
   });
 
-  it('does not re-fund an account that already exists', async () => {
+  it('does not re-fund an account that already has enough XLM', async () => {
     const calls = stubFetch([[/accounts/, { status: 200, body: account('42.0') }]]);
     const res = await ensureFunded(G);
     assert.deepEqual(res, { address: G, created: false, xlm: '42.0' });
     assert.ok(!calls.some((c) => c.includes('friendbot')), 'funded an account that had XLM');
+  });
+
+  // Regression. Pollar creates its wallets with a sponsored createAccount at a
+  // "0" starting balance, so the account exists while holding nothing. Gating
+  // on existence meant [Fondear] handed over 50 USDC and no XLM, and the
+  // wallet could not pay the fee to spend any of it. Friendbot does top up an
+  // account below its starting balance — it only refuses at or above it.
+  it('RULE: an account that exists with no XLM still gets funded', async () => {
+    let seen = 0;
+    const calls: string[] = [];
+    globalThis.fetch = (async (input: string | URL) => {
+      const url = String(input);
+      calls.push(url);
+      if (/friendbot/.test(url)) return { ok: true, status: 200, text: async () => '' } as Response;
+      seen += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => account(seen === 1 ? '0.0000000' : '10000.0000000'),
+      } as Response;
+    }) as typeof fetch;
+
+    const res = await ensureFunded(G);
+    assert.ok(calls.some((c) => c.includes('friendbot')), 'left a 0-XLM wallet unfunded');
+    assert.equal(res.xlm, '10000.0000000');
+    // The account was already there, so we did not create it — but we did fund it.
+    assert.equal(res.created, false);
+  });
+
+  it('tops up an account sitting below MIN_XLM', async () => {
+    let seen = 0;
+    const calls: string[] = [];
+    globalThis.fetch = (async (input: string | URL) => {
+      const url = String(input);
+      calls.push(url);
+      if (/friendbot/.test(url)) return { ok: true, status: 200, text: async () => '' } as Response;
+      seen += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => account(seen === 1 ? String(MIN_XLM - 1) : '10000.0'),
+      } as Response;
+    }) as typeof fetch;
+
+    await ensureFunded(G);
+    assert.ok(calls.some((c) => c.includes('friendbot')), 'left a near-empty wallet alone');
   });
 
   it('treats a friendbot refusal as success if the account exists anyway', async () => {

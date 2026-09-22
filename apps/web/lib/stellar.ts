@@ -36,6 +36,14 @@ export interface FundingResult {
 }
 
 /**
+ * Below this we go back to friendbot. Existing-and-non-empty is not the test:
+ * Pollar creates its wallets with a sponsored createAccount at a "0" starting
+ * balance, so the account is very much there while holding nothing, and a
+ * wallet that cannot pay a fee is no better than one that does not exist.
+ */
+export const MIN_XLM = 5;
+
+/**
  * Makes sure an address can pay a fee.
  *
  * A Stellar address is just a public key until some existing account pays its
@@ -45,18 +53,24 @@ export interface FundingResult {
  * XLM, and only then mint them demo USDC — a wallet holding USDC it cannot
  * afford to spend is worse than no wallet at all.
  *
- * Idempotent: an already-funded account short-circuits to a balance read, and a
- * friendbot that answers "already exists" is treated as success, because two
- * clicks on [Fund] is a thing people do.
+ * Idempotent: an account already holding MIN_XLM short-circuits to a balance
+ * read, and a friendbot that answers "already funded" is treated as success,
+ * because two clicks on [Fund] is a thing people do.
  */
 export async function ensureFunded(address: string): Promise<FundingResult> {
   const existing = await nativeBalance(address);
-  if (existing !== null) return { address, created: false, xlm: existing };
+  if (existing !== null && Number(existing) >= MIN_XLM) {
+    return { address, created: false, xlm: existing };
+  }
 
+  // Friendbot both creates a missing account and tops up an existing one that
+  // sits below its starting balance — it only refuses when the account is
+  // already at or above it ("account already funded to starting balance").
+  // Verified on testnet: an account holding 1.5 XLM came back with 10001.5.
   const res = await fetch(`${FRIENDBOT_URL}/?addr=${encodeURIComponent(address)}`);
   if (!res.ok) {
-    // Friendbot 400s on an account that already exists. Between our balance
-    // read and this call, another tab may well have funded it.
+    // Between our balance read and this call, another tab may well have funded
+    // it. Only a still-missing account means we actually failed.
     const body = await res.text();
     const after = await nativeBalance(address);
     if (after === null) {
@@ -66,7 +80,7 @@ export async function ensureFunded(address: string): Promise<FundingResult> {
   }
 
   const xlm = await nativeBalance(address);
-  return { address, created: true, xlm: xlm ?? '0' };
+  return { address, created: existing === null, xlm: xlm ?? '0' };
 }
 
 /** The account's XLM, or null if the account does not exist on the ledger yet. */

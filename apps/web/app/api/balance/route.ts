@@ -5,7 +5,7 @@
  * @stellar/stellar-sdk out of the client bundle, and keeps the RPC endpoint one
  * place rather than one per component.
  */
-import { addressKind, formatUsdc, nativeBalance } from '../../../lib/stellar.ts';
+import { addressKind, formatUsdc, MIN_XLM, nativeBalance } from '../../../lib/stellar.ts';
 import { usdcBalance } from '../../../lib/token.ts';
 
 // XDR encoding is Node, not edge.
@@ -46,9 +46,11 @@ export async function GET(req: Request): Promise<Response> {
       xlm,
       usdc: usdc.toString(),
       usdcDisplay: formatUsdc(usdc),
-      // A contract wallet pays fees some other way, so "not a G-address" is
-      // never "unfunded".
-      funded: kind === 'contract' || xlm !== null,
+      // "Funded" has to mean "can pay a fee", not "the account row exists" —
+      // a Pollar wallet is created sponsored at 0 XLM, so existence alone left
+      // this true while the widget showed 0.00 and the warning stayed hidden.
+      // A contract wallet pays fees some other way, so it is never unfunded.
+      funded: kind === 'contract' || (xlm !== null && Number(xlm) >= MIN_XLM),
     };
     return Response.json(body);
   } catch (err) {
