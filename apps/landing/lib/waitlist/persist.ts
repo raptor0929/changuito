@@ -127,11 +127,13 @@ async function upstash(auth: RedisAuth, command: string[], fetchImpl: typeof fet
 }
 
 /**
- * JSON the deployed Apps Script (not in this repo) should append.
- * `whatsapp` is E.164. `whatsappGroup` replaces the old `contactForFeedback` flag.
+ * JSON `appendWaitlist_` already reads. The script is not in this repo.
+ * `kind` keeps the row on the waitlist sheet. `whatsappGroup` is the beta-group
+ * answer (sheet column `grupo_whatsapp`). `feedback` is not sent.
  */
 export function waitlistWebhookPayload(entry: WaitlistEntry): Record<string, unknown> {
-  return {
+  const payload: Record<string, unknown> = {
+    kind: 'waitlist',
     name: entry.name,
     email: entry.email,
     source: entry.source,
@@ -140,6 +142,8 @@ export function waitlistWebhookPayload(entry: WaitlistEntry): Record<string, unk
     whatsappGroup: entry.whatsappGroup,
     createdAt: entry.createdAt,
   };
+  if (entry.userAgent) payload.userAgent = entry.userAgent;
+  return payload;
 }
 
 async function postWebhook(target: WebhookAuth, entry: WaitlistEntry, fetchImpl: typeof fetch): Promise<boolean> {

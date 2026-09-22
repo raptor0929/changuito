@@ -25,6 +25,7 @@ export async function POST(request: Request) {
     now: Date.now(),
     env: process.env,
     fetch,
+    userAgent: request.headers.get('user-agent') ?? undefined,
   });
 
   if (parsed.formPost) {
