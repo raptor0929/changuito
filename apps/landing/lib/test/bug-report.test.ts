@@ -308,7 +308,7 @@ test('the report page shows the error mascot and the home hero does not', () => 
   assert.match(confirm, /BugReportSuccess/);
   assert.equal(confirm.includes('Si algo no anduvo'), false);
   assert.match(form, /onSuccess/);
-  assert.match(form, /Contar otro/);
+  assert.match(form, /Reportar otro error/);
   assert.equal(page.includes('animacion-busqueda'), false);
   assert.equal(page.includes('mascot-exito'), false);
   assert.equal(page.includes('mascot-idle'), false);
