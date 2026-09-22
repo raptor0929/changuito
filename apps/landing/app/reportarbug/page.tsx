@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import Image from 'next/image';
 
-import { BugReportForm, BugReportSuccess } from '../../components/bug-report/bug-report-form';
+import { BugReportPanel } from '../../components/bug-report/bug-report-panel';
 import { BugReportViewport } from '../../components/bug-report/bug-report-viewport';
 import { JsonLd } from '../../components/seo/json-ld';
 import styles from '../../components/bug-report/bug-report.module.css';
@@ -66,17 +66,10 @@ export default async function ReportarBugPage({
           </a>
         </div>
       </header>
-      <main id="reporte" className={styles.main} data-testid="bug-report-page">
-        <h1 className={styles.title}>Contanos qué pasó</h1>
-        <p className={styles.lead}>Si algo no anduvo, dejalo acá.</p>
-        <div className={styles.card}>
-          {listed ? (
-            <BugReportSuccess autoFocus />
-          ) : (
-            <BugReportForm notice={estado === 'error' ? 'Revisá los datos e intentá de nuevo.' : undefined} />
-          )}
-        </div>
-      </main>
+      <BugReportPanel
+        initialDone={listed}
+        notice={estado === 'error' ? 'Revisá los datos e intentá de nuevo.' : undefined}
+      />
     </div>
   );
 }

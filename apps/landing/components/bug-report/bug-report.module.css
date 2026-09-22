@@ -14,6 +14,8 @@
   right: 0;
   left: 0;
   height: var(--vvh, 100svh);
+  display: flex;
+  flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -72,6 +74,7 @@
 }
 
 .header {
+  flex: none;
   border-bottom: 1px solid rgba(42, 26, 20, 0.08);
 }
 
@@ -102,9 +105,32 @@
 }
 
 .main {
+  flex: none;
+  width: 100%;
   max-width: 40rem;
   margin: 0 auto;
   padding: 8px 16px 12px;
+  box-sizing: border-box;
+}
+
+/* Success sits in the space under the header, not glued to it. */
+.confirm {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  max-width: 40rem;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 32px 16px 12vh;
+  box-sizing: border-box;
+}
+
+.confirm .card {
+  margin-top: 0;
+  width: 100%;
+  padding: 28px 20px 24px;
 }
 
 .title {
@@ -256,8 +282,16 @@
   align-items: center;
   min-height: 44px;
   margin-top: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--ink);
+  font: inherit;
   font-weight: 700;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 .fileInput {
@@ -340,7 +374,8 @@
 
 @media (min-width: 720px) {
   .headerInner,
-  .main {
+  .main,
+  .confirm {
     padding-left: 24px;
     padding-right: 24px;
   }
@@ -358,9 +393,19 @@
     height: 48px;
   }
 
-  .main {
+  .main,
+  .confirm {
     padding-top: 12px;
     padding-bottom: 16px;
+  }
+
+  .confirm {
+    padding-top: 32px;
+    padding-bottom: 10vh;
+  }
+
+  .confirm .card {
+    padding: 36px 32px 32px;
   }
 
   .title {
