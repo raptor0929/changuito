@@ -236,6 +236,53 @@
   font-weight: 700;
 }
 
+.fileInput {
+  width: 100%;
+  min-height: 48px;
+  color: var(--ink);
+  font: inherit;
+}
+
+.fileInput[aria-invalid='true'] {
+  outline: 2px solid var(--error);
+  outline-offset: 2px;
+}
+
+.fileList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fileItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+}
+
+.fileName {
+  overflow-wrap: anywhere;
+}
+
+.fileRemove {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 2px solid rgba(42, 26, 20, 0.28);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .honeypot {
   position: absolute;
   left: -10000px;

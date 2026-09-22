@@ -69,20 +69,16 @@ async function postWebhook(
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-Changuito-Bug-Report': '1',
+      // The live Apps Script classifies on this header. Name + email + createdAt
+      // alone would land in the waitlist sheet.
+      'X-Changuito-Bug': '1',
     };
     if (target.secret) headers.Authorization = `Bearer ${target.secret}`;
     const response = await fetchImpl(target.url, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        name: entry.name,
-        email: entry.email,
-        description: entry.description,
-        context: entry.context ?? null,
-        severity: entry.severity ?? null,
-        createdAt: entry.createdAt,
-      }),
-      signal: AbortSignal.timeout(8000),
+      body: JSON.stringify(webhookPayload(entry)),
+      signal: AbortSignal.timeout(entry.adjuntos && entry.adjuntos.length > 0 ? 20_000 : 8000),
     });
     if (!response.ok) {
       console.error(`[bug-report] webhook status ${response.status}`);
@@ -96,5 +92,43 @@ async function postWebhook(
 }
 
 function defaultLog(entry: BugReportEntry): void {
-  console.info(`[bug-report] ${JSON.stringify(entry)}`);
+  const preview = {
+    ...entry,
+    adjuntos: (entry.adjuntos ?? []).map((file) => ({
+      name: file.name,
+      mimeType: file.mimeType,
+      bytes: Math.floor((file.base64.replace(/=+$/, '').length * 3) / 4),
+    })),
+  };
+  console.info(`[bug-report] ${JSON.stringify(preview)}`);
+}
+
+/**
+ * Shape the deployed Apps Script already reads. `kind` keeps the row out of
+ * the waitlist. `error` and `pasos` fill the sheet columns. `adjuntos` is
+ * uploaded to Drive and the file URLs are written in that column.
+ */
+function webhookPayload(entry: BugReportEntry): Record<string, unknown> {
+  const line = entry.description.split('\n')[0].replace(/\s+/g, ' ').trim();
+  const short = line.length > 80 ? `${line.slice(0, 77)}...` : line;
+  const payload: Record<string, unknown> = {
+    kind: 'bug',
+    name: entry.name,
+    email: entry.email,
+    description: entry.description,
+    context: entry.context ?? null,
+    severity: entry.severity ?? null,
+    createdAt: entry.createdAt,
+    titulo: entry.severity ? `${entry.severity}. ${short}` : short,
+    error: entry.description,
+    pasos: entry.context ?? '',
+    adjuntos: (entry.adjuntos ?? []).map((file) => ({
+      name: file.name,
+      mimeType: file.mimeType,
+      base64: file.base64,
+    })),
+    origen: 'www.changuito.me/reportarbug',
+  };
+  if (entry.userAgent) payload.userAgent = entry.userAgent;
+  return payload;
 }

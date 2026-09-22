@@ -1,8 +1,8 @@
+import { bytesToBase64, clientFileError, MAX_JSON_CHARS, totalTooBigMessage } from '../../../lib/bug-report/attachments.ts';
 import { submitBugReport } from '../../../lib/bug-report/submit.ts';
 
 export const runtime = 'nodejs';
 
-const TOO_BIG = { ok: false, errors: { form: 'El mensaje es muy largo.' } };
 const UNREADABLE = { ok: false, errors: { form: 'No pudimos leer el formulario.' } };
 
 export async function POST(request: Request) {
@@ -12,6 +12,7 @@ export async function POST(request: Request) {
   const result = await submitBugReport(parsed.body, {
     ip: clientIp(request),
     now: Date.now(),
+    userAgent: request.headers.get('user-agent') ?? undefined,
     env: process.env,
     fetch,
   });
@@ -36,6 +37,7 @@ async function readBody(request: Request): Promise<
         context: unknown;
         severity: unknown;
         company: unknown;
+        adjuntos: unknown;
       };
     }
   | { ok: false; response: Response }
@@ -43,6 +45,8 @@ async function readBody(request: Request): Promise<
   const type = request.headers.get('content-type') ?? '';
   if (type.includes('application/x-www-form-urlencoded') || type.includes('multipart/form-data')) {
     const form = await request.formData();
+    const files = await filesFromForm(form);
+    if (!files.ok) return { ok: false, response: Response.json({ ok: false, errors: { attachments: files.error } }, { status: 400 }) };
     return {
       ok: true,
       formPost: true,
@@ -53,12 +57,15 @@ async function readBody(request: Request): Promise<
         context: form.get('context'),
         severity: form.get('severity'),
         company: form.get('company'),
+        adjuntos: files.adjuntos,
       },
     };
   }
 
   const text = await request.text();
-  if (text.length > 16_000) return { ok: false, response: Response.json(TOO_BIG, { status: 413 }) };
+  if (text.length > MAX_JSON_CHARS) {
+    return { ok: false, response: Response.json({ ok: false, errors: { attachments: totalTooBigMessage() } }, { status: 413 }) };
+  }
   try {
     const payload = JSON.parse(text) as unknown;
     if (!payload || typeof payload !== 'object') {
@@ -75,11 +82,39 @@ async function readBody(request: Request): Promise<
         context: body.context,
         severity: body.severity,
         company: body.company,
+        adjuntos: body.adjuntos ?? body.attachments,
       },
     };
   } catch {
     return { ok: false, response: Response.json(UNREADABLE, { status: 400 }) };
   }
+}
+
+async function filesFromForm(
+  form: FormData,
+): Promise<{ ok: true; adjuntos: { name: string; mimeType: string; base64: string }[] } | { ok: false; error: string }> {
+  const parts = form.getAll('attachments').filter((part): part is File => {
+    return part instanceof File && (part.size > 0 || part.name.trim().length > 0);
+  });
+
+  let count = 0;
+  let bytes = 0;
+  for (const part of parts) {
+    const problem = clientFileError({ name: part.name, type: part.type, size: part.size }, { count, bytes });
+    if (problem) return { ok: false, error: problem };
+    count += 1;
+    bytes += part.size;
+  }
+
+  const adjuntos = [];
+  for (const part of parts) {
+    adjuntos.push({
+      name: part.name,
+      mimeType: part.type,
+      base64: bytesToBase64(new Uint8Array(await part.arrayBuffer())),
+    });
+  }
+  return { ok: true, adjuntos };
 }
 
 function clientIp(request: Request): string {

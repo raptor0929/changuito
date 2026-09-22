@@ -51,10 +51,12 @@ Si `BUG_REPORT_WEBHOOK_URL` está configurada, el servidor hace `POST` JSON. Si 
 
 | Variable | Obligatoria | Para qué |
 |---|---|---|
-| `BUG_REPORT_WEBHOOK_URL` | no | `POST` JSON `{ name, email, description, context, severity, createdAt }` a un HTTPS. `http` solo en `localhost`. `context` y `severity` van `null` si no los completó. |
+| `BUG_REPORT_WEBHOOK_URL` | no | `POST` JSON con `kind: "bug"`, el relato en `error`, cómo repetirlo en `pasos`, y `adjuntos` (foto o video en base64). `http` solo en `localhost`. |
 | `BUG_REPORT_WEBHOOK_SECRET` | no | Si está, va como `Authorization: Bearer …`. |
 
 La mascota de esa página es `public/brand/mascot-error.png` (el carrito idle con ojos en X y gesto hacia abajo). No se usa en el hero ni en los GIF de búsqueda.
+
+El adjunto es opcional: hasta 3 archivos, 3 MB en total, JPG, PNG, WEBP, GIF, MP4, WEBM o MOV. El tope entra en el cuerpo del request (el base64 lo agranda) y en lo que Apps Script sube a Drive. Cada ítem va `{ name, mimeType, base64 }`. El script los sube y escribe las URLs en la columna `adjuntos`.
 
 Si el dashboard no detecta el workspace y pide comandos a mano (el working directory es `apps/landing`):
 
