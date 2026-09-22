@@ -1,13 +1,22 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 
+import {
+  bytesToBase64,
+  clientFileError,
+  FILE_ACCEPT,
+  formatBytes,
+  unreadableFileMessage,
+} from '../../lib/bug-report/attachments.ts';
 import { SEVERITIES } from '../../lib/bug-report/options.ts';
 import styles from './bug-report.module.css';
 
 type FieldErrors = Partial<
-  Record<'name' | 'email' | 'description' | 'context' | 'severity' | 'form', string>
+  Record<'name' | 'email' | 'description' | 'context' | 'severity' | 'attachments' | 'form', string>
 >;
+
+type SelectedFile = { id: string; file: File };
 
 export function BugReportSuccess({ autoFocus = false }: { autoFocus?: boolean }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -35,11 +44,14 @@ export function BugReportForm({ notice }: { notice?: string }) {
   const [description, setDescription] = useState('');
   const [context, setContext] = useState('');
   const [severity, setSeverity] = useState('');
+  const [files, setFiles] = useState<SelectedFile[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const errorSummaryRef = useRef<HTMLParagraphElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileSeq = useRef(0);
   const baseId = useId();
 
   useEffect(() => {
@@ -52,11 +64,52 @@ export function BugReportForm({ notice }: { notice?: string }) {
     if (errors.form || notice) errorSummaryRef.current?.focus();
   }, [errors, done, notice]);
 
+  function onPickFiles(event: ChangeEvent<HTMLInputElement>) {
+    const picked = [...(event.target.files ?? [])];
+    event.target.value = '';
+    const next = [...files];
+    let problem: string | undefined;
+    for (const file of picked) {
+      const error = clientFileError(file, {
+        count: next.length,
+        bytes: next.reduce((sum, item) => sum + item.file.size, 0),
+      });
+      if (error) {
+        problem = error;
+        break;
+      }
+      fileSeq.current += 1;
+      next.push({ id: String(fileSeq.current), file });
+    }
+    setFiles(next);
+    setErrors((current) => ({ ...current, attachments: problem }));
+  }
+
+  function removeFile(id: string) {
+    setFiles((current) => current.filter((item) => item.id !== id));
+    setErrors((current) => ({ ...current, attachments: undefined }));
+    fileInputRef.current?.focus();
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
     setPending(true);
     const company = new FormData(event.currentTarget).get('company');
+    let adjuntos: { name: string; mimeType: string; base64: string }[];
+    try {
+      adjuntos = await Promise.all(
+        files.map(async (item) => ({
+          name: item.file.name,
+          mimeType: item.file.type,
+          base64: bytesToBase64(new Uint8Array(await item.file.arrayBuffer())),
+        })),
+      );
+    } catch {
+      setErrors({ attachments: unreadableFileMessage() });
+      setPending(false);
+      return;
+    }
     try {
       const response = await fetch('/api/bug-report', {
         method: 'POST',
@@ -67,6 +120,7 @@ export function BugReportForm({ notice }: { notice?: string }) {
           description,
           context,
           severity,
+          adjuntos,
           company: typeof company === 'string' ? company : '',
         }),
       });
@@ -95,6 +149,16 @@ export function BugReportForm({ notice }: { notice?: string }) {
   const contextHintId = `${baseId}-context-hint`;
   const severityErrorId = `${baseId}-severity-error`;
   const severityHintId = `${baseId}-severity-hint`;
+  const attachmentsErrorId = `${baseId}-attachments-error`;
+  const attachmentsHintId = `${baseId}-attachments-hint`;
+  const attachmentsStatusId = `${baseId}-attachments-status`;
+  const attachmentsDescribedBy = [
+    attachmentsHintId,
+    attachmentsStatusId,
+    errors.attachments ? attachmentsErrorId : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <form
@@ -102,6 +166,7 @@ export function BugReportForm({ notice }: { notice?: string }) {
       className={styles.form}
       action="/api/bug-report"
       method="post"
+      encType="multipart/form-data"
       onSubmit={onSubmit}
       noValidate
       data-testid="bug-report-form"
@@ -180,7 +245,7 @@ export function BugReportForm({ notice }: { notice?: string }) {
           id={`${baseId}-description`}
           className={`${styles.control} ${styles.textarea}`}
           name="description"
-          rows={5}
+          rows={3}
           maxLength={2000}
           value={description}
           aria-invalid={errors.description ? true : undefined}
@@ -212,9 +277,9 @@ export function BugReportForm({ notice }: { notice?: string }) {
         </p>
         <textarea
           id={`${baseId}-context`}
-          className={`${styles.control} ${styles.textarea}`}
+          className={`${styles.control} ${styles.textarea} ${styles.textareaShort}`}
           name="context"
-          rows={3}
+          rows={2}
           maxLength={500}
           value={context}
           aria-invalid={errors.context ? true : undefined}
@@ -256,6 +321,62 @@ export function BugReportForm({ notice }: { notice?: string }) {
         {errors.severity ? (
           <p id={severityErrorId} className={styles.fieldError} role="alert" data-testid="bug-report-severity-error">
             {errors.severity}
+          </p>
+        ) : null}
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor={`${baseId}-attachments`}>
+          Adjuntá una foto o un video (opcional)
+        </label>
+        <p id={attachmentsHintId} className={styles.hint}>
+          JPG, PNG, WEBP, GIF, MP4, WEBM o MOV. Hasta 3 archivos, y 3 MB en total.
+        </p>
+        <input
+          ref={fileInputRef}
+          id={`${baseId}-attachments`}
+          className={styles.fileInput}
+          name="attachments"
+          type="file"
+          accept={FILE_ACCEPT}
+          multiple
+          aria-invalid={errors.attachments ? true : undefined}
+          aria-describedby={attachmentsDescribedBy}
+          data-testid="bug-report-attachments"
+          onChange={onPickFiles}
+        />
+        <div id={attachmentsStatusId} aria-live="polite" data-testid="bug-report-files">
+          {files.length === 0 ? (
+            <p className={styles.hint}>Ningún archivo seleccionado.</p>
+          ) : (
+            <ul className={styles.fileList}>
+              {files.map((item) => (
+                <li key={item.id} className={styles.fileItem}>
+                  <span className={styles.fileName}>
+                    {item.file.name} ({formatBytes(item.file.size)})
+                  </span>
+                  <button
+                    className={styles.fileRemove}
+                    type="button"
+                    aria-label={`Quitar ${item.file.name}`}
+                    data-testid="bug-report-file-remove"
+                    onClick={() => removeFile(item.id)}
+                  >
+                    Quitar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {errors.attachments ? (
+          <p
+            id={attachmentsErrorId}
+            className={styles.fieldError}
+            role="alert"
+            data-testid="bug-report-attachments-error"
+          >
+            {errors.attachments}
           </p>
         ) : null}
       </div>

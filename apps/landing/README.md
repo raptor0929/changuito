@@ -51,10 +51,12 @@ Si `BUG_REPORT_WEBHOOK_URL` está configurada, el servidor hace `POST` JSON. Si 
 
 | Variable | Obligatoria | Para qué |
 |---|---|---|
-| `BUG_REPORT_WEBHOOK_URL` | no | `POST` JSON `{ name, email, description, context, severity, createdAt }` a un HTTPS. `http` solo en `localhost`. `context` y `severity` van `null` si no los completó. |
+| `BUG_REPORT_WEBHOOK_URL` | no | `POST` JSON con `kind: "bug"`, el relato en `error`, cómo repetirlo en `pasos`, y `adjuntos` (foto o video en base64). `http` solo en `localhost`. |
 | `BUG_REPORT_WEBHOOK_SECRET` | no | Si está, va como `Authorization: Bearer …`. |
 
 La mascota de esa página es `public/brand/mascot-error.png` (el carrito idle con ojos en X y gesto hacia abajo). No se usa en el hero ni en los GIF de búsqueda.
+
+El adjunto es opcional: hasta 3 archivos, 3 MB en total, JPG, PNG, WEBP, GIF, MP4, WEBM o MOV. El tope entra en el cuerpo del request (el base64 lo agranda) y en lo que Apps Script sube a Drive. Cada ítem va `{ name, mimeType, base64 }`. El script los sube y escribe las URLs en la columna `adjuntos`.
 
 Si el dashboard no detecta el workspace y pide comandos a mano (el working directory es `apps/landing`):
 
@@ -88,10 +90,10 @@ El kit completo vive en `apps/branding/` (manuals, logo, mascota, pattern, motio
 | `public/brand/animacion-busqueda.gif` | `apps/branding/motion/animacion-busqueda.gif` (hero y pagos, ida y vuelta) |
 | `public/brand/mascot-idle.png` | `apps/branding/mascot/mascota-idle.png` (movimiento reducido, y marca del header, pie y cierre) |
 | `public/brand/mascota-corriendo.png` | `apps/branding/mascot/mascota-corriendo.png` (CTA, en el lugar de la flecha) |
-| `public/brand/wordmark.png` | sin uso en la UI. El lettering con Sol de Mayo no es el logo. |
+| `public/brand/wordmark.png` | `apps/branding/logo/wordmark.png` (lettering chunky con Sol de Mayo). Header de `/reportarbug`, junto a la mascota de error. El mismo archivo está en `apps/web/public/brand`. |
 | `public/og.png` | pose idle ancha del zip de landing (1280×720), solo Open Graph |
-| `public/brand/isotipo-mascota.png` | `apps/branding/logo/isotipo-mascota.png` (solo la mascota, header de `/whitelist` y de `/reportarbug`) |
+| `public/brand/isotipo-mascota.png` | `apps/branding/logo/isotipo-mascota.png` (solo la mascota, header de `/whitelist`) |
 | `public/brand/mascot-error.png` | carrito idle con ojos en X y gesto hacia abajo. Solo `/reportarbug`. |
 | `app/favicon.ico`, `app/icon.png`, `app/apple-icon.png` | mascota idle completa (`mascota-idle.png`) encajada en un cuadrado con margen transparente (16/32/48, 32 y 180). Sin recorte de cara. Los mismos archivos están en `apps/web/app`. `/whitelist` hereda estos íconos (no hay `app/whitelist/icon.png`). |
 
-El header, el pie y el cierre del home muestran la mascota idle y la palabra «Changuito» en Inter. `/whitelist` usa el isotipo y la misma palabra en texto. Ninguno usa el lettering. El fondo es `#FAFAF7` plano: el patrón mate-pan no se tilea.
+El header, el pie y el cierre del home muestran la mascota idle y la palabra «Changuito» en Inter. `/whitelist` usa el isotipo y la misma palabra en texto. `/reportarbug` usa la mascota de error y el wordmark en imagen. El fondo es `#FAFAF7` plano: el patrón mate-pan no se tilea.

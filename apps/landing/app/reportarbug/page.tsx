@@ -39,27 +39,28 @@ export default async function ReportarBugPage({
         <div className={styles.headerInner}>
           <a className={styles.brandLink} href="/" data-testid="bug-report-brand">
             <Image
-              src="/brand/isotipo-mascota.png"
+              src="/brand/mascot-error.png"
               alt=""
-              width={337}
-              height={467}
+              width={397}
+              height={583}
               priority
               className={styles.mark}
+              data-testid="bug-report-mascot"
             />
-            <span className={styles.brandName}>Changuito</span>
+            <Image
+              src="/brand/wordmark.png"
+              alt="Changuito"
+              width={1097}
+              height={249}
+              priority
+              className={styles.wordmark}
+              data-testid="bug-report-wordmark"
+            />
+            <span className={styles.srOnly}>volver al inicio</span>
           </a>
         </div>
       </header>
       <main id="reporte" className={styles.main} data-testid="bug-report-page">
-        <Image
-          src="/brand/mascot-error.png"
-          alt="Changuito con los ojos en X, como si algo hubiera fallado"
-          width={397}
-          height={583}
-          priority
-          className={styles.mascot}
-          data-testid="bug-report-mascot"
-        />
         <h1 className={styles.title}>Contanos qué pasó</h1>
         <p className={styles.lead}>Si algo no anduvo, dejalo acá.</p>
         <div className={styles.card}>
@@ -70,11 +71,6 @@ export default async function ReportarBugPage({
           )}
         </div>
       </main>
-      <footer className={styles.footer}>
-        <a className={styles.footerLink} href="/">
-          Volver al inicio
-        </a>
-      </footer>
     </div>
   );
 }
