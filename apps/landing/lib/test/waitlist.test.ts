@@ -215,7 +215,7 @@ test('webhook sink posts the entry and the optional secret', async () => {
       },
       fetch: async (url: RequestInfo | URL, init?: RequestInit) => {
         calls.push({ url: String(url), init: init ?? {} });
-        return new Response(null, { status: 204 });
+        return Response.json({ ok: true });
       },
     },
   );
@@ -235,6 +235,7 @@ test('webhook sink posts the entry and the optional secret', async () => {
     whatsappGroup: true,
     createdAt: CREATED,
     userAgent: 'Mozilla/5.0 test',
+    webhookSecret: 'shhh',
   });
   assert.equal('feedback' in posted, false);
   assert.equal('contactForFeedback' in posted, false);
@@ -262,6 +263,73 @@ test('submit forwards a trimmed user agent and never sends feedback', async () =
   assert.equal(bodies[0].whatsapp, '+5491155551234');
   assert.equal(bodies[0].whatsappGroup, false);
   assert.equal('feedback' in bodies[0], false);
+});
+
+test('a webhook HTTP 200 with ok false is not a saved signup', async () => {
+  const errors: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    errors.push(args.map((part) => String(part)).join(' '));
+  };
+  const entry = {
+    name: 'Martina López',
+    email: 'martina@ejemplo.com',
+    source: 'Nerdearla',
+    whatsapp: '+5491155551234',
+    whatsappGroup: false,
+    createdAt: CREATED,
+  };
+  const env = {
+    NODE_ENV: 'production' as const,
+    WAITLIST_WEBHOOK_URL: 'https://hooks.ejemplo.com/waitlist',
+    WAITLIST_WEBHOOK_SECRET: 'shhh',
+  };
+  try {
+    const unauthorized = await saveWaitlistEntry(entry, {
+      env,
+      fetch: async () => Response.json({ ok: false, error: 'unauthorized' }),
+    });
+    assert.deepEqual(unauthorized, { ok: false, reason: 'upstream' });
+
+    const upstream = await saveWaitlistEntry(entry, {
+      env,
+      fetch: async () =>
+        new Response('{"ok":false,"error":"sheet write failed"}', {
+          status: 200,
+          headers: { 'Content-Type': 'text/plain' },
+        }),
+    });
+    assert.deepEqual(upstream, { ok: false, reason: 'upstream' });
+  } finally {
+    console.error = original;
+  }
+  assert.equal(errors.some((line) => line.includes('webhook unauthorized')), true);
+  assert.equal(errors.some((line) => line.includes('webhook upstream rejected the signup')), true);
+});
+
+test('a non-json webhook response still counts as saved', async () => {
+  const result = await saveWaitlistEntry(
+    {
+      name: 'Martina López',
+      email: 'martina@ejemplo.com',
+      source: 'Instagram',
+      whatsapp: '+5491155551234',
+      whatsappGroup: false,
+      createdAt: CREATED,
+    },
+    {
+      env: {
+        NODE_ENV: 'production',
+        WAITLIST_WEBHOOK_URL: 'https://hooks.ejemplo.com/waitlist',
+      },
+      fetch: async (_url, init) => {
+        const payload = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        assert.equal(Object.hasOwn(payload, 'webhookSecret'), false);
+        return new Response(null, { status: 204 });
+      },
+    },
+  );
+  assert.deepEqual(result, { ok: true, sink: 'webhook' });
 });
 
 test('redis sink writes one hash field and treats an existing email as saved', async () => {

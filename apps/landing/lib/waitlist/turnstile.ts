@@ -2,8 +2,11 @@
  * Cloudflare Turnstile verification for the waitlist form.
  *
  * Production refuses signups when keys are missing (same spirit as an
- * unconfigured sink). Local/dev with unset keys skips verification so
- * `next dev` still works — logged once per process.
+ * unconfigured sink). Do not skip the check in production: the landing
+ * Vercel project must set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and
+ * `TURNSTILE_SECRET_KEY`. Those values are not inherited from `apps/web`.
+ * Local/dev with unset keys skips verification so `next dev` still works
+ * — logged once per process.
  */
 
 const SITEVERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
