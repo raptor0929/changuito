@@ -60,6 +60,7 @@
 .brandLink {
   display: inline-flex;
   align-items: center;
+  gap: 8px;
   min-height: 44px;
   min-width: 44px;
   color: var(--ink);
@@ -68,6 +69,11 @@
 
 .mark {
   height: 72px;
+  width: auto;
+}
+
+.wordmark {
+  height: 40px;
   width: auto;
 }
 
@@ -287,6 +293,18 @@
   overflow: hidden;
 }
 
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (min-width: 720px) {
   .headerInner,
   .main {
@@ -301,6 +319,10 @@
 
   .mark {
     height: 88px;
+  }
+
+  .wordmark {
+    height: 48px;
   }
 
   .main {

@@ -292,8 +292,11 @@ test('the report page shows the error mascot and the home hero does not', () => 
   const header = page.slice(0, page.indexOf('</header>'));
   assert.match(header, /src="\/brand\/mascot-error\.png"/);
   assert.match(header, /data-testid="bug-report-mascot"/);
+  assert.match(header, /src="\/brand\/wordmark\.png"/);
+  assert.match(header, /alt="Changuito"/);
   assert.equal(page.split('/brand/mascot-error.png').length - 1, 1);
   assert.equal(page.includes('isotipo-mascota'), false);
+  assert.equal(page.includes('>Changuito<'), false);
   assert.match(page, /Contanos qué pasó/);
   assert.equal(page.includes('animacion-busqueda'), false);
   assert.equal(page.includes('mascot-exito'), false);
@@ -315,6 +318,15 @@ test('the report page shows the error mascot and the home hero does not', () => 
   assert.equal(
     createHash('sha256').update(mascot).digest('hex'),
     '960aa1ad5028b53a0ef6bd6deaaa4f4984ede84c0c95cd6a731672d1517dc674',
+  );
+
+  const wordmark = readFileSync(join(root, 'public/brand/wordmark.png'));
+  const wordmarkMaster = readFileSync(join(root, '../branding/logo/wordmark.png'));
+  assert.equal(wordmark.readUInt32BE(16), 1097);
+  assert.equal(wordmark.readUInt32BE(20), 249);
+  assert.equal(
+    createHash('sha256').update(wordmark).digest('hex'),
+    createHash('sha256').update(wordmarkMaster).digest('hex'),
   );
 
   assert.match(form, /Adjuntá una foto o un video/);

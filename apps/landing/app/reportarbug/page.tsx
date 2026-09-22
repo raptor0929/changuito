@@ -40,13 +40,23 @@ export default async function ReportarBugPage({
           <a className={styles.brandLink} href="/" data-testid="bug-report-brand">
             <Image
               src="/brand/mascot-error.png"
-              alt="Changuito, volver al inicio"
+              alt=""
               width={397}
               height={583}
               priority
               className={styles.mark}
               data-testid="bug-report-mascot"
             />
+            <Image
+              src="/brand/wordmark.png"
+              alt="Changuito"
+              width={1097}
+              height={249}
+              priority
+              className={styles.wordmark}
+              data-testid="bug-report-wordmark"
+            />
+            <span className={styles.srOnly}>volver al inicio</span>
           </a>
         </div>
       </header>
