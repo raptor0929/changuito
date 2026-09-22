@@ -44,7 +44,7 @@ describe('human-gate', () => {
     assert.equal(acceptLooksLikeBrowserFetch(null), false);
   });
 
-  it('gate mode: open in non-prod without keys, closed in prod, enforce when both keys exist', () => {
+  it('gate mode: open in non-prod without a secret, closed in prod, enforce when the secret is set', () => {
     assert.equal(humanGateMode({ NODE_ENV: 'development' }), 'open');
     assert.equal(humanGateMode({ NODE_ENV: 'production' }), 'closed');
     assert.equal(humanGateMode({ ...ENFORCE }), 'enforce');
@@ -56,8 +56,13 @@ describe('human-gate', () => {
       }),
       'enforce',
     );
+    // Site key can live only in the client bundle. The secret is what enforces.
     assert.equal(
       humanGateMode({ NODE_ENV: 'production', TURNSTILE_SECRET_KEY: 's' }),
+      'enforce',
+    );
+    assert.equal(
+      humanGateMode({ NODE_ENV: 'production', NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'p' }),
       'closed',
     );
   });
@@ -126,9 +131,10 @@ describe('human-gate', () => {
       action: 'block',
       reason: 'closed',
     });
-    assert.deepEqual(clientGateDecision({ mode: 'closed', ok: true, siteKey: 'site' }), {
-      action: 'block',
-      reason: 'closed',
+    // A configured public key must draw Turnstile, even if the server said closed.
+    assert.deepEqual(clientGateDecision({ mode: 'closed', ok: false, siteKey: 'site' }), {
+      action: 'widget',
+      siteKey: 'site',
     });
     assert.deepEqual(clientGateDecision({ mode: 'enforce', ok: false, siteKey: '  ' }), {
       action: 'block',

@@ -41,21 +41,21 @@ function withHumanCookie(body: unknown, token: string, status = 200): NextRespon
   return res;
 }
 
-/** GET — is the current cookie valid? Includes the public site key when enforcing. */
+/** GET — is the current cookie valid? Always includes the public site key when we have one. */
 export async function GET(req: Request): Promise<Response> {
   const mode = humanGateMode();
+  const siteKey = turnstileSiteKey();
   if (mode === 'open') {
-    return json({ ok: true, mode: 'open' });
+    return json({ ok: true, mode: 'open', siteKey });
   }
   if (mode === 'closed') {
     console.error('[changuito] human-gate CLOSED on GET /api/human.', {
-      hasSiteKey: Boolean(turnstileSiteKey()),
+      hasSiteKey: Boolean(siteKey),
       hasSecret: Boolean(turnstileSecret()),
     });
-    return json({ ok: false, mode: 'closed', error: 'solo_humanos' }, 403);
+    return json({ ok: false, mode: 'closed', siteKey, error: 'solo_humanos' }, 403);
   }
   const secret = turnstileSecret();
-  const siteKey = turnstileSiteKey();
   const token = readCookie(req.headers.get('cookie'), HUMAN_COOKIE);
   const ok = await verifyHumanToken(token, secret);
   return json({ ok, mode: 'enforce', siteKey }, ok ? 200 : 401);
@@ -69,7 +69,8 @@ export async function POST(req: Request): Promise<Response> {
     const minted = await mintHumanToken(secret);
     return withHumanCookie({ ok: true, mode: 'open' }, minted);
   }
-  if (mode === 'closed') {
+  const secret = turnstileSecret();
+  if (!secret) {
     return soloHumanosResponse();
   }
 
@@ -84,7 +85,6 @@ export async function POST(req: Request): Promise<Response> {
     return json({ error: 'token_required' }, 400);
   }
 
-  const secret = turnstileSecret();
   const ip =
     req.headers.get('cf-connecting-ip') ??
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??

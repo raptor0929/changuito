@@ -4,6 +4,10 @@ import { WalletProvider } from '../components/WalletProvider';
 import { WalletWidget } from '../components/WalletWidget';
 import { turnstileSiteKey } from '../lib/human-gate';
 
+// The site key has to be read per request. A static prerender baked siteKey:""
+// and the widget never appeared, even after the env var existed at runtime.
+export const dynamic = 'force-dynamic';
+
 export default function Home() {
   // Runtime read, not the client bundle. The widget key is public.
   const siteKey = turnstileSiteKey();
