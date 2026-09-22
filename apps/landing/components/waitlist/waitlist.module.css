@@ -88,6 +88,8 @@
 
 .card {
   margin-top: 20px;
+  /* Focus ring is 3px outline + 3px offset. Keep this padding larger than
+     that so a later overflow clip cannot shear the stroke. */
   padding: 20px 16px 24px;
   border: 1px solid var(--line);
   border-radius: 20px;
@@ -140,12 +142,19 @@
 .control {
   width: 100%;
   min-height: 48px;
-  padding: 12px 14px;
+  /* Same inset as the bug report fields: letters clear the border and the
+     focus ring, and the padding sits on the control itself. */
+  padding: 14px 20px;
   border: 2px solid rgba(42, 26, 20, 0.28);
   border-radius: 12px;
   background: #fff;
   color: var(--ink);
   font: inherit;
+}
+
+select.control {
+  /* The native chevron paints inside the end padding. */
+  padding-inline-end: 44px;
 }
 
 .control:focus-visible {
