@@ -15,7 +15,7 @@ Crear un **proyecto nuevo**, no reusar el de `apps/web`.
 | Node.js | **22.x** (el repo pide `>=22.12`) |
 | Install command | default — Vercel instala desde la raíz del monorepo (`npm ci`) |
 | Build command | default — corre `next build` de este paquete |
-| Environment variables | ninguna obligatoria para el sitio. `/whitelist` necesita un destino durable — ver abajo |
+| Environment variables | ninguna obligatoria para el sitio. `/whitelist` necesita un destino durable. `/reportarbug` funciona sin variables (ver abajo). |
 
 Dominio de producción: `www.changuito.me`. `app.changuito.me` sigue en el proyecto de `apps/web`.
 
@@ -42,6 +42,19 @@ El formulario de `/whitelist` manda un token de Turnstile con el alta. El servid
 Creá un widget en el [dashboard de Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) y pegá las dos keys en el proyecto de Vercel de la landing.
 
 La clave de Redis es `changuito:landing:waitlist` (hash por email, `HSETNX`), para no pisar las sesiones del shopper si comparten base.
+
+## Reportar un bug
+
+`/reportarbug` es la página pública para contar un fallo (la app enlaza `https://www.changuito.me/reportarbug`). El pie del home también apunta ahí.
+
+Si `BUG_REPORT_WEBHOOK_URL` está configurada, el servidor hace `POST` JSON. Si no está, el reporte se acepta igual y queda en el log del proceso con el prefijo `[bug-report]`, para que la página sirva antes de tener un destino. Un webhook que responde mal sí es un error: la persona puede reintentar.
+
+| Variable | Obligatoria | Para qué |
+|---|---|---|
+| `BUG_REPORT_WEBHOOK_URL` | no | `POST` JSON `{ name, email, description, context, severity, createdAt }` a un HTTPS. `http` solo en `localhost`. `context` y `severity` van `null` si no los completó. |
+| `BUG_REPORT_WEBHOOK_SECRET` | no | Si está, va como `Authorization: Bearer …`. |
+
+La mascota de esa página es `public/brand/mascot-error.png` (el carrito idle con ojos en X y gesto hacia abajo). No se usa en el hero ni en los GIF de búsqueda.
 
 Si el dashboard no detecta el workspace y pide comandos a mano (el working directory es `apps/landing`):
 
@@ -77,7 +90,8 @@ El kit completo vive en `apps/branding/` (manuals, logo, mascota, pattern, motio
 | `public/brand/mascota-corriendo.png` | `apps/branding/mascot/mascota-corriendo.png` (CTA, en el lugar de la flecha) |
 | `public/brand/wordmark.png` | sin uso en la UI. El lettering con Sol de Mayo no es el logo. |
 | `public/og.png` | pose idle ancha del zip de landing (1280×720), solo Open Graph |
-| `public/brand/isotipo-mascota.png` | `apps/branding/logo/isotipo-mascota.png` (solo la mascota, header de `/whitelist`) |
+| `public/brand/isotipo-mascota.png` | `apps/branding/logo/isotipo-mascota.png` (solo la mascota, header de `/whitelist` y de `/reportarbug`) |
+| `public/brand/mascot-error.png` | carrito idle con ojos en X y gesto hacia abajo. Solo `/reportarbug`. |
 | `app/favicon.ico`, `app/icon.png`, `app/apple-icon.png` | mascota idle completa (`mascota-idle.png`) encajada en un cuadrado con margen transparente (16/32/48, 32 y 180). Sin recorte de cara. Los mismos archivos están en `apps/web/app`. `/whitelist` hereda estos íconos (no hay `app/whitelist/icon.png`). |
 
 El header, el pie y el cierre del home muestran la mascota idle y la palabra «Changuito» en Inter. `/whitelist` usa el isotipo y la misma palabra en texto. Ninguno usa el lettering. El fondo es `#FAFAF7` plano: el patrón mate-pan no se tilea.

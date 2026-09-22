@@ -208,6 +208,11 @@ export function LandingPage() {
                   </li>
                 ))}
                 <li>
+                  <a className={styles.footerLink} href="/reportarbug" data-testid="landing-report-bug">
+                    Reportar un bug
+                  </a>
+                </li>
+                <li>
                   <a className={styles.footerLink} href="/">
                     {FOOTER.siteLabel}
                   </a>
