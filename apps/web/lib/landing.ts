@@ -3,9 +3,14 @@
  *
  * The landing may link to the app and nowhere else. Paths, query strings and
  * tokens do not belong on that URL — the app origin is the whole destination.
+ *
+ * The unfinished-purchase line is not a refund promise. It appears only in the
+ * payments callout and in one FAQ answer.
  */
 
 export const APP_URL = 'https://app.changuito.me';
+
+export const NO_CHARGE = 'Si la compra no se completa, no realizás ningún pago.';
 
 export const HERO = {
   h1Lead: 'Pedí el súper',
@@ -14,14 +19,13 @@ export const HERO = {
   pay: 'Pagá con tarjeta o USDC.',
   cta: 'Probar Changuito',
   secondary: 'Ver cómo funciona',
-  refund: 'Si la compra no se completa, te devolvemos el pago.',
 } as const;
 
 export const STEPS = [
   {
     icon: 'ask',
     title: 'Pedile lo que necesitás',
-    body: 'Contale el súper como se lo dirías a alguien en casa.',
+    body: 'En lenguaje natural: la lista, una receta o lo de la juntada. Changuito busca y calcula con IA.',
   },
   {
     icon: 'compare',
@@ -47,7 +51,7 @@ export const BENEFITS = [
   },
   {
     title: 'Real',
-    body: 'Precios reales de supermercado, no inventados.',
+    body: 'Precios reales de supermercado.',
   },
   {
     title: 'Local',
@@ -62,13 +66,13 @@ export const PAYMENTS = {
     { title: 'Tarjeta', body: 'Pagá con tarjeta.' },
     { title: 'USDC', body: 'Pagá con USDC.' },
   ],
-  refund: 'Si la compra no se completa, te devolvemos el pago. Sin vueltas.',
+  assurance: NO_CHARGE,
 } as const;
 
 export const FAQ = [
   {
     q: '¿Es una app del súper?',
-    a: 'No. Changuito te ayuda a comprar en el súper: compara productos, arma el carrito y te deja listo para pagar.',
+    a: 'No. Es un asistente de IA para el súper: le pedís en tu idioma lo que necesitás — una receta, una juntada, la lista de la semana — y Changuito busca, calcula y te arma el carrito.',
   },
   {
     q: '¿Cómo pago?',
@@ -76,7 +80,7 @@ export const FAQ = [
   },
   {
     q: '¿Qué pasa si falla la compra?',
-    a: 'Si la compra no se completa, te devolvemos el pago.',
+    a: NO_CHARGE,
   },
   {
     q: '¿Para quién es?',
@@ -91,3 +95,5 @@ export const BOFU = {
 
 export const BENEFITS_TITLE = 'El súper, más simple';
 export const STEPS_TITLE = 'Así de simple';
+
+export const FINE_PRINT = 'Changuito te ayuda a armar el súper. No es un supermercado.';

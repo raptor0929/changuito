@@ -221,14 +221,6 @@
   margin-top: 28px;
 }
 
-.micro {
-  margin: 12px 0 0;
-  max-width: 36ch;
-  font-size: 0.9375rem;
-  line-height: 1.45;
-  color: var(--ink-soft);
-}
-
 .textLink {
   display: inline-flex;
   align-items: center;
@@ -240,15 +232,18 @@
 }
 
 .mascotFrame {
-  position: relative;
-  width: min(100%, 460px);
-  aspect-ratio: 1;
+  width: min(100%, 480px);
   justify-self: end;
 }
 
+.mascotFrame picture {
+  display: block;
+}
+
 .mascot {
-  object-fit: cover;
-  object-position: center;
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .section {
@@ -355,7 +350,7 @@
   gap: 16px;
 }
 
-.refund {
+.callout {
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -368,7 +363,7 @@
   line-height: 1.45;
 }
 
-.refundIcon {
+.calloutIcon {
   flex: none;
   margin-top: 2px;
 }
@@ -538,8 +533,7 @@
     padding: 32px 20px 56px;
   }
 
-  .sub,
-  .micro {
+  .sub {
     margin-inline: auto;
   }
 
@@ -549,7 +543,7 @@
 
   .mascotFrame {
     justify-self: center;
-    width: min(100%, 360px);
+    width: min(100%, 320px);
   }
 
   .section {
@@ -578,6 +572,52 @@
 
   .headerInner {
     padding: 12px 16px;
+  }
+}
+
+/* iPhone 13/14 class (~390×844) and the 14 Plus (~428). Header stays wordmark-only. */
+@media (max-width: 480px) {
+  .headerInner {
+    padding: 8px 16px;
+  }
+
+  .wordmark {
+    height: 28px;
+  }
+
+  .heroInner {
+    padding: 4px 16px 8px;
+    gap: 2px;
+  }
+
+  .h1 {
+    font-size: 2rem;
+    line-height: 1.02;
+  }
+
+  .sub {
+    margin-top: 6px;
+    font-size: 0.9375rem;
+    line-height: 1.3;
+  }
+
+  .payLine {
+    margin-top: 2px;
+    font-size: 0.9375rem;
+  }
+
+  .heroActions {
+    margin-top: 8px;
+    gap: 0 12px;
+  }
+
+  .cta {
+    min-height: 44px;
+    padding: 10px 16px;
+  }
+
+  .mascotFrame {
+    width: min(100%, 300px);
   }
 }
 

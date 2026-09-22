@@ -5,12 +5,14 @@ import {
   BENEFITS,
   BENEFITS_TITLE,
   BOFU,
+  FINE_PRINT,
   HERO,
   PAYMENTS,
   STEPS,
   STEPS_TITLE,
 } from '../../lib/landing';
 import { FaqList } from './faq-list';
+import { HeroMascot } from './hero-mascot';
 import { CheckIcon, StepIcon } from './icons';
 import { SiteHeader } from './site-header';
 import { TryLink } from './try-link';
@@ -41,18 +43,8 @@ export function LandingPage() {
                   {HERO.secondary}
                 </a>
               </div>
-              <p className={styles.micro}>{HERO.refund}</p>
             </div>
-            <div className={styles.mascotFrame}>
-              <Image
-                src="/brand/mascot-idle.png"
-                alt="Changuito, un carrito con pan, verdes y un mate"
-                fill
-                priority
-                sizes="(max-width: 860px) 90vw, 460px"
-                className={styles.mascot}
-              />
-            </div>
+            <HeroMascot />
           </div>
         </section>
 
@@ -127,9 +119,9 @@ export function LandingPage() {
                 </li>
               ))}
             </ul>
-            <p className={styles.refund}>
-              <CheckIcon className={styles.refundIcon} />
-              <span>{PAYMENTS.refund}</span>
+            <p className={styles.callout}>
+              <CheckIcon className={styles.calloutIcon} />
+              <span>{PAYMENTS.assurance}</span>
             </p>
           </div>
         </section>
@@ -208,10 +200,7 @@ export function LandingPage() {
             </ul>
           </nav>
         </div>
-        <p className={styles.fine}>
-          Changuito te ayuda a armar el súper. No es un supermercado. Si la compra no se completa, te
-          devolvemos el pago.
-        </p>
+        <p className={styles.fine}>{FINE_PRINT}</p>
         <p className={styles.fine}>© 2026 Changuito</p>
       </footer>
     </div>
