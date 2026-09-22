@@ -9,11 +9,12 @@ export function TryLink({ testId }: { testId: string }) {
       {/* Decorative stand-in for the old arrow. The link name stays the CTA text. */}
       <img
         className={styles.ctaMascot}
-        src="/brand/mascot-corriendo.png"
+        src="/brand/mascota-corriendo.png"
         alt=""
         aria-hidden="true"
         width={630}
         height={560}
+        decoding="async"
       />
     </a>
   );
