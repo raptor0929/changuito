@@ -269,14 +269,6 @@
   flex-shrink: 0;
 }
 
-.whatsapp {
-  display: none;
-}
-
-.form:has(input[name='contactForFeedback'][value='si']:checked) .whatsapp {
-  display: flex;
-}
-
 .turnstile {
   display: flex;
   justify-content: flex-start;

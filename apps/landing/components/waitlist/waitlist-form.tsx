@@ -3,10 +3,11 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 
 import { OTHER_SOURCE, SOURCE_GROUPS } from '../../lib/waitlist/options.ts';
+import { validateWaitlist } from '../../lib/waitlist/validate.ts';
 import styles from './waitlist.module.css';
 
 type FieldErrors = Partial<
-  Record<'name' | 'email' | 'source' | 'otherDetail' | 'contactForFeedback' | 'whatsapp' | 'form', string>
+  Record<'name' | 'email' | 'source' | 'otherDetail' | 'whatsapp' | 'whatsappGroup' | 'form', string>
 >;
 
 declare global {
@@ -36,8 +37,8 @@ export function WaitlistForm({ notice }: { notice?: string }) {
   const [email, setEmail] = useState('');
   const [source, setSource] = useState('');
   const [otherDetail, setOtherDetail] = useState('');
-  const [contactForFeedback, setContactForFeedback] = useState<'si' | 'no' | ''>('');
   const [whatsapp, setWhatsapp] = useState('');
+  const [whatsappGroup, setWhatsappGroup] = useState<'si' | 'no' | ''>('');
   const [turnstileToken, setTurnstileToken] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, setPending] = useState(false);
@@ -111,8 +112,16 @@ export function WaitlistForm({ notice }: { notice?: string }) {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
-    setPending(true);
     const company = new FormData(event.currentTarget).get('company');
+    const checked = validateWaitlist(
+      { name, email, source, otherDetail, whatsapp, whatsappGroup },
+      new Date().toISOString(),
+    );
+    if (!checked.ok) {
+      setErrors(checked.errors);
+      return;
+    }
+    setPending(true);
     try {
       const response = await fetch('/api/whitelist', {
         method: 'POST',
@@ -122,8 +131,8 @@ export function WaitlistForm({ notice }: { notice?: string }) {
           email,
           source,
           otherDetail,
-          contactForFeedback,
-          whatsapp: contactForFeedback === 'si' ? whatsapp : '',
+          whatsapp,
+          whatsappGroup,
           company: typeof company === 'string' ? company : '',
           turnstileToken,
         }),
@@ -150,7 +159,7 @@ export function WaitlistForm({ notice }: { notice?: string }) {
         <h2 ref={successRef} className={styles.successTitle} tabIndex={-1}>
           Listo, te anotamos
         </h2>
-        <p className={styles.successLead}>Te avisamos por mail cuando puedas probar Changuito.</p>
+        <p className={styles.successLead}>Te escribimos por WhatsApp cuando puedas probar Changuito.</p>
       </div>
     );
   }
@@ -161,8 +170,16 @@ export function WaitlistForm({ notice }: { notice?: string }) {
   const emailErrorId = `${baseId}-email-error`;
   const sourceErrorId = `${baseId}-source-error`;
   const otherErrorId = `${baseId}-other-error`;
-  const contactErrorId = `${baseId}-contact-error`;
+  const whatsappHintId = `${baseId}-whatsapp-hint`;
   const whatsappErrorId = `${baseId}-whatsapp-error`;
+  const groupHintId = `${baseId}-group-hint`;
+  const groupErrorId = `${baseId}-group-error`;
+  const groupHint =
+    whatsappGroup === 'no'
+      ? 'Te contactaremos por WhatsApp por privado.'
+      : whatsappGroup === 'si'
+        ? 'Te sumamos al grupo.'
+        : '';
 
   return (
     <form
@@ -294,55 +311,13 @@ export function WaitlistForm({ notice }: { notice?: string }) {
         ) : null}
       </div>
 
-      <fieldset
-        className={styles.fieldset}
-        aria-invalid={errors.contactForFeedback ? true : undefined}
-        aria-describedby={errors.contactForFeedback ? contactErrorId : undefined}
-        data-testid="whitelist-contact"
-      >
-        <legend className={styles.label}>¿Te gustaría que te contactemos para que nos des feedback?</legend>
-        <div className={styles.radioRow}>
-          <label className={styles.radio}>
-            <input
-              type="radio"
-              name="contactForFeedback"
-              value="si"
-              checked={contactForFeedback === 'si'}
-              data-testid="whitelist-contact-si"
-              onChange={() => {
-                setContactForFeedback('si');
-              }}
-              required
-            />
-            Sí
-          </label>
-          <label className={styles.radio}>
-            <input
-              type="radio"
-              name="contactForFeedback"
-              value="no"
-              checked={contactForFeedback === 'no'}
-              data-testid="whitelist-contact-no"
-              onChange={() => {
-                setContactForFeedback('no');
-                setWhatsapp('');
-              }}
-              required
-            />
-            No
-          </label>
-        </div>
-        {errors.contactForFeedback ? (
-          <p id={contactErrorId} className={styles.fieldError} role="alert" data-testid="whitelist-contact-error">
-            {errors.contactForFeedback}
-          </p>
-        ) : null}
-      </fieldset>
-
-      <div className={`${styles.field} ${styles.whatsapp}`}>
+      <div className={styles.field}>
         <label className={styles.label} htmlFor={`${baseId}-whatsapp`}>
-          WhatsApp (opcional)
+          WhatsApp
         </label>
+        <p id={whatsappHintId} className={styles.hint}>
+          Con código de país.
+        </p>
         <input
           id={`${baseId}-whatsapp`}
           className={styles.control}
@@ -350,13 +325,14 @@ export function WaitlistForm({ notice }: { notice?: string }) {
           type="tel"
           autoComplete="tel"
           inputMode="tel"
-          maxLength={24}
+          maxLength={32}
           value={whatsapp}
           placeholder="+54 9 11 1234 5678"
           aria-invalid={errors.whatsapp ? true : undefined}
-          aria-describedby={errors.whatsapp ? whatsappErrorId : undefined}
+          aria-describedby={errors.whatsapp ? `${whatsappHintId} ${whatsappErrorId}` : whatsappHintId}
           data-testid="whitelist-whatsapp"
           onChange={(event) => setWhatsapp(event.target.value)}
+          required
         />
         {errors.whatsapp ? (
           <p id={whatsappErrorId} className={styles.fieldError} role="alert" data-testid="whitelist-whatsapp-error">
@@ -364,6 +340,54 @@ export function WaitlistForm({ notice }: { notice?: string }) {
           </p>
         ) : null}
       </div>
+
+      <fieldset
+        className={styles.fieldset}
+        aria-invalid={errors.whatsappGroup ? true : undefined}
+        aria-describedby={
+          [groupHint ? groupHintId : '', errors.whatsappGroup ? groupErrorId : ''].filter(Boolean).join(' ') ||
+          undefined
+        }
+        data-testid="whitelist-whatsapp-group"
+      >
+        <legend className={styles.label}>¿Querés sumarte al grupo de WhatsApp de beta testers?</legend>
+        <div className={styles.radioRow}>
+          <label className={styles.radio}>
+            <input
+              type="radio"
+              name="whatsappGroup"
+              value="si"
+              checked={whatsappGroup === 'si'}
+              data-testid="whitelist-whatsapp-group-si"
+              onChange={() => setWhatsappGroup('si')}
+              required
+            />
+            Sí
+          </label>
+          <label className={styles.radio}>
+            <input
+              type="radio"
+              name="whatsappGroup"
+              value="no"
+              checked={whatsappGroup === 'no'}
+              data-testid="whitelist-whatsapp-group-no"
+              onChange={() => setWhatsappGroup('no')}
+              required
+            />
+            No
+          </label>
+        </div>
+        {groupHint ? (
+          <p id={groupHintId} className={styles.hint} data-testid="whitelist-whatsapp-group-hint">
+            {groupHint}
+          </p>
+        ) : null}
+        {errors.whatsappGroup ? (
+          <p id={groupErrorId} className={styles.fieldError} role="alert" data-testid="whitelist-whatsapp-group-error">
+            {errors.whatsappGroup}
+          </p>
+        ) : null}
+      </fieldset>
 
       {SITE_KEY ? (
         <div className={styles.turnstile} data-testid="whitelist-turnstile">

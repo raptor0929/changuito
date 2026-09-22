@@ -47,15 +47,15 @@ export default async function WhitelistPage({
         </div>
       </header>
       <main id="lista" className={styles.main} data-testid="whitelist-page">
-        <h1 className={styles.title}>Sumate a la lista</h1>
-        <p className={styles.lead}>Te avisamos cuando puedas probar Changuito.</p>
+        <h1 className={styles.title}>Súmate a la lista para beta testear.</h1>
+        <p className={styles.lead}>Te bonificaremos algo de tu compra del mercado a cambio del feedback.</p>
         <div className={styles.card}>
           {listed ? (
             <div className={styles.success} data-testid="whitelist-success">
               <h2 className={styles.successTitle} tabIndex={-1}>
                 Listo, te anotamos
               </h2>
-              <p className={styles.successLead}>Te avisamos por mail cuando puedas probar Changuito.</p>
+              <p className={styles.successLead}>Te escribimos por WhatsApp cuando puedas probar Changuito.</p>
             </div>
           ) : (
             <WaitlistForm notice={estado === 'error' ? 'Revisá los datos e intentá de nuevo.' : undefined} />
