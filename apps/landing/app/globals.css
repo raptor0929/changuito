@@ -26,3 +26,20 @@ body {
   min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
 }
+
+/* /reportarbug only. The document must not scroll: on iOS the layout
+   viewport stays full height when the keyboard opens, Safari pans it, and
+   the autofill pill is left over the fields. The form shell scrolls instead.
+   Other landing pages keep the document scroller. */
+html:has([data-testid='bug-report-screen']),
+html:has([data-testid='bug-report-screen']) body {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  html:has([data-testid='bug-report-screen']) {
+    scroll-behavior: auto;
+  }
+}
