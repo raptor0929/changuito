@@ -15,6 +15,7 @@ const COMPOSER_PLACEHOLDERS = [
   '¿Semana laboral o juntada? Decime cuántos son y qué comen, y armamos el carrito.',
 ];
 
+import { LOGIN_CTA, LOGIN_REQUIRED_MESSAGE } from '../lib/login-constants';
 import type { OpenedOrder } from '../lib/order';
 import { pollarEnabled } from '../lib/pollar';
 import { useChat } from '../lib/use-chat';
@@ -42,7 +43,7 @@ function ChatCore({
   isAuthenticated?: boolean;
   openLoginModal?: () => void;
 }) {
-  const { state, send, stop } = useChat();
+  const { state, send, stop, loginRequired, clearLoginRequired } = useChat();
   const [draft, setDraft] = useState('');
   const [placeholderIdx] = useState(() => Math.floor(Math.random() * COMPOSER_PLACEHOLDERS.length));
   // The basket the payment modal is open over. A cart, not a block id: the
@@ -63,12 +64,18 @@ function ChatCore({
   // message, silently goes nowhere. Shopping is a conversation; the cursor
   // should be waiting where the next sentence goes.
   useEffect(() => {
-    if (!state.streaming) composer.current?.focus();
-  }, [state.streaming]);
+    if (!state.streaming && !loginRequired) composer.current?.focus();
+  }, [state.streaming, loginRequired]);
 
+  // After Pollar login (+ /api/session/login cookie), lift the UI gate.
+  useEffect(() => {
+    if (isAuthenticated && loginRequired) clearLoginRequired();
+  }, [isAuthenticated, loginRequired, clearLoginRequired]);
+
+  const gated = loginRequired && !isAuthenticated;
 
   const submit = (text: string) => {
-    if (state.streaming) return;
+    if (state.streaming || gated) return;
     setDraft('');
     void send(text);
   };
@@ -136,6 +143,30 @@ function ChatCore({
         <div ref={bottom} />
       </div>
 
+      {gated ? (
+        <div className="login-gate-banner" role="status">
+          <img
+            className="login-gate-mascot"
+            src="/brand/mascot-idle.png"
+            alt=""
+            aria-hidden="true"
+            width={48}
+            height={48}
+          />
+          <div className="login-gate-copy">
+            <p className="login-gate-title">Para seguir, iniciá sesión</p>
+            <p>{LOGIN_REQUIRED_MESSAGE}</p>
+          </div>
+          {openLoginModal ? (
+            <button type="button" className="btn" onClick={openLoginModal}>
+              {LOGIN_CTA}
+            </button>
+          ) : (
+            <p className="login-gate-muted">El inicio de sesión no está configurado en este build.</p>
+          )}
+        </div>
+      ) : null}
+
       <form
         className="composer"
         onSubmit={(e) => {
@@ -156,7 +187,7 @@ function ChatCore({
           }}
           placeholder={COMPOSER_PLACEHOLDERS[placeholderIdx] ?? COMPOSER_PLACEHOLDERS[0]}
           rows={3}
-          disabled={state.streaming}
+          disabled={state.streaming || gated}
           autoFocus
         />
         {state.streaming ? (
@@ -164,7 +195,7 @@ function ChatCore({
             Parar
           </button>
         ) : (
-          <button type="submit" className="btn" disabled={!draft.trim()}>
+          <button type="submit" className="btn" disabled={!draft.trim() || gated}>
             Enviar
           </button>
         )}

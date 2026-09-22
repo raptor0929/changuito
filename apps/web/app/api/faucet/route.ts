@@ -15,6 +15,7 @@ import { faucetVerdict } from '../../../lib/faucet-policy.ts';
 import { usdcAsAdmin } from '../../../lib/server/resolver.ts';
 import { addressKind, ensureFunded, formatUsdc } from '../../../lib/stellar.ts';
 import { usdcBalance } from '../../../lib/token.ts';
+import { requireHuman } from '../../../lib/human-gate.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
