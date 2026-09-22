@@ -11,7 +11,7 @@ import type { RateBuckets } from '../waitlist/rate-limit.ts';
 import { allowSubmission } from '../waitlist/rate-limit.ts';
 import { submitWaitlist } from '../waitlist/submit.ts';
 import { resetTurnstileDevLog, verifyTurnstile } from '../waitlist/turnstile.ts';
-import { validateWaitlist } from '../waitlist/validate.ts';
+import { normalizeWhatsapp, validateWaitlist } from '../waitlist/validate.ts';
 
 const CREATED = '2026-09-22T12:00:00.000Z';
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -38,8 +38,8 @@ const valid = {
   email: 'Martina@Ejemplo.com',
   source: 'Instagram',
   otherDetail: '',
-  contactForFeedback: 'no',
-  whatsapp: '',
+  whatsapp: '+54 9 11 5555 1234',
+  whatsappGroup: 'no',
 };
 
 test('the source list is socials, events (with Nerdearla) and Otros — no WhatsApp or Threads', () => {
@@ -76,12 +76,24 @@ test('the source list is socials, events (with Nerdearla) and Otros — no Whats
   assert.equal(allowedSources().has('Threads'), false);
 });
 
-test('the waitlist form drops the single-option hint and asks about feedback contact', () => {
+test('the waitlist form asks for a required WhatsApp and the beta group', () => {
   const form = readFileSync(join(root, 'components/waitlist/waitlist-form.tsx'), 'utf8');
+  const page = readFileSync(join(root, 'app/whitelist/page.tsx'), 'utf8');
   assert.equal(form.includes('Elegí una sola opción.'), false);
+  assert.equal(form.includes('¿Te gustaría que te contactemos para que nos des feedback?'), false);
+  assert.equal(form.includes('WhatsApp (opcional)'), false);
   assert.match(form, /Elegí una opción/);
-  assert.match(form, /¿Te gustaría que te contactemos para que nos des feedback\?/);
-  assert.match(form, /WhatsApp \(opcional\)/);
+  assert.match(form, /WhatsApp/);
+  assert.match(form, /Con código de país\./);
+  assert.match(form, /¿Querés sumarte al grupo de WhatsApp de beta testers\?/);
+  assert.match(form, /Te contactaremos por WhatsApp por privado\./);
+  assert.match(form, /Te sumamos al grupo\./);
+  assert.match(page, /Súmate a la lista para beta testear\./);
+  assert.match(page, /Te bonificaremos algo de tu compra del mercado a cambio del feedback\./);
+  for (const copy of [form, page]) {
+    assert.equal(copy.includes('\u2014'), false);
+    assert.equal(copy.includes('\u2013'), false);
+  }
   assert.match(form, /turnstile/i);
 });
 
@@ -92,8 +104,8 @@ test('a valid signup keeps the email lowercased and drops detail unless Otros', 
   assert.equal(result.entry.email, 'martina@ejemplo.com');
   assert.equal(result.entry.name, 'Martina López');
   assert.equal(result.entry.otherDetail, undefined);
-  assert.equal(result.entry.contactForFeedback, false);
-  assert.equal(result.entry.whatsapp, undefined);
+  assert.equal(result.entry.whatsappGroup, false);
+  assert.equal(result.entry.whatsapp, '+5491155551234');
   assert.equal(result.entry.createdAt, CREATED);
 });
 
@@ -109,44 +121,54 @@ test('Otros requires a short detail and stores it', () => {
   assert.equal(ok.entry.otherDetail, 'Un amigo');
 });
 
-test('feedback contact is required; WhatsApp is optional only when Sí', () => {
-  const missing = validateWaitlist({ ...valid, contactForFeedback: '' }, CREATED);
-  assert.equal(missing.ok, false);
-  if (missing.ok) return;
-  assert.equal(missing.errors.contactForFeedback, 'Decinos si podemos contactarte para feedback.');
+test('WhatsApp is required and the beta group answer is required', () => {
+  const missingGroup = validateWaitlist({ ...valid, whatsappGroup: '' }, CREATED);
+  assert.equal(missingGroup.ok, false);
+  if (missingGroup.ok) return;
+  assert.equal(missingGroup.errors.whatsappGroup, 'Decinos si querés sumarte al grupo de WhatsApp.');
 
-  const noContact = validateWaitlist(
-    { ...valid, contactForFeedback: 'no', whatsapp: '+54 9 11 5555 1234' },
+  const missingPhone = validateWaitlist({ ...valid, whatsapp: '   ' }, CREATED);
+  assert.equal(missingPhone.ok, false);
+  if (missingPhone.ok) return;
+  assert.equal(missingPhone.errors.whatsapp, 'Ingresá tu WhatsApp.');
+
+  const noGroup = validateWaitlist({ ...valid, whatsappGroup: 'no' }, CREATED);
+  assert.equal(noGroup.ok, true);
+  if (!noGroup.ok) return;
+  assert.equal(noGroup.entry.whatsappGroup, false);
+  assert.equal(noGroup.entry.whatsapp, '+5491155551234');
+
+  const yesGroup = validateWaitlist(
+    { ...valid, whatsappGroup: 'sí', whatsapp: '011 15 5555-1234' },
     CREATED,
   );
-  assert.equal(noContact.ok, true);
-  if (!noContact.ok) return;
-  assert.equal(noContact.entry.contactForFeedback, false);
-  assert.equal(noContact.entry.whatsapp, undefined);
+  assert.equal(yesGroup.ok, true);
+  if (!yesGroup.ok) return;
+  assert.equal(yesGroup.entry.whatsappGroup, true);
+  assert.equal(yesGroup.entry.whatsapp, '+5491155551234');
 
-  const yesEmpty = validateWaitlist({ ...valid, contactForFeedback: 'si', whatsapp: '' }, CREATED);
-  assert.equal(yesEmpty.ok, true);
-  if (!yesEmpty.ok) return;
-  assert.equal(yesEmpty.entry.contactForFeedback, true);
-  assert.equal(yesEmpty.entry.whatsapp, undefined);
-
-  const yesPhone = validateWaitlist(
-    { ...valid, contactForFeedback: 'si', whatsapp: '+54 9 11 5555-1234' },
-    CREATED,
-  );
-  assert.equal(yesPhone.ok, true);
-  if (!yesPhone.ok) return;
-  assert.equal(yesPhone.entry.whatsapp, '+54 9 11 5555-1234');
-
-  const badPhone = validateWaitlist({ ...valid, contactForFeedback: 'si', whatsapp: '123' }, CREATED);
+  const badPhone = validateWaitlist({ ...valid, whatsapp: '123' }, CREATED);
   assert.equal(badPhone.ok, false);
   if (badPhone.ok) return;
-  assert.equal(badPhone.errors.whatsapp, 'Ingresá un WhatsApp válido, o dejalo vacío.');
+  assert.equal(badPhone.errors.whatsapp, 'Ingresá un WhatsApp válido, con código de país.');
+});
+
+test('WhatsApp normalization accepts Argentina and explicit international numbers', () => {
+  assert.equal(normalizeWhatsapp('+54 9 11 5555-1234'), '+5491155551234');
+  assert.equal(normalizeWhatsapp('5491155551234'), '+5491155551234');
+  assert.equal(normalizeWhatsapp('11 5555 1234'), '+5491155551234');
+  assert.equal(normalizeWhatsapp('15 5555 1234'), '+5491155551234');
+  assert.equal(normalizeWhatsapp('+54 (011) 15 5555-1234'), '+5491155551234');
+  assert.equal(normalizeWhatsapp('351 15 555 1234'), '+5493515551234');
+  assert.equal(normalizeWhatsapp('+1 415 555 0134'), '+14155550134');
+  assert.equal(normalizeWhatsapp('123'), undefined);
+  assert.equal(normalizeWhatsapp('no es un teléfono'), undefined);
+  assert.equal(normalizeWhatsapp(''), undefined);
 });
 
 test('rejects an unknown source, a bad email and a one-letter name', () => {
   const result = validateWaitlist(
-    { name: 'A', email: 'no-es-mail', source: 'Radio', otherDetail: '', contactForFeedback: 'no', whatsapp: '' },
+    { name: 'A', email: 'no-es-mail', source: 'Radio', otherDetail: '', whatsapp: '123', whatsappGroup: 'no' },
     CREATED,
   );
   assert.equal(result.ok, false);
@@ -179,8 +201,8 @@ test('webhook sink posts the entry and the optional secret', async () => {
       name: 'Martina López',
       email: 'martina@ejemplo.com',
       source: 'Nerdearla',
-      contactForFeedback: true,
       whatsapp: '+5491155551234',
+      whatsappGroup: true,
       createdAt: CREATED,
     },
     {
@@ -205,8 +227,8 @@ test('webhook sink posts the entry and the optional secret', async () => {
     email: 'martina@ejemplo.com',
     source: 'Nerdearla',
     otherDetail: null,
-    contactForFeedback: true,
     whatsapp: '+5491155551234',
+    whatsappGroup: true,
     createdAt: CREATED,
   });
 });
@@ -218,7 +240,8 @@ test('redis sink writes one hash field and treats an existing email as saved', a
       name: 'Martina López',
       email: 'martina@ejemplo.com',
       source: 'Instagram',
-      contactForFeedback: false,
+      whatsapp: '+5491155551234',
+      whatsappGroup: false,
       createdAt: CREATED,
     },
     {
@@ -248,7 +271,8 @@ test('production without a sink does not pretend the signup was stored', async (
       name: 'Martina López',
       email: 'martina@ejemplo.com',
       source: 'Instagram',
-      contactForFeedback: false,
+      whatsapp: '+5491155551234',
+      whatsappGroup: false,
       createdAt: CREATED,
     },
     {
@@ -270,7 +294,8 @@ test('local dev appends a json line when no sink is configured', async () => {
       name: 'Martina López',
       email: 'martina@ejemplo.com',
       source: 'Telegram',
-      contactForFeedback: false,
+      whatsapp: '+5491155551234',
+      whatsappGroup: false,
       createdAt: CREATED,
     },
     {
@@ -413,7 +438,8 @@ test('an http webhook that is not local is ignored', async () => {
       name: 'Martina López',
       email: 'martina@ejemplo.com',
       source: 'YouTube',
-      contactForFeedback: false,
+      whatsapp: '+5491155551234',
+      whatsappGroup: false,
       createdAt: CREATED,
     },
     {

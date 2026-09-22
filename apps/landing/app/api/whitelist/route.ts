@@ -10,8 +10,8 @@ type BodyFields = {
   email: unknown;
   source: unknown;
   otherDetail: unknown;
-  contactForFeedback: unknown;
   whatsapp: unknown;
+  whatsappGroup: unknown;
   company: unknown;
   turnstileToken: unknown;
 };
@@ -50,8 +50,8 @@ async function readBody(
         email: form.get('email'),
         source: form.get('source'),
         otherDetail: form.get('otherDetail'),
-        contactForFeedback: form.get('contactForFeedback'),
         whatsapp: form.get('whatsapp'),
+        whatsappGroup: form.get('whatsappGroup'),
         company: form.get('company'),
         turnstileToken: form.get('cf-turnstile-response') ?? form.get('turnstileToken'),
       },
@@ -74,8 +74,8 @@ async function readBody(
         email: body.email,
         source: body.source,
         otherDetail: body.otherDetail,
-        contactForFeedback: body.contactForFeedback,
         whatsapp: body.whatsapp,
+        whatsappGroup: body.whatsappGroup,
         company: body.company,
         turnstileToken: body.turnstileToken ?? body['cf-turnstile-response'],
       },

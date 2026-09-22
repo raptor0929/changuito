@@ -8,8 +8,8 @@ export type SubmitBody = {
   email: unknown;
   source: unknown;
   otherDetail: unknown;
-  contactForFeedback: unknown;
   whatsapp: unknown;
+  whatsappGroup: unknown;
   company: unknown;
   turnstileToken: unknown;
 };
@@ -42,8 +42,8 @@ export async function submitWaitlist(
     email: asText(body.email),
     source: asText(body.source),
     otherDetail: asText(body.otherDetail),
-    contactForFeedback: asText(body.contactForFeedback),
     whatsapp: asText(body.whatsapp),
+    whatsappGroup: asText(body.whatsappGroup),
   };
 
   const validated = validateWaitlist(input, new Date(ctx.now).toISOString());

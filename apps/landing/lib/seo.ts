@@ -52,11 +52,11 @@ export const PUBLIC_PAGES = [
   },
   {
     path: '/whitelist',
-    title: 'Sumate a la lista',
-    description: 'Anotate en la lista de Changuito. Te avisamos por mail cuando puedas probarlo.',
+    title: 'Súmate a la lista para beta testear',
+    description: 'Te bonificaremos algo de tu compra del mercado a cambio del feedback.',
     changeFrequency: 'monthly',
     priority: 0.6,
-    navLabel: 'Sumate a la lista',
+    navLabel: 'Súmate a la lista',
   },
   {
     path: '/reportarbug',
