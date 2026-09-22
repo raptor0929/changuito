@@ -25,26 +25,28 @@ Elegí **uno** de estos destinos. Si están los dos, Redis es el registro y el w
 
 | Variable | Obligatoria | Para qué |
 |---|---|---|
-| `WAITLIST_WEBHOOK_URL` | una de las dos vías | `POST` JSON `{ name, email, source, otherDetail, whatsapp, whatsappGroup, createdAt }` a un HTTPS (Apps Script, Notion, Sheets, Slack, Make). `http` solo en `localhost`. |
+| `WAITLIST_WEBHOOK_URL` | una de las dos vías | `POST` JSON `{ kind, name, email, source, otherDetail, whatsapp, whatsappGroup, userAgent, createdAt }` a un HTTPS (Apps Script, Notion, Sheets, Slack, Make). `http` solo en `localhost`. |
 | `WAITLIST_WEBHOOK_SECRET` | no | Si está, va como `Authorization: Bearer …`. |
 | `KV_REST_API_URL` o `UPSTASH_REDIS_REST_URL` | la otra vía | El mismo Redis REST que ya usa el shopper. La landing es otro proyecto de Vercel: hay que conectar la integración ahí, no se hereda sola. |
 | `KV_REST_API_TOKEN` o `UPSTASH_REDIS_REST_TOKEN` | junto con la URL | Token REST. Nunca commitearlo. |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | en producción | Site key pública de Cloudflare Turnstile (widget en el formulario). |
 | `TURNSTILE_SECRET_KEY` | en producción | Secret key de Turnstile (solo servidor; verifica el token antes de guardar). Nunca commitearla. |
 
-El webhook de la lista no tiene el Apps Script en este repo. El `POST` manda este JSON (header `X-Changuito-Waitlist: 1`):
+El Apps Script (`appendWaitlist_`) no está en este repo. El `POST` manda este JSON (header `X-Changuito-Waitlist: 1`), con los nombres que el script ya lee:
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `name` | string | Nombre limpio. |
+| `kind` | string | Siempre `"waitlist"`. |
+| `name` | string | Nombre limpio. El script también acepta `nombre`. |
 | `email` | string | En minúsculas. |
-| `source` | string | Una opción de la lista (el valor visible). |
-| `otherDetail` | string o `null` | Solo si `source` es `Otros`. |
+| `source` | string | Una opción de la lista (el valor visible). El script también acepta `fuente`. |
+| `otherDetail` | string o `null` | Solo si `source` es `Otros`. El script también acepta `detalle_otros`. |
 | `whatsapp` | string | Obligatorio. E.164 con `+`. Un número argentino local se guarda como `+549…` (se saca el `15` y se agrega el `9`). |
-| `whatsappGroup` | boolean | `true` si quiere entrar al grupo de beta testers. |
+| `whatsappGroup` | boolean | `true` si quiere entrar al grupo de beta testers. En la hoja va a `grupo_whatsapp`. |
+| `userAgent` | string | Solo si el request trae `User-Agent`. El script también acepta `user_agent`. |
 | `createdAt` | string | ISO 8601. |
 
-`contactForFeedback` ya no se envía. En la hoja hay que reemplazar esa columna por `whatsapp` (si no estaba) y `whatsappGroup`.
+No se envía `feedback` ni `contactForFeedback`. La pregunta de contacto quedó reemplazada por `whatsappGroup`.
 
 ### Cloudflare Turnstile
 

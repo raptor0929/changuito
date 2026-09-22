@@ -23,7 +23,7 @@ const RATE_ERROR = 'Esperá un toque y volvé a intentar.';
 
 export async function submitWaitlist(
   body: SubmitBody,
-  ctx: { ip: string; now: number; buckets?: RateBuckets } & SaveDeps,
+  ctx: { ip: string; now: number; buckets?: RateBuckets; userAgent?: string } & SaveDeps,
 ): Promise<SubmitResult> {
   if (honeypotFilled(body.company)) return { ok: true };
 
@@ -51,6 +51,9 @@ export async function submitWaitlist(
 
   const allowed = allowSubmission(ctx.ip, validated.entry.email, ctx.now, ctx.buckets);
   if (!allowed) return { ok: false, status: 429, errors: { form: RATE_ERROR } };
+
+  const userAgent = ctx.userAgent?.replace(/\s+/g, ' ').trim().slice(0, 300);
+  if (userAgent) validated.entry.userAgent = userAgent;
 
   const saved = await saveWaitlistEntry(validated.entry, ctx);
   if (!saved.ok) return { ok: false, status: 503, errors: { form: FORM_ERROR } };

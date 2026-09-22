@@ -203,6 +203,7 @@ test('webhook sink posts the entry and the optional secret', async () => {
       source: 'Nerdearla',
       whatsapp: '+5491155551234',
       whatsappGroup: true,
+      userAgent: 'Mozilla/5.0 test',
       createdAt: CREATED,
     },
     {
@@ -222,7 +223,9 @@ test('webhook sink posts the entry and the optional secret', async () => {
   assert.equal(calls[0].url, 'https://hooks.ejemplo.com/waitlist');
   const headers = new Headers(calls[0].init.headers);
   assert.equal(headers.get('authorization'), 'Bearer shhh');
-  assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
+  const posted = JSON.parse(String(calls[0].init.body)) as Record<string, unknown>;
+  assert.deepEqual(posted, {
+    kind: 'waitlist',
     name: 'Martina López',
     email: 'martina@ejemplo.com',
     source: 'Nerdearla',
@@ -230,7 +233,34 @@ test('webhook sink posts the entry and the optional secret', async () => {
     whatsapp: '+5491155551234',
     whatsappGroup: true,
     createdAt: CREATED,
+    userAgent: 'Mozilla/5.0 test',
   });
+  assert.equal('feedback' in posted, false);
+  assert.equal('contactForFeedback' in posted, false);
+});
+
+test('submit forwards a trimmed user agent and never sends feedback', async () => {
+  const bodies: Record<string, unknown>[] = [];
+  const result = await submitWaitlist(
+    { ...valid, company: '', turnstileToken: '' },
+    {
+      ip: '198.51.100.20',
+      now: Date.parse(CREATED),
+      buckets: new Map(),
+      userAgent: '  Mozilla/5.0   test agent  ',
+      env: { NODE_ENV: 'development', WAITLIST_WEBHOOK_URL: 'https://hooks.ejemplo.com/waitlist' },
+      fetch: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return new Response(null, { status: 200 });
+      },
+    },
+  );
+  assert.equal(result.ok, true);
+  assert.equal(bodies[0].kind, 'waitlist');
+  assert.equal(bodies[0].userAgent, 'Mozilla/5.0 test agent');
+  assert.equal(bodies[0].whatsapp, '+5491155551234');
+  assert.equal(bodies[0].whatsappGroup, false);
+  assert.equal('feedback' in bodies[0], false);
 });
 
 test('redis sink writes one hash field and treats an existing email as saved', async () => {
