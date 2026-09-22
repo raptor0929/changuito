@@ -28,7 +28,7 @@ export function SiteHeader() {
     <header className={styles.header} data-testid="landing-header">
       <div className={styles.headerInner}>
         <a className={styles.logoLink} href="/" data-testid="landing-brand">
-          <BrandLockup />
+          <BrandLockup variant="wordmark" />
         </a>
         <button
           ref={buttonRef}
