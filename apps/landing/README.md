@@ -77,12 +77,12 @@ La clave de Redis es `changuito:landing:waitlist` (hash por email, `HSETNX`), pa
 
 `/reportarbug` es la página pública para contar un fallo (la app enlaza `https://www.changuito.me/reportarbug`). El pie del home también apunta ahí.
 
-Si `BUG_REPORT_WEBHOOK_URL` está configurada, el servidor hace `POST` JSON. Si no está, el reporte se acepta igual y queda en el log del proceso con el prefijo `[bug-report]`, para que la página sirva antes de tener un destino. Un webhook que responde mal sí es un error: la persona puede reintentar.
+Si `BUG_REPORT_WEBHOOK_URL` está configurada, el servidor hace `POST` JSON. Si no está, el reporte se acepta igual y queda en el log del proceso con el prefijo `[bug-report]`, para que la página sirva antes de tener un destino. Un webhook que responde mal sí es un error: la persona puede reintentar. Un HTTP 200 con `{ "ok": false }` también es un fallo.
 
 | Variable | Obligatoria | Para qué |
 |---|---|---|
-| `BUG_REPORT_WEBHOOK_URL` | no | `POST` JSON con `kind: "bug"`, el relato en `error`, cómo repetirlo en `pasos`, y `adjuntos` (foto o video en base64). `http` solo en `localhost`. |
-| `BUG_REPORT_WEBHOOK_SECRET` | no | Si está, va como `Authorization: Bearer …`. |
+| `BUG_REPORT_WEBHOOK_URL` | no | `POST` JSON con `kind: "bug"`, el relato en `error`, cómo repetirlo en `pasos`, `adjuntos` (foto o video en base64) y, si hay secreto, `webhookSecret`. `http` solo en `localhost`. |
+| `BUG_REPORT_WEBHOOK_SECRET` | no | Si está, va como `Authorization: Bearer …` y el mismo valor en el cuerpo como `webhookSecret`. Apps Script no entrega `Authorization` ni headers custom en `e.headers`; `doPost` tiene que leer el secreto del body y no guardarlo en la hoja. Un HTTP 200 con `{ "ok": false }` es un fallo, no un reporte guardado. |
 
 La mascota de esa página es `public/brand/mascot-error.png` (el carrito idle con ojos en X y gesto hacia abajo). No se usa en el hero ni en el GIF de carga.
 
