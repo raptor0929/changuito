@@ -1,0 +1,39 @@
+{
+  "name": "Changuito Typography",
+  "version": "1.5",
+  "display": {
+    "family": "Changuito Lettering (custom)",
+    "assets": [
+      "logo/png/wordmark.png",
+      "logo/svg/wordmark.svg"
+    ],
+    "note": "Use wordmark PNG/SVG for brand titles. NOT Baloo."
+  },
+  "ui": {
+    "family": "Inter",
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800,
+      900
+    ],
+    "fallback": [
+      "Nunito",
+      "system-ui",
+      "sans-serif"
+    ],
+    "roles": {
+      "body": "Inter Regular/Medium 16\u201318px",
+      "subtitle": "Inter SemiBold 14\u201318px",
+      "cta": "Inter SemiBold/Bold 14\u201318px",
+      "companionDisplay": "Inter Black/ExtraBold (mockups only)"
+    }
+  },
+  "forbidden": [
+    "Baloo",
+    "Baloo 2",
+    "tech-neon families"
+  ]
+}

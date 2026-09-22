@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     viewBox="0 0 1097 249" width="1097" height="249" role="img">
+  <!-- Custom Changuito lettering with Sol de Mayo i-tittle — PNG master -->
+  <!-- PNG-primary asset. For production prefer ../png/wordmark.png. This SVG is a sized wrapper. -->
+  <image xlink:href="../png/wordmark.png" width="1097" height="249" preserveAspectRatio="xMidYMid meet"/>
+</svg>
