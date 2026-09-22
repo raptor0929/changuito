@@ -11,6 +11,8 @@ export type BugReportEntry = {
   context?: string;
   severity?: string;
   createdAt: string;
+  userAgent?: string;
+  adjuntos?: { name: string; mimeType: string; base64: string }[];
 };
 
 const EMAIL = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;

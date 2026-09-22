@@ -14,7 +14,6 @@ export const HERO = {
   sub: 'Changuito compara productos, arma el carrito y te deja listo para pagar.',
   pay: 'Pagá con tarjeta o USDC.',
   cta: 'Probar Changuito',
-  secondary: 'Ver cómo funciona',
 } as const;
 
 export const NAV = [

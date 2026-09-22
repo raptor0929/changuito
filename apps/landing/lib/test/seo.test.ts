@@ -187,6 +187,8 @@ test('public pages keep one h1 and key images have alt text', () => {
   assert.equal(bug.match(/<h1[\s>]/g)?.length, 1);
   assert.equal(home.includes('<h4'), false);
   assert.match(home, /alt="Changuito va y vuelve buscando el súper"/);
-  assert.match(bug, /alt="Changuito con los ojos en X, como si algo hubiera fallado"/);
+  assert.match(bug, /src="\/brand\/mascot-error.png"/);
+  assert.match(bug, /alt="Changuito"/);
+  assert.equal(home.includes('mascot-error'), false);
   assert.match(readFileSync(join(root, 'app/layout.tsx'), 'utf8'), /lang="es-AR"/);
 });
