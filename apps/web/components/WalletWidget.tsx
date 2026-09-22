@@ -1,7 +1,7 @@
 'use client';
 
 import { usePollar } from '@pollar/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { pollarEnabled, shortAddress } from '../lib/pollar.ts';
 import { useBalances } from '../lib/use-balances.ts';
@@ -19,9 +19,9 @@ export function WalletWidget() {
 
 function NoWallet() {
   return (
-    <div className="wallet wallet-off" title="Falta NEXT_PUBLIC_POLLAR_API_KEY — ver DEPLOY.md">
-      <span className="wallet-label">Billetera</span>
-      <span className="wallet-muted">sin configurar</span>
+    <div className="wallet wallet-off" title="Falta NEXT_PUBLIC_POLLAR_API_KEY. Ver DEPLOY.md">
+      <span className="wallet-label">Tu pago</span>
+      <span className="wallet-muted">pago no configurado</span>
     </div>
   );
 }
@@ -33,6 +33,20 @@ function ConnectedWallet() {
 
   const [funding, setFunding] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+
+  // After Pollar login, set httpOnly chg_user so /api/chat skips the guest turn limit.
+  useEffect(() => {
+    if (!isAuthenticated || !address) return;
+    void fetch('/api/session/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ address }),
+    }).catch(() => {
+      /* cookie mint is best-effort; chat still works within free turns */
+    });
+  }, [isAuthenticated, address]);
+
 
   async function fund() {
     if (!address) return;
@@ -50,8 +64,8 @@ function ConnectedWallet() {
       setNote(
         json.note ??
           (json.created
-            ? 'Cuenta creada con XLM de prueba y fondeada con USDC.'
-            : `+${'50.00'} USDC de prueba.`),
+            ? 'Listo: saldo de prueba cargado.'
+            : '+50,00 USDC de prueba.'),
       );
       refresh();
     } catch (err) {
@@ -65,7 +79,7 @@ function ConnectedWallet() {
     return (
       <div className="wallet">
         <button type="button" className="btn" onClick={openLoginModal}>
-          Conectar billetera
+          Empezá a comprar
         </button>
       </div>
     );
@@ -74,28 +88,26 @@ function ConnectedWallet() {
   return (
     <div className="wallet">
       <div className="wallet-head">
-        <span className="wallet-label">Billetera</span>
+        <span className="wallet-label">Tu pago</span>
         <button
           type="button"
           className="wallet-addr"
           onClick={() => void navigator.clipboard?.writeText(address)}
-          title={`${address} — clic para copiar`}
+          title={`${address}. Clic para copiar`}
         >
           {shortAddress(address)}
         </button>
       </div>
 
       <div className="wallet-balance">
-        <strong>{data ? data.usdcDisplay : '—'}</strong>
-        <span className="wallet-unit">USDC de prueba</span>
+        <strong>{data ? data.usdcDisplay : '-'}</strong>
+        <span className="wallet-unit">USDC</span>
         {loading && <span className="wallet-muted">actualizando…</span>}
       </div>
 
       <div className="wallet-sub">
-        {/* XLM is not the point, but a wallet with none cannot sign anything,
-            so it is worth a line rather than a surprise at payment time. */}
-        {data?.xlm !== null && data?.xlm !== undefined && <span>{Number(data.xlm).toFixed(2)} XLM</span>}
-        {data && !data.funded && <span className="wallet-warn">sin XLM para comisiones</span>}
+        {/* Warn only when the account cannot pay network fees yet. */}
+        {data && !data.funded && <span className="wallet-warn">falta saldo para comisiones</span>}
         {!verified && <span className="wallet-muted">verificando sesión…</span>}
       </div>
 
@@ -104,12 +116,18 @@ function ConnectedWallet() {
 
       <div className="wallet-actions">
         <button type="button" className="btn btn-sm" onClick={() => void fund()} disabled={funding}>
-          {funding ? 'Fondeando…' : 'Fondear'}
+          {funding ? 'Cargando…' : 'Cargar USDC'}
         </button>
         <button type="button" className="btn btn-ghost btn-sm" onClick={refresh} disabled={loading}>
           Actualizar
         </button>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={logout}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => {
+            void fetch('/api/session/logout', { method: 'POST', credentials: 'same-origin' }).finally(() => logout());
+          }}
+        >
           Salir
         </button>
       </div>

@@ -17,6 +17,7 @@ import { Status } from '@changuito/escrow-bindings';
 import { canonicalReceipt, fromHex, receiptHash, toHex, type SettleAction } from '../../../lib/order.ts';
 import { escrowAsResolver } from '../../../lib/server/resolver.ts';
 import { explorer, formatUsdc } from '../../../lib/stellar.ts';
+import { requireHuman } from '../../../lib/human-gate.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

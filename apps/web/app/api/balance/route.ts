@@ -7,6 +7,7 @@
  */
 import { addressKind, formatUsdc, MIN_XLM, nativeBalance } from '../../../lib/stellar.ts';
 import { usdcBalance } from '../../../lib/token.ts';
+import { requireHuman } from '../../../lib/human-gate.ts';
 
 // XDR encoding is Node, not edge.
 export const runtime = 'nodejs';

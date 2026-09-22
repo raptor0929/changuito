@@ -111,5 +111,21 @@ export const FOOTER = {
   appLabel: 'app.changuito.me',
 } as const;
 
+/** Public social profiles. Keep labels short; aria-labels carry the brand. */
+export const SOCIAL = [
+  {
+    href: 'https://x.com/appchanguito',
+    label: 'X',
+    ariaLabel: 'Changuito en X',
+    icon: 'x',
+  },
+  {
+    href: 'https://instagram.com/appchanguito',
+    label: 'Instagram',
+    ariaLabel: 'Changuito en Instagram',
+    icon: 'instagram',
+  },
+] as const;
+
 export const DESCRIPTION =
   'Changuito compara productos, arma el carrito y te deja listo para pagar. Pagá con tarjeta o USDC.';
