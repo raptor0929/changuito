@@ -81,7 +81,10 @@ function ChatCore({
   };
 
   return (
-    <div className="chat">
+    // `is-empty` is the hook for the mobile first-screen layout. The class is
+    // server-rendered with the initial state, so compact CSS applies before
+    // hydration and the shell can target it with :has().
+    <div className={state.blocks.length === 0 ? 'chat is-empty' : 'chat'}>
       <div className="thread" role="log" aria-live="polite" aria-busy={state.streaming}>
         {state.blocks.length === 0 ? <Greeting onPick={submit} /> : null}
 

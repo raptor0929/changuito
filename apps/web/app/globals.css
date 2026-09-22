@@ -648,3 +648,164 @@ a:hover { color: var(--chg-arcilla); }
 .report-bug a:hover {
   color: var(--chg-arcilla);
 }
+
+/* ------------------------------------------------- empty chat, phone only
+   The first screen has to fit a ~390×844 CSS viewport, and a shorter
+   ~360×740 one, without the page or the thread scrolling. Desktop and
+   tablet keep the spacing above. Only the empty thread is tightened:
+   once a turn starts, `.is-empty` is gone and the roomy layout returns.
+   Touch targets stay at least 44px. Copy is unchanged. */
+@media (max-width: 560px) {
+  .shell:has(.chat.is-empty) {
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    padding: 8px 12px 8px;
+  }
+
+  .shell:has(.chat.is-empty) .masthead {
+    gap: 6px;
+    padding-bottom: 8px;
+  }
+
+  .shell:has(.chat.is-empty) .brand {
+    gap: 8px;
+    min-height: 0;
+  }
+
+  .shell:has(.chat.is-empty) .brand-mark {
+    height: 36px;
+  }
+
+  .shell:has(.chat.is-empty) .brand-name {
+    font-size: 1.05rem;
+  }
+
+  .shell:has(.chat.is-empty) .tagline {
+    margin-top: 2px;
+    font-size: 12.5px;
+    line-height: 1.25;
+  }
+
+  /* Logged-out masthead is a single full-width CTA. Drop the extra card
+     chrome so the pill is the control, not a card wrapping a control. */
+  .shell:has(.chat.is-empty) .wallet:has(> .btn) {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    gap: 0;
+    min-width: 0;
+  }
+
+  .shell:has(.chat.is-empty) .wallet:has(> .btn) .btn {
+    width: 100%;
+  }
+
+  .shell:has(.chat.is-empty) .thread {
+    padding: 8px 0 2px;
+    gap: 0;
+  }
+
+  .shell:has(.chat.is-empty) .greeting h2 {
+    margin: 0 0 6px;
+    font-size: 18px;
+    line-height: 1.2;
+  }
+
+  .shell:has(.chat.is-empty) .greeting-timeline-item {
+    gap: 8px;
+  }
+
+  .shell:has(.chat.is-empty) .greeting-timeline-rail {
+    width: 16px;
+  }
+
+  .shell:has(.chat.is-empty) .greeting-timeline-dot {
+    width: 10px;
+    height: 10px;
+    margin-top: 8px;
+  }
+
+  .shell:has(.chat.is-empty) .greeting-timeline-line {
+    min-height: 6px;
+    margin-top: 2px;
+  }
+
+  .shell:has(.chat.is-empty) .greeting-timeline-card {
+    padding: 6px 10px;
+    margin-bottom: 6px;
+    border-radius: 10px;
+  }
+
+  .shell:has(.chat.is-empty) .greeting-timeline-card h3 {
+    margin: 0 0 1px;
+    font-size: 13.5px;
+    line-height: 1.25;
+  }
+
+  .shell:has(.chat.is-empty) .greeting-timeline-card p {
+    font-size: 12.5px;
+    line-height: 1.25;
+  }
+
+  .shell:has(.chat.is-empty) .greeting-hint {
+    margin: 8px 0 4px;
+    font-size: 13px;
+    line-height: 1.2;
+  }
+
+  .shell:has(.chat.is-empty) .starters {
+    gap: 6px;
+  }
+
+  .shell:has(.chat.is-empty) .starter {
+    padding: 6px 10px;
+    font-size: 13.5px;
+    line-height: 1.25;
+    min-height: 44px;
+    border-radius: 10px;
+  }
+
+  .shell:has(.chat.is-empty) .composer {
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 6px;
+    padding: 6px 0 2px;
+    margin-bottom: 0;
+  }
+
+  .shell:has(.chat.is-empty) .composer-input {
+    /* Grow with the placeholder (the longest prompt is four lines at 360px)
+       but stay inside the slack the thread gives up. `content` is what makes
+       an empty box follow the placeholder; a fixed height clips it. */
+    field-sizing: content;
+    height: auto;
+    min-height: 64px;
+    max-height: 96px;
+    padding: 8px 12px;
+    font-size: 13.5px;
+    line-height: 1.25;
+    border-radius: 16px;
+    overflow-y: auto;
+  }
+
+  .shell:has(.chat.is-empty) .composer .btn {
+    padding: 8px 14px;
+    flex: 0 0 auto;
+  }
+
+  .shell:has(.chat.is-empty) .report-bug {
+    padding: 0;
+    font-size: 13px;
+    line-height: 1.2;
+  }
+
+  .shell:has(.chat.is-empty) .report-bug a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 8px;
+  }
+}
