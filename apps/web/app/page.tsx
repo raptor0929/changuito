@@ -7,9 +7,19 @@ export default function Home() {
     <WalletProvider>
       <main className="shell">
         <header className="masthead">
-          <div>
-            <h1>changuito</h1>
-            <p className="tagline">Supermercado por MCP, pago en USDC sobre Stellar.</p>
+          <div className="brand">
+            <img
+              className="brand-mark"
+              src="/brand/mascot-idle.png"
+              alt=""
+              aria-hidden="true"
+              width={397}
+              height={583}
+            />
+            <div>
+              <h1>Changuito</h1>
+              <p className="tagline">Supermercado por MCP, pago en USDC sobre Stellar.</p>
+            </div>
           </div>
           <WalletWidget />
         </header>

@@ -61,14 +61,13 @@ El kit completo vive en `apps/branding/` (manuals, logo, mascota, pattern, motio
 
 | Público | Origen |
 |---|---|
-| `public/brand/wordmark.png` | `apps/branding/logo/wordmark.png` |
 | `public/brand/animacion-busqueda.gif` | `apps/branding/motion/animacion-busqueda.gif` (hero y pagos, ida y vuelta) |
-| `public/brand/mascot-idle.png` | `apps/branding/mascot/mascota-idle.png` (`prefers-reduced-motion`) |
+| `public/brand/mascot-idle.png` | `apps/branding/mascot/mascota-idle.png` (movimiento reducido, y marca del header, pie y cierre) |
 | `public/brand/mascota-corriendo.png` | `apps/branding/mascot/mascota-corriendo.png` (CTA, en el lugar de la flecha) |
-| `public/brand/lockup-stacked.png` | `apps/branding/logo/lockup-stacked-mascota-y-wordmark.png` |
+| `public/brand/wordmark.png` | sin uso en la UI. El lettering con Sol de Mayo no es el logo. |
 | `public/og.png` | pose idle ancha del zip de landing (1280×720), solo Open Graph |
 | `public/brand/isotipo-mascota.png` | `apps/branding/logo/isotipo-mascota.png` (solo la mascota, header de `/whitelist`) |
 | `app/whitelist/icon.png` | el mismo isotipo, ícono de la ruta `/whitelist` |
-| `app/icon.svg` | `apps/branding/logo/sol-mayo.svg` |
+| `app/favicon.ico`, `app/icon.png`, `app/apple-icon.png` | cara de la bolsa recortada de `apps/branding/mascot/mascota-idle.png` (16/32/48, 32 y 180). Los mismos archivos están en `apps/web/app`. |
 
-El header del home usa solo el wordmark. El de `/whitelist` usa el isotipo y la palabra Changuito en Inter, no el asset de lettering. El fondo es `#FAFAF7` plano: el patrón mate-pan no se tilea.
+El header, el pie y el cierre del home muestran la mascota idle y la palabra «Changuito» en Inter. `/whitelist` usa el isotipo y la misma palabra en texto. Ninguno usa el lettering. El fondo es `#FAFAF7` plano: el patrón mate-pan no se tilea.

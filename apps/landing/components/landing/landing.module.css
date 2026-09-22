@@ -82,11 +82,28 @@
   align-items: center;
   min-height: 44px;
   min-width: 44px;
+  color: inherit;
+  text-decoration: none;
 }
 
-.wordmark {
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logoMark {
   height: 40px;
   width: auto;
+  display: block;
+}
+
+.logoWord {
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 1.35rem;
+  letter-spacing: -0.03em;
+  line-height: 1;
 }
 
 .menuButton {
@@ -460,10 +477,26 @@
   margin-inline: auto;
 }
 
-.lockup {
-  width: auto;
-  height: 220px;
+.bofuBrand {
+  flex-direction: column;
+  gap: 12px;
   margin: 0 auto 24px;
+}
+
+.bofuBrand .logoMark {
+  height: 160px;
+}
+
+.bofuBrand .logoWord {
+  font-size: clamp(2rem, 4vw, 2.75rem);
+}
+
+.footerBrand .logoMark {
+  height: 32px;
+}
+
+.footerBrand .logoWord {
+  font-size: 1.05rem;
 }
 
 .bofuCta {
@@ -481,11 +514,6 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px 40px;
-}
-
-.footerMark {
-  height: 32px;
-  width: auto;
 }
 
 .footerNav {
@@ -523,8 +551,12 @@
 }
 
 @media (max-width: 860px) {
-  .wordmark {
+  .logoMark {
     height: 32px;
+  }
+
+  .logoWord {
+    font-size: 1.15rem;
   }
 
   .menuButton {
@@ -640,8 +672,12 @@
     box-sizing: border-box;
   }
 
-  .wordmark {
-    height: 26px;
+  .logoMark {
+    height: 28px;
+  }
+
+  .logoWord {
+    font-size: 1rem;
   }
 
   .heroInner {
