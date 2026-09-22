@@ -28,7 +28,10 @@ export {
   LOGIN_REQUIRED,
   LOGIN_REQUIRED_MESSAGE,
   USER_COOKIE,
+  loginGateBannerText,
+  shouldShowLoginGate,
 } from './login-constants.ts';
+export type { LoginGateInput } from './login-constants.ts';
 
 const TTL_SECONDS = 60 * 60; // match turn-store: abandon after an hour
 const USER_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days

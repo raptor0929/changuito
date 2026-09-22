@@ -15,7 +15,7 @@ const COMPOSER_PLACEHOLDERS = [
   '¿Semana laboral o juntada? Decime cuántos son y qué comen, y armamos el carrito.',
 ];
 
-import { LOGIN_CTA, LOGIN_REQUIRED_MESSAGE } from '../lib/login-constants';
+import { FREE_TURNS, LOGIN_CTA, LOGIN_REQUIRED_MESSAGE, loginGateBannerText } from '../lib/login-constants';
 import type { OpenedOrder } from '../lib/order';
 import { pollarEnabled } from '../lib/pollar';
 import { useChat } from '../lib/use-chat';
@@ -33,18 +33,21 @@ export function Chat() {
 }
 
 function ChatWithPollar() {
-  const { isAuthenticated, openLoginModal } = usePollar();
-  return <ChatCore isAuthenticated={isAuthenticated} openLoginModal={openLoginModal} />;
+  const { isAuthenticated, openLoginModal, wallet } = usePollar();
+  const address = isAuthenticated ? (wallet?.address ?? null) : null;
+  return <ChatCore isAuthenticated={isAuthenticated} openLoginModal={openLoginModal} address={address} />;
 }
 
 function ChatCore({
   isAuthenticated = false,
   openLoginModal,
+  address = null,
 }: {
   isAuthenticated?: boolean;
   openLoginModal?: () => void;
+  address?: string | null;
 }) {
-  const { state, send, stop, loginRequired, clearLoginRequired } = useChat();
+  const { state, send, stop, loginRequired, clearLoginRequired } = useChat({ isAuthenticated, address });
   const [draft, setDraft] = useState('');
   const [placeholderIdx] = useState(() => Math.floor(Math.random() * COMPOSER_PLACEHOLDERS.length));
   // The basket the payment modal is open over. A cart, not a block id: the
@@ -71,20 +74,26 @@ function ChatCore({
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [state.blocks]);
 
+  // After Pollar login, drop the guest latch and any soft-limit line already
+  // written into the transcript.
+  useEffect(() => {
+    if (isAuthenticated) clearLoginRequired();
+  }, [isAuthenticated, clearLoginRequired]);
+
+  // Guests at the limit. Signed-in shoppers never match, even if the latch is
+  // still true for this render or the free-turn count is already spent.
+  const gateText = loginGateBannerText({ isAuthenticated, loginRequired });
+  const gated = gateText !== null;
+  const loginCopyVisible =
+    loginGateBannerText({ isAuthenticated, loginRequired: true, turnsUsed: FREE_TURNS }) !== null;
+
   // `disabled` blurs the composer the moment a turn starts, and nothing gives
   // the focus back when it ends — so the obvious thing, typing the next
   // message, silently goes nowhere. Shopping is a conversation; the cursor
   // should be waiting where the next sentence goes.
   useEffect(() => {
-    if (!state.streaming && !loginRequired) composer.current?.focus();
-  }, [state.streaming, loginRequired]);
-
-  // After Pollar login (+ /api/session/login cookie), lift the UI gate.
-  useEffect(() => {
-    if (isAuthenticated && loginRequired) clearLoginRequired();
-  }, [isAuthenticated, loginRequired, clearLoginRequired]);
-
-  const gated = loginRequired && !isAuthenticated;
+    if (!state.streaming && !gated) composer.current?.focus();
+  }, [state.streaming, gated]);
 
   const submit = (text: string) => {
     if (state.streaming || gated) return;
@@ -141,6 +150,10 @@ function ChatCore({
                 />
               );
             case 'error':
+              // The soft-limit line is guest copy. Once the shopper is signed
+              // in it is not an error, and leaving it in the thread reads as
+              // the gate still being shut.
+              if (b.message === LOGIN_REQUIRED_MESSAGE && !loginCopyVisible) return null;
               return (
                 <p key={b.id} className="bubble is-error" role="alert">
                   {b.message}
@@ -175,8 +188,8 @@ function ChatCore({
         <ReportBug />
       </div>
 
-      {gated ? (
-        <div className="login-gate-banner" role="status">
+      {gated && gateText ? (
+        <div className="login-gate-banner" data-testid="login-gate-banner" role="status">
           <img
             className="login-gate-mascot"
             src="/brand/mascot-idle.png"
@@ -187,7 +200,7 @@ function ChatCore({
           />
           <div className="login-gate-copy">
             <p className="login-gate-title">Para seguir, iniciá sesión</p>
-            <p>{LOGIN_REQUIRED_MESSAGE}</p>
+            <p>{gateText}</p>
           </div>
           {openLoginModal ? (
             <button type="button" className="btn" onClick={openLoginModal}>
