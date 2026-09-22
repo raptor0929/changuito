@@ -511,8 +511,7 @@
   justify-content: flex-end;
 }
 
-.footerLink,
-.footerLabel {
+.footerLink {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
@@ -549,6 +548,12 @@
 
 .socialLink:hover {
   color: var(--ink-soft);
+}
+
+/* Text-only social link: the word is the control, so it needs an underline. */
+.socialText {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .socialIcon {

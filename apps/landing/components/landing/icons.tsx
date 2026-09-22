@@ -77,15 +77,6 @@ function socialStroke(className?: string) {
   };
 }
 
-export function XIcon({ className }: IconProps) {
-  return (
-    <svg {...socialStroke(className)}>
-      <path d="M4 4l16 16" />
-      <path d="M20 4L4 20" />
-    </svg>
-  );
-}
-
 export function InstagramIcon({ className }: IconProps) {
   return (
     <svg {...socialStroke(className)}>

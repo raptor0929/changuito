@@ -108,7 +108,6 @@ export const FOOTER = {
   legal: 'Changuito te ayuda a armar el súper. No es un supermercado.',
   copyright: '© 2026 Changuito',
   siteLabel: 'www.changuito.me',
-  appLabel: 'app.changuito.me',
 } as const;
 
 /**
