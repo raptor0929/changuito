@@ -89,6 +89,7 @@ test('the waitlist form asks for a required WhatsApp and the beta group', () => 
   assert.match(form, /Te contactaremos por WhatsApp por privado\./);
   assert.match(form, /Te sumamos al grupo\./);
   assert.match(page, /Súmate a la lista para beta testear\./);
+  assert.match(page, /Solo disponible en 🇦🇷/);
   assert.match(page, /Te bonificaremos algo de tu compra del mercado a cambio del feedback\./);
   for (const copy of [form, page]) {
     assert.equal(copy.includes('\u2014'), false);

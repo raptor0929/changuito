@@ -101,8 +101,15 @@
   letter-spacing: -0.03em;
 }
 
-.lead {
+.availability {
   margin: 12px 0 0;
+  color: var(--ink);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.lead {
+  margin: 8px 0 0;
   color: var(--ink-soft);
   font-size: 1.125rem;
 }

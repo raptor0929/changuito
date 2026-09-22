@@ -48,6 +48,9 @@ export default async function WhitelistPage({
       </header>
       <main id="lista" className={styles.main} data-testid="whitelist-page">
         <h1 className={styles.title}>Súmate a la lista para beta testear.</h1>
+        <p className={styles.availability} data-testid="whitelist-availability">
+          Solo disponible en 🇦🇷
+        </p>
         <p className={styles.lead}>Te bonificaremos algo de tu compra del mercado a cambio del feedback.</p>
         <div className={styles.card}>
           {listed ? (
