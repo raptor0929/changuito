@@ -15,22 +15,35 @@ Crear un **proyecto nuevo**, no reusar el de `apps/web`.
 | Node.js | **22.x** (el repo pide `>=22.12`) |
 | Install command | default — Vercel instala desde la raíz del monorepo (`npm ci`) |
 | Build command | default — corre `next build` de este paquete |
-| Environment variables | ninguna obligatoria para el sitio. `/whitelist` necesita un destino durable. `/reportarbug` funciona sin variables (ver abajo). |
+| Environment variables | el sitio se construye sin ellas. `/whitelist` en producción no anota a nadie si faltan Turnstile o un destino. `/reportarbug` funciona sin variables (ver abajo). |
 
 Dominio de producción: `www.changuito.me`. `app.changuito.me` sigue en el proyecto de `apps/web`.
 
 La lista de espera vive en `/whitelist`. No hace falta login de Vercel para mergear el código: el próximo deploy toma la ruta. Sin un destino configurado, producción responde que no pudo anotar a la persona (no finge el alta). En `next dev` / `next start` local, si no hay variables, el alta se agrega a `apps/landing/.data/waitlist.jsonl` (gitignored).
 
-Elegí **uno** de estos destinos. Si están los dos, Redis es el registro y el webhook recibe una copia.
+### Variables que el proyecto de Vercel de la landing tiene que tener
+
+El proyecto de `apps/web` (`app.changuito.me`) no comparte env con este. Las keys de Turnstile que ya usa el shopper hay que copiarlas al proyecto de la landing. Si falta alguna, `/whitelist` responde 503: «No pudimos anotarte. Probá de nuevo en un rato.» Producción no saltea el CAPTCHA.
+
+En el proyecto de Vercel de **landing**, Production (y Preview si se prueba el alta ahí):
+
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+- `TURNSTILE_SECRET_KEY`
+- `WAITLIST_WEBHOOK_URL`
+- `WAITLIST_WEBHOOK_SECRET`
+
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY` entra en el bundle del cliente: un valor vacío deja el formulario sin widget. Las otras tres son de servidor. Un cambio de env se aplica en el próximo deploy.
+
+Elegí **uno** de estos destinos. Si están los dos, Redis es el registro y el webhook recibe una copia. El alta en vivo va a Apps Script, así que las dos variables del webhook hacen falta.
 
 | Variable | Obligatoria | Para qué |
 |---|---|---|
-| `WAITLIST_WEBHOOK_URL` | una de las dos vías | `POST` JSON `{ kind, name, email, source, otherDetail, whatsapp, whatsappGroup, userAgent, createdAt }` a un HTTPS (Apps Script, Notion, Sheets, Slack, Make). `http` solo en `localhost`. |
-| `WAITLIST_WEBHOOK_SECRET` | no | Si está, va como `Authorization: Bearer …`. |
+| `WAITLIST_WEBHOOK_URL` | en producción, salvo que haya Redis | `POST` JSON `{ kind, name, email, source, otherDetail, whatsapp, whatsappGroup, userAgent, createdAt }` y, si hay secreto, `webhookSecret`. HTTPS (Apps Script, Notion, Sheets, Slack, Make). `http` solo en `localhost`. |
+| `WAITLIST_WEBHOOK_SECRET` | junto con el webhook en producción | `Authorization: Bearer …` y el mismo valor en el cuerpo como `webhookSecret`. Apps Script no entrega `Authorization` ni headers custom en `e.headers`; `doPost` tiene que leer el secreto del body y no guardarlo en la hoja. Un HTTP 200 con `{ "ok": false }` es un fallo, no un alta. |
 | `KV_REST_API_URL` o `UPSTASH_REDIS_REST_URL` | la otra vía | El mismo Redis REST que ya usa el shopper. La landing es otro proyecto de Vercel: hay que conectar la integración ahí, no se hereda sola. |
 | `KV_REST_API_TOKEN` o `UPSTASH_REDIS_REST_TOKEN` | junto con la URL | Token REST. Nunca commitearlo. |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | en producción | Site key pública de Cloudflare Turnstile (widget en el formulario). |
-| `TURNSTILE_SECRET_KEY` | en producción | Secret key de Turnstile (solo servidor; verifica el token antes de guardar). Nunca commitearla. |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | en producción | Site key pública de Cloudflare Turnstile (widget en el formulario). Tiene que estar en este proyecto, no solo en el del shopper. |
+| `TURNSTILE_SECRET_KEY` | en producción | Secret key de Turnstile (solo servidor; verifica el token antes de guardar). Nunca commitearla. Si falta esta o la site key, producción rechaza el alta. |
 
 El Apps Script (`appendWaitlist_`) no está en este repo. El `POST` manda este JSON (header `X-Changuito-Waitlist: 1`), con los nombres que el script ya lee:
 
@@ -45,6 +58,7 @@ El Apps Script (`appendWaitlist_`) no está en este repo. El `POST` manda este J
 | `whatsappGroup` | boolean | `true` si quiere entrar al grupo de beta testers. En la hoja va a `grupo_whatsapp`. |
 | `userAgent` | string | Solo si el request trae `User-Agent`. El script también acepta `user_agent`. |
 | `createdAt` | string | ISO 8601. |
+| `webhookSecret` | string | Solo si `WAITLIST_WEBHOOK_SECRET` está seteado. Es auth, no un dato de la persona. El script lo lee y no lo escribe en la fila. |
 
 No se envía `feedback` ni `contactForFeedback`. La pregunta de contacto quedó reemplazada por `whatsappGroup`.
 
@@ -52,10 +66,10 @@ No se envía `feedback` ni `contactForFeedback`. La pregunta de contacto quedó 
 
 El formulario de `/whitelist` manda un token de Turnstile con el alta. El servidor lo verifica contra `siteverify` antes de persistir. El honeypot (`company`) y el rate-limit siguen activos; el CAPTCHA es adicional.
 
-- **Producción:** si faltan `NEXT_PUBLIC_TURNSTILE_SITE_KEY` o `TURNSTILE_SECRET_KEY`, el alta se rechaza (mismo espíritu que un sink sin configurar).
+- **Producción:** si faltan `NEXT_PUBLIC_TURNSTILE_SITE_KEY` o `TURNSTILE_SECRET_KEY` en el proyecto de Vercel de la landing, el alta se rechaza (mismo espíritu que un sink sin configurar). No se saltea la verificación.
 - **Local / no-production:** si las keys no están, el submit se acepta sin widget (se loguea un aviso una vez) para que `next dev` siga funcionando.
 
-Creá un widget en el [dashboard de Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) y pegá las dos keys en el proyecto de Vercel de la landing.
+Creá un widget en el [dashboard de Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) (o reusá el de `app.changuito.me` si el hostname `www.changuito.me` está permitido) y pegá las dos keys en el proyecto de Vercel de la landing.
 
 La clave de Redis es `changuito:landing:waitlist` (hash por email, `HSETNX`), para no pisar las sesiones del shopper si comparten base.
 
