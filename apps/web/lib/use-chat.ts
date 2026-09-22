@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { applyEvent, endTurn, initialState, sendUser, type ChatState } from './chat-state';
+import { LOGIN_REQUIRED, LOGIN_REQUIRED_MESSAGE } from './login-constants';
 import { parseEvents, type ChatRequest } from './protocol';
 
 /**
@@ -19,6 +20,7 @@ import { parseEvents, type ChatRequest } from './protocol';
  */
 export function useChat() {
   const [state, setState] = useState<ChatState>(initialState);
+  const [loginRequired, setLoginRequired] = useState(false);
   // A ref, not state: the snapshot is read inside the send closure and must be
   // the one from the turn that just finished, not the one React rendered with.
   const snapshot = useRef<ChatState['snapshot']>(undefined);
@@ -30,6 +32,7 @@ export function useChat() {
   const send = useCallback(async (message: string) => {
     const text = message.trim();
     if (!text) return;
+    if (loginRequired) return;
     if (inFlight.current) return;
     inFlight.current = true;
 
@@ -51,7 +54,10 @@ export function useChat() {
         let message = `El servidor respondió ${res.status}.`;
         try {
           const json = (await res.json()) as { error?: string; message?: string };
-          if (json.message) {
+          if (json.error === LOGIN_REQUIRED) {
+            setLoginRequired(true);
+            message = json.message ?? LOGIN_REQUIRED_MESSAGE;
+          } else if (json.message) {
             message = json.message;
           }
         } catch {
@@ -84,11 +90,13 @@ export function useChat() {
       abort.current = null;
       inFlight.current = false;
     }
-  }, []);
+  }, [loginRequired]);
 
   const stop = useCallback(() => {
     abort.current?.abort();
   }, []);
 
-  return { state, send, stop };
+  const clearLoginRequired = useCallback(() => setLoginRequired(false), []);
+
+  return { state, send, stop, loginRequired, clearLoginRequired };
 }

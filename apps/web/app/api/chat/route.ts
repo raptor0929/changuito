@@ -2,6 +2,8 @@ import { newTurnState, runTurn } from '@/lib/agent/loop';
 import { turnStore } from '@/lib/agent/turn-store';
 import { withSession } from '@/lib/mcp/session';
 import { encodeEvent, HEARTBEAT, SSE_HEADERS, type ChatRequest, type UiEvent } from '@/lib/protocol';
+import { requireHuman } from '@/lib/human-gate';
+import { requireLoginOrFreeTurn } from '@/lib/login-gate';
 
 /**
  * Node, not edge: the MCP server reads `node:url` and the Stellar SDK needs
@@ -17,6 +19,9 @@ const turns = turnStore();
 const HEARTBEAT_MS = 15_000;
 
 export async function POST(req: Request): Promise<Response> {
+  const gated = await requireHuman(req);
+  if (gated) return gated;
+
   let body: ChatRequest;
   try {
     body = (await req.json()) as ChatRequest;
@@ -27,6 +32,11 @@ export async function POST(req: Request): Promise<Response> {
   if (!body.sessionId || typeof body.message !== 'string' || !body.message.trim()) {
     return Response.json({ error: 'sessionId and a non-empty message are required.' }, { status: 400 });
   }
+
+  // Guests: at most FREE_TURNS chat POSTs per sessionId (server-side). Logged-in
+  // users (chg_user cookie from /api/session/login after Pollar) skip the limit.
+  const loginGate = await requireLoginOrFreeTurn(req, body.sessionId);
+  if (loginGate) return loginGate;
 
   const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
   const hasOllama = Boolean(process.env.OLLAMA_URL?.trim());

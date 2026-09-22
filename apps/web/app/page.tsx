@@ -1,4 +1,5 @@
 import { Chat } from '../components/Chat';
+import { HumanGate } from '../components/HumanGate';
 import { WalletProvider } from '../components/WalletProvider';
 import { WalletWidget } from '../components/WalletWidget';
 
@@ -32,7 +33,9 @@ export default function Home() {
           </div>
           <WalletWidget />
         </header>
-        <Chat />
+        <HumanGate>
+          <Chat />
+        </HumanGate>
         <p className="report-bug">
           <a
             href="https://www.changuito.me/reportarbug"

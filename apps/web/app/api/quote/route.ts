@@ -8,6 +8,7 @@
 import { arsToUsdCents, getArsPerUsd } from '@changuito/mcp/fx';
 
 import { centsToUnits, formatUsdc } from '../../../lib/stellar.ts';
+import { requireHuman } from '../../../lib/human-gate.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
