@@ -88,15 +88,15 @@ El kit completo vive en `apps/branding/` (manuals, logo, mascota, pattern, motio
 | Público | Origen |
 |---|---|
 | `public/brand/animacion-busqueda.gif` | `apps/branding/motion/animacion-busqueda.gif` (hero y pagos, ida y vuelta) |
-| `public/brand/mascot-idle.png` | `apps/branding/mascot/mascota-idle.png` (movimiento reducido, y marca del header, pie y cierre) |
+| `public/brand/mascot-idle.png` | `apps/branding/mascot/mascota-idle.png` (movimiento reducido, header de `/whitelist`, pie y cierre) |
 | `public/brand/mascota-corriendo.png` | `apps/branding/mascot/mascota-corriendo.png` (CTA, en el lugar de la flecha) |
-| `public/brand/wordmark.png` | `apps/branding/logo/wordmark.png` (lettering chunky con Sol de Mayo). Header de `/reportarbug`, junto a la mascota de error. El mismo archivo está en `apps/web/public/brand`. |
+| `public/brand/wordmark.png` | `apps/branding/logo/wordmark.png` (lettering chunky con Sol de Mayo). Header de `/` (solo), `/whitelist` y `/reportarbug`. El mismo archivo está en `apps/web/public/brand`. |
 | `public/og.jpg` | pose idle ancha del zip de landing (1280×720, JPEG), Open Graph y Twitter. El archivo anterior se llamaba `og.png` pero los bytes eran JPEG, así que el content-type no coincidía. |
-| `public/brand/isotipo-mascota.png` | `apps/branding/logo/isotipo-mascota.png` (solo la mascota, header de `/whitelist`) |
-| `public/brand/mascot-error.png` | carrito idle con ojos en X y gesto hacia abajo. Solo `/reportarbug`. |
+| `public/brand/isotipo-mascota.png` | `apps/branding/logo/isotipo-mascota.png` (isotipo del JSON-LD, no va en el header) |
+| `public/brand/mascot-error.png` | carrito idle con ojos en X y gesto hacia abajo. Header de `/reportarbug`, junto al wordmark. |
 | `app/favicon.ico`, `app/icon.png`, `app/apple-icon.png` | mascota idle completa (`mascota-idle.png`) encajada en un cuadrado con margen transparente (16/32/48, 32 y 180). Sin recorte de cara. Los mismos archivos están en `apps/web/app`. `/whitelist` hereda estos íconos (no hay `app/whitelist/icon.png`). |
 
-El header, el pie y el cierre del home muestran la mascota idle y la palabra «Changuito» en Inter. `/whitelist` usa el isotipo y la misma palabra en texto. `/reportarbug` usa la mascota de error y el wordmark en imagen. El fondo es `#FAFAF7` plano: el patrón mate-pan no se tilea.
+El header del home es solo el wordmark. El pie y el cierre siguen con la mascota idle y la palabra «Changuito» en Inter. `/whitelist` muestra la mascota idle y el wordmark. `/reportarbug` muestra la mascota de error y el wordmark. El fondo es `#FAFAF7` plano: el patrón mate-pan no se tilea.
 
 ## SEO
 

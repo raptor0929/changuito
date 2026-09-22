@@ -98,6 +98,12 @@
   display: block;
 }
 
+.logoWordmark {
+  height: 40px;
+  width: auto;
+  display: block;
+}
+
 .logoWord {
   color: var(--ink);
   font-weight: 800;
@@ -580,6 +586,10 @@
     height: 32px;
   }
 
+  .logoWordmark {
+    height: 32px;
+  }
+
   .logoWord {
     font-size: 1.15rem;
   }
@@ -709,6 +719,10 @@
   }
 
   .logoMark {
+    height: 28px;
+  }
+
+  .logoWordmark {
     height: 28px;
   }
 

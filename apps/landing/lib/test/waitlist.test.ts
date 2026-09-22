@@ -16,20 +16,32 @@ import { validateWaitlist } from '../waitlist/validate.ts';
 const CREATED = '2026-09-22T12:00:00.000Z';
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
-test('the whitelist header is the mascot cutout plus the name in text', () => {
+test('the whitelist header is the idle mascot plus the wordmark', () => {
   const page = readFileSync(join(root, 'app/whitelist/page.tsx'), 'utf8');
-  assert.equal(page.includes('wordmark'), false);
-  assert.match(page, /src="\/brand\/isotipo-mascota\.png"/);
-  assert.match(page, /alt=""/);
-  assert.match(page, />Changuito</);
+  const header = page.slice(0, page.indexOf('</header>'));
+  assert.match(header, /src="\/brand\/mascot-idle\.png"/);
+  assert.match(header, /data-testid="whitelist-mascot"/);
+  assert.match(header, /src="\/brand\/wordmark\.png"/);
+  assert.match(header, /alt="Changuito"/);
+  assert.match(header, /data-testid="whitelist-wordmark"/);
+  assert.equal(header.includes('>Changuito<'), false);
+  assert.equal(header.includes('isotipo-mascota'), false);
+  assert.equal(header.includes('mascot-error'), false);
 
   const css = readFileSync(join(root, 'components/waitlist/waitlist.module.css'), 'utf8');
-  assert.equal(css.includes('wordmark'), false);
+  assert.match(css, /\.wordmark \{/);
+  assert.equal(css.includes('.brandName'), false);
 
   const hash = (file: string) => createHash('sha256').update(readFileSync(file)).digest('hex');
-  const master = hash(join(root, '../branding/logo/isotipo-mascota.png'));
-  assert.equal(hash(join(root, 'public/brand/isotipo-mascota.png')), master);
-  // Route icon omitted on purpose — /whitelist inherits the root full-mascot favicons.
+  assert.equal(
+    hash(join(root, 'public/brand/mascot-idle.png')),
+    hash(join(root, '../branding/mascot/mascota-idle.png')),
+  );
+  assert.equal(
+    hash(join(root, 'public/brand/wordmark.png')),
+    hash(join(root, '../branding/logo/wordmark.png')),
+  );
+  // Route icon omitted on purpose. /whitelist inherits the root full-mascot favicons.
   assert.equal(existsSync(join(root, 'app/whitelist/icon.png')), false);
 });
 

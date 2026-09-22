@@ -60,24 +60,21 @@
 .brandLink {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 16px;
   min-height: 48px;
   min-width: 44px;
   color: var(--ink);
-  font-weight: 800;
   text-decoration: none;
 }
 
 .mark {
-  height: 48px;
+  height: 72px;
   width: auto;
 }
 
-.brandName {
-  font-size: 1.25rem;
-  line-height: 1;
-  letter-spacing: -0.03em;
-  white-space: nowrap;
+.wordmark {
+  height: 40px;
+  width: auto;
 }
 
 .main {
@@ -291,11 +288,11 @@
   }
 
   .mark {
-    height: 56px;
+    height: 88px;
   }
 
-  .brandName {
-    font-size: 1.4rem;
+  .wordmark {
+    height: 48px;
   }
 
   .card {
