@@ -390,8 +390,9 @@ a:hover { color: var(--chg-arcilla); }
      controls (3px outline + 2px offset on the field, 3px + 3px on Enviar).
      Inline padding keeps that ring, including the left rounded corner, inside
      the clip instead of shearing it off at the content edge. 8px is the ring
-     plus a pixel so antialiasing is not the new clip. */
-  padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
+     plus a pixel so antialiasing is not the new clip.
+     The home-indicator inset lives on .app-footer, under this bar. */
+  padding: 10px 8px;
   margin: 0;
   border-top: 1px solid var(--border);
   background: var(--bg);
@@ -716,6 +717,45 @@ a:hover { color: var(--chg-arcilla); }
   color: var(--chg-arcilla);
 }
 
+.app-footer {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 2px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+/* Wide: one sentence, copyright first. Narrow: names, then the copyright line. */
+.chg-trust {
+  container-type: inline-size;
+  container-name: chg-trust;
+}
+.chg-trust-line { margin: 0; }
+.chg-trust-link {
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.chg-trust-link:hover { text-decoration-thickness: 2px; }
+.chg-trust-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@container chg-trust (max-width: 36rem) {
+  .chg-trust-line { display: flex; flex-direction: column-reverse; }
+  .chg-trust-sep { display: none; }
+}
+
 /* ------------------------------------------------- empty chat, phone only
    The first screen has to fit a ~390×844 CSS viewport, and a shorter
    ~360×740 one, with the composer on screen and the thread not scrolling.
@@ -831,7 +871,7 @@ a:hover { color: var(--chg-arcilla); }
     /* Same ring gutter as .composer. The empty bar used to be 4px on the
        bottom, one pixel short of the field ring, so the lower stroke clipped
        too. 6px clears a 5px ring without giving back the tight first screen. */
-    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    padding: 6px 8px;
     margin: 0;
   }
 
@@ -865,5 +905,11 @@ a:hover { color: var(--chg-arcilla); }
     justify-content: center;
     min-height: 44px;
     padding: 0 8px;
+  }
+
+  .shell:has(.chat.is-empty) .app-footer {
+    padding: 0 8px calc(4px + env(safe-area-inset-bottom, 0px));
+    font-size: 11px;
+    line-height: 1.25;
   }
 }
