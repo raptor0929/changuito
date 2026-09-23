@@ -254,40 +254,14 @@ function ChatCore({
   );
 }
 
-/** Onboarding E: timeline of what Changuito does, then starter chips. */
-const GREETING_STEPS = [
-  {
-    title: 'Contame la receta',
-    body: 'Qué querés cocinar y para cuántos.',
-  },
-  {
-    title: 'Armo la lista',
-    body: 'Productos de súpers de Argentina, calculados para vos.',
-  },
-  {
-    title: 'Planeo semana o mes',
-    body: 'Según tus metas nutricionales.',
-  },
-] as const;
+/** Empty-chat intro under the greeting, then starter chips. */
+const GREETING_BODY = 'Changuito te ayuda a armar tus compras en el supermercado.';
 
 function Greeting({ onPick }: { onPick: (text: string) => void }) {
   return (
     <div className="greeting" data-testid="greeting">
       <h2>Hola 👋</h2>
-      <ol className="greeting-timeline" aria-label="Cómo funciona Changuito">
-        {GREETING_STEPS.map((step, i) => (
-          <li key={step.title} className="greeting-timeline-item">
-            <div className="greeting-timeline-rail" aria-hidden="true">
-              <span className="greeting-timeline-dot" />
-              {i < GREETING_STEPS.length - 1 ? <span className="greeting-timeline-line" /> : null}
-            </div>
-            <div className="greeting-timeline-card">
-              <h3>{step.title}</h3>
-              <p>{step.body}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
+      <p className="greeting-body" data-testid="greeting-body">{GREETING_BODY}</p>
       <p className="greeting-hint">Probá con:</p>
       <ul className="starters">
         {STARTERS.map((s) => (
