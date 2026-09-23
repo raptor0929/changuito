@@ -14,7 +14,12 @@ const config: NextConfig = {
   // output, published from src/ with no dist — see scripts/fixup-bindings.mjs.
   // They are TypeScript, so they must be compiled here rather than treated as
   // ready-made node modules.
-  transpilePackages: ['@changuito/mcp', '@changuito/escrow-bindings', '@changuito/usdc-bindings'],
+  transpilePackages: [
+    '@changuito/mcp',
+    '@changuito/escrow-bindings',
+    '@changuito/usdc-bindings',
+    '@changuito/trust',
+  ],
 
   outputFileTracingRoot: new URL('../..', import.meta.url).pathname,
 

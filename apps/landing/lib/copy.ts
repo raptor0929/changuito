@@ -104,23 +104,15 @@ export const BOFU = {
   lead: 'Changuito compara productos, arma el carrito y te deja listo para pagar.',
 } as const;
 
+/**
+ * Legal note and site label. The year, the registered mark, and the
+ * founder names are not here: they live in `@changuito/trust` and render
+ * once through `FounderTrust`, so a second copyright line cannot stack.
+ */
 export const FOOTER = {
   legal: 'Changuito te ayuda a armar el súper. No es un supermercado.',
-  copyright: '© 2026 Changuito',
   siteLabel: 'www.changuito.me',
 } as const;
-
-/**
- * Personal attribution for an early product. Not a registered company
- * and not a job title. Link text is the visible label, so the accessible
- * name matches the screen.
- */
-export const FOUNDERS = [
-  { name: 'SimonethG', href: 'https://www.linkedin.com/in/simonethg/' },
-  { name: 'Fabio', href: 'https://www.linkedin.com/in/fabio-laura-yavi/' },
-] as const;
-
-export const FOUNDER_TRUST = `Hecho en 🇦🇷 por ${FOUNDERS[0].name} y ${FOUNDERS[1].name}.`;
 
 /** Public social profiles. Keep labels short; aria-labels carry the brand. */
 export const SOCIAL = [

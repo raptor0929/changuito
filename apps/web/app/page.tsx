@@ -1,3 +1,4 @@
+import { FounderTrust } from '@changuito/trust/ui';
 import { Chat } from '../components/Chat';
 import { HumanGate } from '../components/HumanGate';
 import { WalletProvider } from '../components/WalletProvider';
@@ -44,6 +45,9 @@ export default function Home() {
         <HumanGate siteKey={siteKey}>
           <Chat />
         </HumanGate>
+        <footer className="app-footer">
+          <FounderTrust />
+        </footer>
       </main>
     </WalletProvider>
   );

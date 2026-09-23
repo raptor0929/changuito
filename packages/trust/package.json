@@ -1,0 +1,17 @@
+{
+  "name": "@changuito/trust",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared footer trust copy for the landing and the shopper. Year, registered mark, and founder names live here so the pages cannot drift.",
+  "exports": {
+    ".": "./src/copy.ts",
+    "./ui": "./src/founder-trust.tsx"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test src/copy.test.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

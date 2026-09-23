@@ -6,6 +6,12 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+  COPYRIGHT_LINE,
+  FOUNDER_SENTENCE,
+  FOUNDERS,
+  TRUST_LINE,
+} from '../../../../packages/trust/src/copy.ts';
+import {
   APP_URL,
   BENEFITS,
   BENEFITS_TITLE,
@@ -13,8 +19,6 @@ import {
   DESCRIPTION,
   FAQ,
   FOOTER,
-  FOUNDER_TRUST,
-  FOUNDERS,
   HERO,
   NO_CHARGE,
   PAYMENTS,
@@ -100,7 +104,8 @@ test('landing copy stays free of jargon and a refund promise', () => {
     FAQ,
     BOFU,
     FOOTER,
-    FOUNDER_TRUST,
+    TRUST_LINE,
+    FOUNDER_SENTENCE,
     FOUNDERS,
     SOCIAL,
     DESCRIPTION,
@@ -216,44 +221,38 @@ test('source does not reintroduce the refund line or a tiled pattern', () => {
   assert.deepEqual(hits, []);
 });
 
-test('founder trust copy is the chosen line, linked from the fine print', () => {
-  assert.equal(FOUNDER_TRUST, 'Hecho en 🇦🇷 por SimonethG y Fabio.');
-  assert.equal(FOUNDER_TRUST.includes('\u2014'), false);
-  assert.equal(FOUNDER_TRUST.includes('\u2013'), false);
-  assert.deepEqual(
-    FOUNDERS.map((person) => ({ name: person.name, href: person.href })),
-    [
-      { name: 'SimonethG', href: 'https://www.linkedin.com/in/simonethg/' },
-      { name: 'Fabio', href: 'https://www.linkedin.com/in/fabio-laura-yavi/' },
-    ],
-  );
-
-  const line = readFileSync(join(root, 'components/trust/founder-line.tsx'), 'utf8');
-  assert.equal(line.includes('Hecho en 🇦🇷 por'), true);
-  assert.equal(line.includes('target="_blank"'), true);
-  assert.equal(line.includes('rel="noopener noreferrer"'), true);
-  assert.equal(line.includes('aria-label'), false);
-  assert.equal(line.includes('Simoneth Gomez'), false);
-  assert.equal(line.includes('Fabio Laura'), false);
+test('founder trust is one shared line, with the mark, and not a second copyright', () => {
+  assert.equal(TRUST_LINE, '© 2026 Changuito\u00AE · Hecho en 🇦🇷 por SimonethG y Fabio.');
+  assert.equal(COPYRIGHT_LINE, '© 2026 Changuito\u00AE');
+  assert.equal(FOUNDER_SENTENCE, 'Hecho en 🇦🇷 por SimonethG y Fabio.');
+  assert.equal('copyright' in FOOTER, false);
 
   const home = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
   const footer = home.slice(home.indexOf('<footer'));
   const legalAt = footer.indexOf('{FOOTER.legal}');
-  const trustAt = footer.indexOf('<FounderLine');
-  const copyAt = footer.indexOf('{FOOTER.copyright}');
+  const trustAt = footer.indexOf('<FounderTrust');
   const navClose = footer.indexOf('</nav>');
   assert.ok(navClose !== -1 && navClose < legalAt);
-  assert.ok(legalAt !== -1 && legalAt < trustAt && trustAt < copyAt);
-  assert.equal(footer.slice(0, navClose).includes('FounderLine'), false);
+  assert.ok(legalAt !== -1 && legalAt < trustAt);
+  assert.equal(footer.includes('FOOTER.copyright'), false);
+  assert.equal(footer.includes('©'), false);
+  assert.equal(footer.slice(0, navClose).includes('FounderTrust'), false);
+  assert.equal(footer.split('FounderTrust').length - 1, 1);
 
   const whitelist = readFileSync(join(root, 'app/whitelist/page.tsx'), 'utf8');
   const cardAt = whitelist.indexOf('styles.card');
-  const whitelistTrust = whitelist.indexOf('<FounderLine');
+  const whitelistTrust = whitelist.indexOf('<FounderTrust');
   const mainClose = whitelist.indexOf('</main>');
   assert.ok(cardAt !== -1 && cardAt < whitelistTrust && whitelistTrust < mainClose);
+  assert.equal(whitelist.split('FounderTrust').length - 1, 2);
 
   const bug = readFileSync(join(root, 'app/reportarbug/page.tsx'), 'utf8');
   const panel = readFileSync(join(root, 'components/bug-report/bug-report-panel.tsx'), 'utf8');
-  assert.equal(bug.includes('FounderLine'), false);
-  assert.equal(panel.includes('FounderLine'), false);
+  const bugCss = readFileSync(join(root, 'components/bug-report/bug-report.module.css'), 'utf8');
+  const viewport = readFileSync(join(root, 'components/bug-report/bug-report-viewport.tsx'), 'utf8');
+  assert.equal(panel.includes('FounderTrust'), false);
+  assert.equal(bug.split('FounderTrust').length - 1, 2);
+  assert.match(bugCss, /data-keyboard='open'/);
+  assert.match(viewport, /dataset\.keyboard = 'open'/);
+  assert.equal(existsSync(join(root, 'components/trust/founder-line.tsx')), false);
 });
