@@ -7,11 +7,23 @@
   --paper: #fafaf7;
   --line: rgba(42, 26, 20, 0.14);
   --error: #6b2b22;
-  min-height: 100dvh;
+  /* Pinned to the visual viewport (WhitelistViewport). Resting content is
+     sized to fit this band, so the page does not scroll until the keyboard
+     shrinks it. The document itself does not scroll. */
+  position: fixed;
+  top: var(--vv-top, 0px);
+  right: 0;
+  left: 0;
+  height: var(--vvh, 100svh);
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--paper);
   color: var(--ink);
-  font-size: 1.0625rem;
-  line-height: 1.5;
+  font-size: 0.9375rem;
+  line-height: 1.3;
 }
 
 .page ::selection {
@@ -30,132 +42,205 @@
 
 .skip {
   position: absolute;
-  left: 16px;
-  top: 12px;
   z-index: 40;
-  transform: translateY(-160%);
   background: var(--sun);
   color: var(--ink);
   font-weight: 700;
   text-decoration: none;
-  padding: 12px 16px;
   border-radius: 999px;
-  min-height: 44px;
+  /* Off-screen until focused, without translate or filter. Those promote a
+     compositing layer, and iOS Safari then anchors the autofill bar to that
+     layer instead of to the top of the keyboard. */
+  clip: rect(0, 0, 0, 0);
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
 }
 
 .skip:focus {
-  transform: none;
+  left: 16px;
+  top: 12px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 12px 16px;
+  min-height: 44px;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
 }
 
 .header {
+  flex: none;
   border-bottom: 1px solid rgba(42, 26, 20, 0.08);
 }
 
 .headerInner {
   max-width: 40rem;
   margin: 0 auto;
-  padding: 16px 20px;
+  padding: 2px 12px;
 }
 
 .brandLink {
   display: inline-flex;
   align-items: center;
-  gap: 16px;
-  min-height: 48px;
+  gap: 8px;
+  min-height: 44px;
   min-width: 44px;
   color: var(--ink);
   text-decoration: none;
 }
 
 .mark {
-  height: 72px;
+  height: 48px;
   width: auto;
 }
 
 .wordmark {
-  height: 40px;
+  height: 26px;
   width: auto;
 }
 
 .main {
+  /* Grow into leftover viewport space when the form is short, and refuse to
+     shrink below its content so a taller form scrolls the page instead of
+     clipping the submit button. */
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
   max-width: 40rem;
   margin: 0 auto;
-  padding: 28px 20px 64px;
+  padding: 4px 12px 2px;
+  box-sizing: border-box;
 }
 
-/* Same quiet weight as the home footer .fine. Sits under the form card. */
+/* Trust line under the card. Sinks to the bottom of a short page. Drops out
+   while the keyboard is open so the fields keep the visible band. */
 .fine {
-  max-width: 1120px;
-  margin: 28px auto 0;
+  flex: none;
+  width: 100%;
+  margin-top: auto;
+  padding-top: 6px;
+  padding-bottom: max(2px, env(safe-area-inset-bottom));
   color: var(--ink-soft);
-  font-size: 0.875rem;
-  line-height: 1.5;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+:global(:root[data-keyboard='open']) .fine {
+  display: none;
 }
 
 .card {
-  margin-top: 20px;
+  margin-top: 6px;
   /* Focus ring is 3px outline + 3px offset. Keep this padding larger than
      that so a later overflow clip cannot shear the stroke. */
-  padding: 20px 16px 24px;
+  padding: 8px 10px;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 16px;
   background: var(--paper);
 }
 
 .title {
   margin: 0;
-  font-size: 2rem;
+  font-size: 1.0625rem;
   line-height: 1.15;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 .availability {
-  margin: 12px 0 0;
+  margin: 2px 0 0;
   color: var(--ink);
-  font-size: 1.125rem;
+  font-size: 0.8125rem;
   font-weight: 700;
+  line-height: 1.2;
 }
 
 .lead {
-  margin: 8px 0 0;
+  margin: 2px 0 0;
   color: var(--ink-soft);
-  font-size: 1.125rem;
+  font-size: 0.8125rem;
+  line-height: 1.25;
 }
 
 .form {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px 8px;
   margin: 0;
+}
+
+.field,
+.fieldset,
+.turnstile,
+.submit,
+.formError,
+.other {
+  grid-column: 1 / -1;
+}
+
+.fieldName,
+.fieldEmail {
+  grid-column: auto;
+  min-width: 0;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
+}
+
+.fieldWhatsapp {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 8px;
+  row-gap: 2px;
+  align-items: baseline;
+}
+
+.fieldWhatsapp .control,
+.fieldWhatsapp .fieldError {
+  grid-column: 1 / -1;
 }
 
 .label {
+  font-size: 0.8125rem;
   font-weight: 700;
+  line-height: 1.15;
 }
 
 .hint {
   margin: 0;
   color: var(--ink-soft);
-  font-size: 0.95rem;
+  font-size: 0.75rem;
+  line-height: 1.2;
 }
 
 .control {
   width: 100%;
-  min-height: 48px;
+  min-height: 44px;
   /* Same inset as the bug report fields: letters clear the border and the
-     focus ring, and the padding sits on the control itself. */
+     focus ring, and the padding sits on the control itself. 1rem keeps iOS
+     from zooming the field on focus. */
   padding: 14px 20px;
   border: 2px solid rgba(42, 26, 20, 0.28);
   border-radius: 12px;
   background: #fff;
   color: var(--ink);
   font: inherit;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.control::placeholder {
+  color: var(--ink-soft);
+  opacity: 1;
 }
 
 select.control {
@@ -174,13 +259,14 @@ select.control {
 .fieldError {
   margin: 0;
   color: var(--error);
-  font-size: 0.95rem;
+  font-size: 0.75rem;
   font-weight: 600;
+  line-height: 1.25;
 }
 
 .formError {
   margin: 0;
-  padding: 12px 14px;
+  padding: 8px 10px;
   border-radius: 12px;
   background: rgba(107, 43, 34, 0.08);
   color: var(--error);
@@ -192,9 +278,8 @@ select.control {
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 48px;
-  margin-top: 4px;
-  padding: 12px 22px;
+  min-height: 44px;
+  padding: 8px 22px;
   border: 2px solid transparent;
   border-radius: 999px;
   background: var(--sun);
@@ -225,15 +310,15 @@ select.control {
 
 .successTitle {
   margin: 0;
-  font-size: 1.75rem;
+  font-size: 1.375rem;
   line-height: 1.2;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 .successLead {
-  margin: 12px 0 0;
+  margin: 8px 0 0;
   color: var(--ink-soft);
-  font-size: 1.125rem;
+  font-size: 0.9375rem;
 }
 
 .honeypot {
@@ -256,10 +341,16 @@ select.control {
   margin: 0;
   padding: 0;
   border: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
   min-width: 0;
+}
+
+.fieldset .label {
+  margin: 0;
+  padding: 0;
 }
 
 .fieldset[aria-invalid='true'] .radio {
@@ -270,17 +361,18 @@ select.control {
 .radioRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 20px;
+  gap: 4px 12px;
 }
 
 .radio {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-height: 44px;
   min-width: 44px;
-  padding: 4px 2px;
+  padding: 2px;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -304,19 +396,55 @@ select.control {
     padding-right: 24px;
   }
 
+  .fieldSource,
+  .fieldWhatsapp {
+    grid-column: auto;
+    min-width: 0;
+  }
+}
+
+@media (min-width: 720px) and (min-height: 860px) {
+  .headerInner {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
   .mark {
-    height: 88px;
+    height: 64px;
   }
 
   .wordmark {
-    height: 48px;
+    height: 34px;
   }
 
-  .card {
-    padding: 28px 28px 32px;
+  .main {
+    padding-top: 10px;
+    padding-bottom: 8px;
   }
 
   .title {
-    font-size: 2.5rem;
+    font-size: 1.5rem;
+  }
+
+  .availability,
+  .lead {
+    font-size: 1rem;
+  }
+
+  .lead {
+    margin-top: 4px;
+  }
+
+  .card {
+    margin-top: 8px;
+    padding: 12px 16px;
+  }
+
+  .form {
+    gap: 8px 12px;
+  }
+
+  .fine {
+    font-size: 0.8125rem;
   }
 }

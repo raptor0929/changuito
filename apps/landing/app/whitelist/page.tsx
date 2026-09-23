@@ -1,11 +1,20 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import Image from 'next/image';
 
 import { FounderTrust } from '@changuito/trust/ui';
 import { JsonLd } from '../../components/seo/json-ld';
 import { WaitlistForm } from '../../components/waitlist/waitlist-form';
+import { WhitelistViewport } from '../../components/waitlist/whitelist-viewport';
 import styles from '../../components/waitlist/waitlist.module.css';
 import { pageMetadata, publicPage, subpageJsonLd } from '../../lib/seo';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  // Chrome shrinks the layout viewport with the keyboard. iOS Safari
+  // ignores this; the form scrolls the focused field itself.
+  interactiveWidget: 'resizes-content',
+};
 
 const page = publicPage('/whitelist');
 
@@ -28,6 +37,7 @@ export default async function WhitelistPage({
 
   return (
     <div className={styles.page} data-testid="whitelist-screen">
+      <WhitelistViewport />
       <JsonLd data={subpageJsonLd(page)} />
       <a className={styles.skip} href="#lista">
         Saltar al formulario

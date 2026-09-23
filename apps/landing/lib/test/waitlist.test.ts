@@ -97,6 +97,36 @@ test('waitlist fields use the same inset as the bug report controls', () => {
   assert.equal(css.includes('\u2013'), false);
 });
 
+test('the whitelist page fits the visual viewport and hides trust while the keyboard is open', () => {
+  const css = readFileSync(join(root, 'components/waitlist/waitlist.module.css'), 'utf8');
+  const page = readFileSync(join(root, 'app/whitelist/page.tsx'), 'utf8');
+  const form = readFileSync(join(root, 'components/waitlist/waitlist-form.tsx'), 'utf8');
+  const viewport = readFileSync(join(root, 'components/waitlist/whitelist-viewport.tsx'), 'utf8');
+  const globals = readFileSync(join(root, 'app/globals.css'), 'utf8');
+
+  assert.equal(/\btransform\s*:/.test(css), false);
+  assert.equal(/\bfilter\s*:/.test(css), false);
+  assert.equal(/\bperspective\s*:/.test(css), false);
+  assert.equal(/\bwill-change\s*:/.test(css), false);
+  assert.equal(css.includes('100dvh'), false);
+  assert.equal(css.includes('100vh'), false);
+  assert.match(css, /position:\s*fixed/);
+  assert.match(css, /top:\s*var\(--vv-top, 0px\)/);
+  assert.match(css, /height:\s*var\(--vvh, 100svh\)/);
+  assert.match(css, /overflow-y:\s*auto/);
+  assert.match(css, /data-keyboard='open'/);
+  assert.match(page, /interactiveWidget:\s*'resizes-content'/);
+  assert.match(page, /WhitelistViewport/);
+  assert.match(viewport, /dataset\.keyboard = 'open'/);
+  assert.match(form, /scrollDeltaToClear/);
+  assert.match(form, /whitelist-screen/);
+  assert.match(globals, /html:has\(\[data-testid='whitelist-screen'\]\) body/);
+  assert.equal(css.includes('\u2014'), false);
+  assert.equal(css.includes('\u2013'), false);
+  assert.equal(viewport.includes('\u2014'), false);
+  assert.equal(viewport.includes('\u2013'), false);
+});
+
 test('the waitlist form asks for a required WhatsApp and the beta group', () => {
   const form = readFileSync(join(root, 'components/waitlist/waitlist-form.tsx'), 'utf8');
   const page = readFileSync(join(root, 'app/whitelist/page.tsx'), 'utf8');
