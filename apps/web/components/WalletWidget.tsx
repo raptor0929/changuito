@@ -4,6 +4,7 @@ import { usePollar } from '@pollar/react';
 import { useEffect, useState } from 'react';
 
 import { pollarEnabled, shortAddress } from '../lib/pollar.ts';
+import { ensureUserCookie, forgetUserCookie } from '../lib/session-login.ts';
 import { useBalances } from '../lib/use-balances.ts';
 
 /**
@@ -34,17 +35,12 @@ function ConnectedWallet() {
   const [funding, setFunding] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
-  // After Pollar login, set httpOnly chg_user so /api/chat skips the guest turn limit.
+  // After Pollar login, set httpOnly chg_user so /api/chat skips the guest turn
+  // limit. Shared with the chat, which awaits the same promise before it
+  // re-sends a message the gate rejected — see lib/session-login.ts.
   useEffect(() => {
     if (!isAuthenticated || !address) return;
-    void fetch('/api/session/login', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ address }),
-    }).catch(() => {
-      /* cookie mint is best-effort; chat still works within free turns */
-    });
+    void ensureUserCookie(address);
   }, [isAuthenticated, address]);
 
 
@@ -125,7 +121,10 @@ function ConnectedWallet() {
           type="button"
           className="btn btn-ghost btn-sm"
           onClick={() => {
-            void fetch('/api/session/logout', { method: 'POST', credentials: 'same-origin' }).finally(() => logout());
+            void fetch('/api/session/logout', { method: 'POST', credentials: 'same-origin' }).finally(() => {
+              forgetUserCookie();
+              logout();
+            });
           }}
         >
           Salir
