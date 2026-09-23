@@ -140,6 +140,7 @@ test('the landing wires analytics without sending form fields', () => {
   const form = readFileSync(join(root, 'components/waitlist/waitlist-form.tsx'), 'utf8');
   const bugForm = readFileSync(join(root, 'components/bug-report/bug-report-form.tsx'), 'utf8');
   const config = readFileSync(join(root, 'next.config.ts'), 'utf8');
+  const csp = readFileSync(join(root, 'lib/csp.ts'), 'utf8');
   const example = readFileSync(join(root, '.env.example'), 'utf8');
 
   assert.match(layout, /AnalyticsScripts/);
@@ -165,7 +166,8 @@ test('the landing wires analytics without sending form fields', () => {
   assert.match(bugForm, /bug_report_success/);
   assert.equal(/track\([^)]*email/.test(form), false);
   assert.equal(/track\([^)]*whatsapp[^G]/.test(form), false);
-  assert.match(config, /analyticsCspSources/);
+  assert.match(config, /landingSecurityHeaders/);
+  assert.match(csp, /analyticsCspSources/);
   assert.match(example, /NEXT_PUBLIC_GA_MEASUREMENT_ID/);
   assert.match(example, /NEXT_PUBLIC_META_PIXEL_ID/);
   assert.match(example, /NEXT_PUBLIC_CLARITY_PROJECT_ID/);
