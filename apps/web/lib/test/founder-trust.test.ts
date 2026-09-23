@@ -26,7 +26,8 @@ test('the shopper footer uses the trust line once', () => {
   const css = readFileSync(join(root, 'app/globals.css'), 'utf8');
   const ui = readFileSync(join(root, 'components/FounderTrust.tsx'), 'utf8');
 
-  assert.equal(page.split('FounderTrust').length - 1, 2);
+  assert.equal(page.split('<FounderTrust').length - 1, 1);
+  assert.match(page, /import \{ FounderTrust \}/);
   assert.match(page, /<footer className="app-footer">/);
   assert.equal(page.includes('©'), false);
   assert.equal(page.includes('app.changuito.me'), false);
