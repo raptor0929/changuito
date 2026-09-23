@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Cart } from '@changuito/mcp/types';
 
 import { STARTERS } from '../lib/agent/prompt';
+import { canRetry, type Block } from '../lib/chat-state';
 
 /** Rotating fun rioplatense prompts for the fat composer box. */
 const COMPOSER_PLACEHOLDERS = [
@@ -15,11 +16,21 @@ const COMPOSER_PLACEHOLDERS = [
   '¿Semana laboral o juntada? Decime cuántos son y qué comen, y armamos el carrito.',
 ];
 
+/** Copy for a message that never left. Rioplatense, short, no jargon. */
+const COPY = {
+  undelivered: 'No se envió',
+  undeliveredLogin: 'No se envió. Iniciá sesión y lo reenviamos',
+  retry: 'Reintentar',
+  retryAria: 'Reintentar enviar este mensaje',
+} as const;
+
 import { LOGIN_CTA, LOGIN_REQUIRED_MESSAGE } from '../lib/login-constants';
 import type { OpenedOrder } from '../lib/order';
 import { pollarEnabled } from '../lib/pollar';
+import { ensureUserCookie } from '../lib/session-login';
 import { useChat } from '../lib/use-chat';
 import { CartCard } from './CartCard';
+import { RetryIcon } from './icons';
 import { OrderPanel } from './OrderPanel';
 import { PaymentModal } from './PaymentModal';
 import { ProductGrid } from './ProductGrid';
@@ -33,18 +44,26 @@ export function Chat() {
 }
 
 function ChatWithPollar() {
-  const { isAuthenticated, openLoginModal } = usePollar();
-  return <ChatCore isAuthenticated={isAuthenticated} openLoginModal={openLoginModal} />;
+  const { isAuthenticated, wallet, openLoginModal } = usePollar();
+  return (
+    <ChatCore
+      isAuthenticated={isAuthenticated}
+      address={isAuthenticated ? (wallet?.address ?? null) : null}
+      openLoginModal={openLoginModal}
+    />
+  );
 }
 
 function ChatCore({
   isAuthenticated = false,
+  address = null,
   openLoginModal,
 }: {
   isAuthenticated?: boolean;
+  address?: string | null;
   openLoginModal?: () => void;
 }) {
-  const { state, send, stop, loginRequired, clearLoginRequired } = useChat();
+  const { state, send, retry, stop, loginRequired, clearLoginRequired } = useChat();
   const [draft, setDraft] = useState('');
   const [placeholderIdx] = useState(() => Math.floor(Math.random() * COMPOSER_PLACEHOLDERS.length));
   // The basket the payment modal is open over. A cart, not a block id: the
@@ -79,12 +98,45 @@ function ChatCore({
     if (!state.streaming && !loginRequired) composer.current?.focus();
   }, [state.streaming, loginRequired]);
 
-  // After Pollar login (+ /api/session/login cookie), lift the UI gate.
+  /** True once the server has the cookie, not merely once Pollar says hello. */
+  const [sessionReady, setSessionReady] = useState(false);
+
+  // After Pollar login, lift the UI gate — but the cookie is what /api/chat
+  // actually reads, and minting it is a round trip. Lifting on isAuthenticated
+  // alone let the next POST race the cookie, which is the same "the screen is
+  // ahead of the server" shape this whole change exists to remove. Keyed on
+  // the address because `wallet` can still be null when the flag flips.
   useEffect(() => {
-    if (isAuthenticated && loginRequired) clearLoginRequired();
-  }, [isAuthenticated, loginRequired, clearLoginRequired]);
+    if (!isAuthenticated || !address) return;
+    let live = true;
+    void ensureUserCookie(address).then((ok) => {
+      if (!live) return;
+      // Free the composer either way — a dead composer is worse than a second
+      // gate. But only resume on our own when the session is really there.
+      clearLoginRequired();
+      if (ok) setSessionReady(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [isAuthenticated, address, clearLoginRequired]);
 
   const gated = loginRequired && !isAuthenticated;
+
+  const last = state.blocks.at(-1);
+  const undelivered = !state.streaming && last?.kind === 'user' && last.failed ? last : null;
+
+  // The message the gate rejected goes on its own once the user is through it.
+  // Once per message id: a second refusal re-marks the same block, and this
+  // ref is what stops that becoming a loop against the network. The manual
+  // button is still there when it does.
+  const resumed = useRef<string | null>(null);
+  useEffect(() => {
+    if (!sessionReady || !undelivered || undelivered.failed?.reason !== 'login') return;
+    if (resumed.current === undelivered.id) return;
+    resumed.current = undelivered.id;
+    void retry(undelivered.id, undelivered.text);
+  }, [sessionReady, undelivered, retry]);
 
   const submit = (text: string) => {
     if (state.streaming || gated) return;
@@ -111,9 +163,12 @@ function ChatCore({
           switch (b.kind) {
             case 'user':
               return (
-                <p key={b.id} className="bubble is-user">
-                  {b.text}
-                </p>
+                <UserBubble
+                  key={b.id}
+                  block={b}
+                  canRetry={canRetry(state, b.id)}
+                  onRetry={retry}
+                />
               );
             case 'say':
               return (
@@ -239,6 +294,47 @@ function ChatCore({
           onClose={() => setPaying(null)}
           onOpened={setOrder}
         />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The user's own message, and whether it got there.
+ *
+ * The wrapper is present in both states so the bubble does not jump when the
+ * mark clears on a retry.
+ */
+export function UserBubble({
+  block,
+  canRetry: retryable,
+  onRetry,
+}: {
+  block: Extract<Block, { kind: 'user' }>;
+  canRetry: boolean;
+  onRetry: (id: string, text: string) => void;
+}) {
+  return (
+    <div className="msg-user">
+      <p className={block.failed ? 'bubble is-user is-undelivered' : 'bubble is-user'}>{block.text}</p>
+      {block.failed ? (
+        <div className="msg-failed">
+          <span className="msg-failed-note" role="alert">
+            {block.failed.reason === 'login' ? COPY.undeliveredLogin : COPY.undelivered}
+          </span>
+          {retryable ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm msg-retry"
+              data-testid="message-retry"
+              aria-label={COPY.retryAria}
+              onClick={() => onRetry(block.id, block.text)}
+            >
+              <RetryIcon />
+              {COPY.retry}
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
