@@ -115,22 +115,59 @@ function ConnectedWallet() {
       {note && <p className="wallet-note">{note}</p>}
 
       <div className="wallet-actions">
-        <button type="button" className="btn btn-sm" onClick={() => void fund()} disabled={funding}>
+        <button
+          type="button"
+          className="btn btn-sm"
+          data-testid="wallet-fund"
+          onClick={() => void fund()}
+          disabled={funding}
+        >
           {funding ? 'Cargando…' : 'Cargar USDC'}
         </button>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={refresh} disabled={loading}>
-          Actualizar
+        {/* No visible label: the name is aria-label, and the 44px box is the target. */}
+        <button
+          type="button"
+          className="btn btn-ghost wallet-icon-btn"
+          data-testid="wallet-refresh"
+          onClick={refresh}
+          disabled={loading}
+          aria-label="Actualizar"
+        >
+          <RefreshIcon />
         </button>
         <button
           type="button"
-          className="btn btn-ghost btn-sm"
+          className="btn btn-ghost wallet-icon-btn"
+          data-testid="wallet-logout"
+          aria-label="Salir"
           onClick={() => {
             void fetch('/api/session/logout', { method: 'POST', credentials: 'same-origin' }).finally(() => logout());
           }}
         >
-          Salir
+          <LogoutIcon />
         </button>
       </div>
     </div>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg className="wallet-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+      <path d="M16 16h5v5" />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg className="wallet-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
   );
 }
