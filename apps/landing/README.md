@@ -32,7 +32,13 @@ En el proyecto de Vercel de **landing**, Production (y Preview si se prueba el a
 - `WAITLIST_WEBHOOK_URL`
 - `WAITLIST_WEBHOOK_SECRET`
 
-`NEXT_PUBLIC_TURNSTILE_SITE_KEY` entra en el bundle del cliente: un valor vacío deja el formulario sin widget. Las otras tres son de servidor. Un cambio de env se aplica en el próximo deploy.
+Analytics es opcional y gratis. Si estas variables quedan vacías, la landing no carga gtag, Meta Pixel ni Clarity. Setealas en **Production** del proyecto de Vercel de la landing. Preview y local pueden quedar sin ellas.
+
+- `NEXT_PUBLIC_GA_MEASUREMENT_ID` (GA4, forma `G-XXXX`)
+- `NEXT_PUBLIC_META_PIXEL_ID` (numérico)
+- `NEXT_PUBLIC_CLARITY_PROJECT_ID`
+
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY` entra en el bundle del cliente: un valor vacío deja el formulario sin widget. `TURNSTILE_SECRET_KEY`, `WAITLIST_WEBHOOK_URL` y `WAITLIST_WEBHOOK_SECRET` son de servidor. Los tres ids de analytics también son públicos y, vacíos, no cargan scripts. Un cambio de env se aplica en el próximo deploy.
 
 Elegí **uno** de estos destinos. Si están los dos, Redis es el registro y el webhook recibe una copia. El alta en vivo va a Apps Script, así que las dos variables del webhook hacen falta.
 

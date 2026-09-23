@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import Image from 'next/image';
 
 import { FounderTrust } from '@changuito/trust/ui';
+import { AnalyticsView } from '../../components/analytics/analytics-view';
 import { JsonLd } from '../../components/seo/json-ld';
 import { WaitlistForm } from '../../components/waitlist/waitlist-form';
 import { WhitelistViewport } from '../../components/waitlist/whitelist-viewport';
@@ -38,6 +39,8 @@ export default async function WhitelistPage({
 
   return (
     <div className={styles.page} data-testid="whitelist-screen">
+      <AnalyticsView event="whitelist_view" />
+      {listed ? <AnalyticsView event="whitelist_submit_success" /> : null}
       <WhitelistViewport />
       <JsonLd data={subpageJsonLd(page)} />
       <a className={styles.skip} href="#lista">

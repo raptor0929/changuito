@@ -1,5 +1,7 @@
 import type { NextConfig } from 'next';
 
+import { analyticsCspSources } from './lib/analytics.ts';
+
 /**
  * Static CSP, not a per-request nonce.
  *
@@ -11,13 +13,17 @@ import type { NextConfig } from 'next';
  */
 function securityHeaders(): { key: string; value: string }[] {
   const isProd = process.env.NODE_ENV === 'production';
+  const vendors = analyticsCspSources();
+  const scriptVendors = vendors.script.length ? ` ${vendors.script.join(' ')}` : '';
+  const connectVendors = vendors.connect.length ? ` ${vendors.connect.join(' ')}` : '';
+  const imgVendors = vendors.img.length ? ` ${vendors.img.join(' ')}` : '';
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isProd ? '' : " 'unsafe-eval'"}`,
+    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isProd ? '' : " 'unsafe-eval'"}${scriptVendors}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
+    `img-src 'self' data:${imgVendors}`,
     "font-src 'self'",
-    `connect-src 'self'${isProd ? '' : ' ws: wss:'}`,
+    `connect-src 'self'${isProd ? '' : ' ws: wss:'}${connectVendors}`,
     "frame-src 'none'",
     "frame-ancestors 'none'",
     "base-uri 'self'",

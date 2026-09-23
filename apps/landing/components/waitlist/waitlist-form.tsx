@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 
 import { ACCESSORY_PX, keyboardInset, scrollDeltaToClear } from '../../lib/bug-report/keyboard-inset.ts';
+import { track } from '../../lib/analytics.ts';
 import { firstFieldMessage, SERVER_ERROR, TURNSTILE_MISSING } from '../../lib/waitlist/messages.ts';
 import { OTHER_SOURCE, SOURCE_GROUPS } from '../../lib/waitlist/options.ts';
 import { validateWaitlist, type FieldErrors } from '../../lib/waitlist/validate.ts';
@@ -170,9 +171,11 @@ export function WaitlistForm({ notice }: { notice?: string }) {
     const fieldErrors: FieldErrors = checked.ok ? {} : { ...checked.errors };
     if (SITE_KEY && !turnstileToken) fieldErrors.turnstile = TURNSTILE_MISSING;
     if (Object.keys(fieldErrors).length > 0) {
+      track('whitelist_submit_error', { error_type: 'field' });
       setErrors(fieldErrors);
       return;
     }
+    track('whitelist_submit_attempt');
     setPending(true);
     try {
       const response = await fetch('/api/whitelist', {
@@ -191,6 +194,7 @@ export function WaitlistForm({ notice }: { notice?: string }) {
       });
       const payload = (await response.json()) as { ok?: boolean; errors?: FieldErrors };
       if (payload.ok) {
+        track('whitelist_submit_success');
         setErrors({});
         setDone(true);
         return;
@@ -198,9 +202,11 @@ export function WaitlistForm({ notice }: { notice?: string }) {
       const returned = payload.errors;
       const named = returned ? firstFieldMessage(returned) : undefined;
       const next = named || returned?.form ? (returned ?? { form: SERVER_ERROR }) : { form: SERVER_ERROR };
+      track('whitelist_submit_error', { error_type: named ? 'field' : 'server' });
       setErrors(next);
       if (next.form === SERVER_ERROR || next.turnstile) resetTurnstile();
     } catch {
+      track('whitelist_submit_error', { error_type: 'server' });
       setErrors({ form: SERVER_ERROR });
       resetTurnstile();
     } finally {
@@ -415,7 +421,10 @@ export function WaitlistForm({ notice }: { notice?: string }) {
               value="si"
               checked={whatsappGroup === 'si'}
               data-testid="whitelist-whatsapp-group-si"
-              onChange={() => setWhatsappGroup('si')}
+              onChange={() => {
+                setWhatsappGroup('si');
+                track('whitelist_group_optin', { value: 'yes' });
+              }}
               required
             />
             Sí
@@ -427,7 +436,10 @@ export function WaitlistForm({ notice }: { notice?: string }) {
               value="no"
               checked={whatsappGroup === 'no'}
               data-testid="whitelist-whatsapp-group-no"
-              onChange={() => setWhatsappGroup('no')}
+              onChange={() => {
+                setWhatsappGroup('no');
+                track('whitelist_group_optin', { value: 'no' });
+              }}
               required
             />
             No

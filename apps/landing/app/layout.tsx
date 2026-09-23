@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 
+import { AnalyticsListener } from '../components/analytics/analytics-listener';
+import { AnalyticsScripts } from '../components/analytics/analytics-scripts';
 import { SITE_URL } from '../lib/copy';
 import {
   HOME_DESCRIPTION,
@@ -49,7 +51,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es-AR" className={inter.variable}>
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <AnalyticsScripts />
+        <AnalyticsListener />
+        {children}
+      </body>
     </html>
   );
 }
