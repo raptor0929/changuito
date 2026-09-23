@@ -62,4 +62,18 @@ describe('ensureUserCookie', () => {
     await ensureUserCookie(ADDRESS);
     assert.equal(calls.length, 2);
   });
+
+  it('force remints after a remembered success', async () => {
+    const calls = stubFetch(ok);
+    await ensureUserCookie(ADDRESS);
+    assert.equal(await ensureUserCookie(ADDRESS, { force: true }), true);
+    assert.equal(calls.length, 2);
+  });
+
+  it('force waits on the in-flight mint instead of firing a second one', async () => {
+    const calls = stubFetch(ok);
+    const [a, b] = await Promise.all([ensureUserCookie(ADDRESS), ensureUserCookie(ADDRESS, { force: true })]);
+    assert.deepEqual([a, b], [true, true]);
+    assert.equal(calls.length, 1);
+  });
 });

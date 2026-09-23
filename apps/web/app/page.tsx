@@ -1,4 +1,5 @@
 import { Chat } from '../components/Chat';
+import { FounderTrust } from '../components/FounderTrust';
 import { HumanGate } from '../components/HumanGate';
 import { WalletProvider } from '../components/WalletProvider';
 import { WalletWidget } from '../components/WalletWidget';
@@ -44,6 +45,9 @@ export default function Home() {
         <HumanGate siteKey={siteKey}>
           <Chat />
         </HumanGate>
+        <footer className="app-footer">
+          <FounderTrust />
+        </footer>
       </main>
     </WalletProvider>
   );

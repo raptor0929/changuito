@@ -6,7 +6,21 @@ import { useEffect, useRef, useState } from 'react';
 import type { Cart } from '@changuito/mcp/types';
 
 import { STARTERS } from '../lib/agent/prompt';
+import { errorCode, track, trackLoginStart } from '../lib/analytics';
 import { canRetry, type Block } from '../lib/chat-state';
+import { FREE_TURNS, LOGIN_CTA, LOGIN_REQUIRED_MESSAGE, loginGateBannerText } from '../lib/login-constants';
+import type { OpenedOrder } from '../lib/order';
+import { pollarEnabled } from '../lib/pollar';
+import { ensureUserCookie } from '../lib/session-login';
+import { useChat } from '../lib/use-chat';
+import { CartCard } from './CartCard';
+import { RetryIcon } from './icons';
+import { OrderPanel } from './OrderPanel';
+import { PaymentModal } from './PaymentModal';
+import { ProductGrid } from './ProductGrid';
+import { MarkdownText } from './MarkdownText';
+import { ReportBug } from './ReportBug';
+import { ToolTrail } from './ToolTrail';
 
 /** Rotating fun rioplatense prompts for the fat composer box. */
 const COMPOSER_PLACEHOLDERS = [
@@ -24,19 +38,8 @@ const COPY = {
   retryAria: 'Reintentar enviar este mensaje',
 } as const;
 
-import { LOGIN_CTA, LOGIN_REQUIRED_MESSAGE } from '../lib/login-constants';
-import type { OpenedOrder } from '../lib/order';
-import { pollarEnabled } from '../lib/pollar';
-import { ensureUserCookie } from '../lib/session-login';
-import { useChat } from '../lib/use-chat';
-import { CartCard } from './CartCard';
-import { RetryIcon } from './icons';
-import { OrderPanel } from './OrderPanel';
-import { PaymentModal } from './PaymentModal';
-import { ProductGrid } from './ProductGrid';
-import { MarkdownText } from './MarkdownText';
-import { ReportBug } from './ReportBug';
-import { ToolTrail } from './ToolTrail';
+/** Empty-chat intro under the greeting, then starter chips. */
+const GREETING_BODY = 'Changuito te ayuda a armar tus compras en el supermercado.';
 
 export function Chat() {
   // Same split as WalletWidget: usePollar only mounts inside a real provider.
@@ -44,14 +47,9 @@ export function Chat() {
 }
 
 function ChatWithPollar() {
-  const { isAuthenticated, wallet, openLoginModal } = usePollar();
-  return (
-    <ChatCore
-      isAuthenticated={isAuthenticated}
-      address={isAuthenticated ? (wallet?.address ?? null) : null}
-      openLoginModal={openLoginModal}
-    />
-  );
+  const { isAuthenticated, openLoginModal, wallet } = usePollar();
+  const address = isAuthenticated ? (wallet?.address ?? null) : null;
+  return <ChatCore isAuthenticated={isAuthenticated} openLoginModal={openLoginModal} address={address} />;
 }
 
 function ChatCore({
@@ -63,7 +61,7 @@ function ChatCore({
   address?: string | null;
   openLoginModal?: () => void;
 }) {
-  const { state, send, retry, stop, loginRequired, clearLoginRequired } = useChat();
+  const { state, send, retry, stop, loginRequired, clearLoginRequired } = useChat({ isAuthenticated, address });
   const [draft, setDraft] = useState('');
   const [placeholderIdx] = useState(() => Math.floor(Math.random() * COMPOSER_PLACEHOLDERS.length));
   // The basket the payment modal is open over. A cart, not a block id: the
@@ -90,29 +88,29 @@ function ChatCore({
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [state.blocks]);
 
-  // `disabled` blurs the composer the moment a turn starts, and nothing gives
-  // the focus back when it ends — so the obvious thing, typing the next
-  // message, silently goes nowhere. Shopping is a conversation; the cursor
-  // should be waiting where the next sentence goes.
+  // After Pollar login, drop the guest latch and any soft-limit line already
+  // written into the transcript. The banner also keys off isAuthenticated, so
+  // a signed-in shopper never keeps the red gate for this render.
   useEffect(() => {
-    if (!state.streaming && !loginRequired) composer.current?.focus();
-  }, [state.streaming, loginRequired]);
+    if (isAuthenticated) clearLoginRequired();
+  }, [isAuthenticated, clearLoginRequired]);
 
   /** True once the server has the cookie, not merely once Pollar says hello. */
   const [sessionReady, setSessionReady] = useState(false);
 
-  // After Pollar login, lift the UI gate — but the cookie is what /api/chat
-  // actually reads, and minting it is a round trip. Lifting on isAuthenticated
-  // alone let the next POST race the cookie, which is the same "the screen is
-  // ahead of the server" shape this whole change exists to remove. Keyed on
-  // the address because `wallet` can still be null when the flag flips.
+  // The cookie is what /api/chat actually reads, and minting it is a round
+  // trip. The banner can hide as soon as Pollar says the shopper is in, but
+  // re-sending the rejected message has to wait until the mint resolved —
+  // otherwise the retry POSTs into the same 401. Keyed on the address because
+  // `wallet` can still be null when the flag flips.
   useEffect(() => {
-    if (!isAuthenticated || !address) return;
+    if (!isAuthenticated || !address) {
+      setSessionReady(false);
+      return;
+    }
     let live = true;
     void ensureUserCookie(address).then((ok) => {
       if (!live) return;
-      // Free the composer either way — a dead composer is worse than a second
-      // gate. But only resume on our own when the session is really there.
       clearLoginRequired();
       if (ok) setSessionReady(true);
     });
@@ -121,7 +119,20 @@ function ChatCore({
     };
   }, [isAuthenticated, address, clearLoginRequired]);
 
-  const gated = loginRequired && !isAuthenticated;
+  // Guests at the limit. Signed-in shoppers never match, even if the latch is
+  // still true for this render or the free-turn count is already spent.
+  const gateText = loginGateBannerText({ isAuthenticated, loginRequired });
+  const gated = gateText !== null;
+  const loginCopyVisible =
+    loginGateBannerText({ isAuthenticated, loginRequired: true, turnsUsed: FREE_TURNS }) !== null;
+
+  // `disabled` blurs the composer the moment a turn starts, and nothing gives
+  // the focus back when it ends — so the obvious thing, typing the next
+  // message, silently goes nowhere. Shopping is a conversation; the cursor
+  // should be waiting where the next sentence goes.
+  useEffect(() => {
+    if (!state.streaming && !gated) composer.current?.focus();
+  }, [state.streaming, gated]);
 
   const last = state.blocks.at(-1);
   const undelivered = !state.streaming && last?.kind === 'user' && last.failed ? last : null;
@@ -139,10 +150,25 @@ function ChatCore({
   }, [sessionReady, undelivered, retry]);
 
   const submit = (text: string) => {
-    if (state.streaming || gated) return;
+    if (state.streaming || gated || !text.trim()) return;
     setDraft('');
+    track('search_submit');
     void send(text);
   };
+
+  const sawGate = useRef(false);
+  useEffect(() => {
+    if (gated && !sawGate.current) track('search_limit_hit');
+    sawGate.current = gated;
+  }, [gated]);
+
+  const seenError = useRef<string | null>(null);
+  useEffect(() => {
+    const lastError = [...state.blocks].reverse().find((b) => b.kind === 'error');
+    if (!lastError || lastError.kind !== 'error' || seenError.current === lastError.id) return;
+    seenError.current = lastError.id;
+    track('error_shown', { code: errorCode(lastError.message) });
+  }, [state.blocks]);
 
   return (
     // `is-empty` is the hook for the mobile first-screen layout. The class is
@@ -190,12 +216,19 @@ function ChatCore({
                   // button that opens a modal with nothing to sign with.
                   onPay={
                     pollarEnabled
-                      ? (cart) => setPaying({ cart, handoffUrl: b.handoffUrl })
+                      ? (cart) => {
+                          track('payment_start', { flow: 'checkout' });
+                          setPaying({ cart, handoffUrl: b.handoffUrl });
+                        }
                       : undefined
                   }
                 />
               );
             case 'error':
+              // The soft-limit line is guest copy. Once the shopper is signed
+              // in it is not an error, and leaving it in the thread reads as
+              // the gate still being shut.
+              if (b.message === LOGIN_REQUIRED_MESSAGE && !loginCopyVisible) return null;
               return (
                 <p key={b.id} className="bubble is-error" role="alert">
                   {b.message}
@@ -205,23 +238,33 @@ function ChatCore({
         })}
 
         {state.streaming && state.blocks.at(-1)?.kind === 'user' ? (
-          <p className="bubble is-agent thinking">
+          // Copy first, then the back-and-forth search GIF. The idle PNG is
+          // only the reduced-motion fallback (hidden in CSS until then).
+          <p className="bubble is-agent thinking" data-testid="search-loading">
+            <span>Buscando en el súper…</span>
             <img
-              className="thinking-mascot"
+              className="thinking-mascot thinking-mascot-motion"
+              src="/brand/animacion-busqueda.gif"
+              alt=""
+              aria-hidden="true"
+              width={54}
+              height={36}
+            />
+            <img
+              className="thinking-mascot thinking-mascot-still"
               src="/brand/mascot-idle.png"
               alt=""
               aria-hidden="true"
-              width={40}
-              height={40}
+              width={25}
+              height={36}
             />
-            Buscando en el súper…
           </p>
         ) : null}
         <ReportBug />
       </div>
 
-      {gated ? (
-        <div className="login-gate-banner" role="status">
+      {gated && gateText ? (
+        <div className="login-gate-banner" data-testid="login-gate-banner" role="status">
           <img
             className="login-gate-mascot"
             src="/brand/mascot-idle.png"
@@ -232,10 +275,17 @@ function ChatCore({
           />
           <div className="login-gate-copy">
             <p className="login-gate-title">Para seguir, iniciá sesión</p>
-            <p>{LOGIN_REQUIRED_MESSAGE}</p>
+            <p>{gateText}</p>
           </div>
           {openLoginModal ? (
-            <button type="button" className="btn" onClick={openLoginModal}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                track('login_cta_from_limit');
+                trackLoginStart(openLoginModal);
+              }}
+            >
               {LOGIN_CTA}
             </button>
           ) : (
@@ -340,40 +390,11 @@ export function UserBubble({
   );
 }
 
-/** Onboarding E: timeline of what Changuito does, then starter chips. */
-const GREETING_STEPS = [
-  {
-    title: 'Contame la receta',
-    body: 'Qué querés cocinar y para cuántos.',
-  },
-  {
-    title: 'Armo la lista',
-    body: 'Productos de súpers de Argentina, calculados para vos.',
-  },
-  {
-    title: 'Planeo semana o mes',
-    body: 'Según tus metas nutricionales.',
-  },
-] as const;
-
 function Greeting({ onPick }: { onPick: (text: string) => void }) {
   return (
     <div className="greeting" data-testid="greeting">
       <h2>Hola 👋</h2>
-      <ol className="greeting-timeline" aria-label="Cómo funciona Changuito">
-        {GREETING_STEPS.map((step, i) => (
-          <li key={step.title} className="greeting-timeline-item">
-            <div className="greeting-timeline-rail" aria-hidden="true">
-              <span className="greeting-timeline-dot" />
-              {i < GREETING_STEPS.length - 1 ? <span className="greeting-timeline-line" /> : null}
-            </div>
-            <div className="greeting-timeline-card">
-              <h3>{step.title}</h3>
-              <p>{step.body}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
+      <p className="greeting-body" data-testid="greeting-body">{GREETING_BODY}</p>
       <p className="greeting-hint">Probá con:</p>
       <ul className="starters">
         {STARTERS.map((s) => (

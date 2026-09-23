@@ -160,12 +160,19 @@ a:hover { color: var(--chg-arcilla); }
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  /* overflow-y:auto makes overflow-x compute to non-visible, so a focus ring
-     painted at the content edge is sheared off or opens a sideways scrollbar.
-     The retry button under an undelivered message is the first focusable thing
-     in here and it sits hard right. 8px is the ring plus a pixel — the same
-     figure, for the same reason, as the composer below. */
-  padding: 24px 8px;
+  /* Overlay scrollbars paint on top of this box. `stable` reserves their
+     gutter, and the extra inline-end padding is the gap so a right-aligned
+     espresso bubble — and the retry control under an undelivered message —
+     stays clear of the bar. overflow-y:auto makes overflow-x compute to
+     non-visible, so a focus ring painted at that right edge would be sheared
+     off; 16px covers the ring (the composer uses 8px for the same reason)
+     and the scrollbar gap. Inline-start stays tight so agent copy keeps its
+     left edge. Later padding rules must not use the shorthand: it would zero
+     this end gap. */
+  scrollbar-gutter: stable;
+  padding-block: 24px;
+  padding-inline-start: 2px;
+  padding-inline-end: 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -209,9 +216,24 @@ a:hover { color: var(--chg-arcilla); }
   gap: 8px;
 }
 .thinking-mascot {
-  height: 1.6em;
+  height: 36px;
   width: auto;
+  max-width: 72px;
   display: block;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+/* Search GIF is 480×320. Idle pose is the still stand-in when motion is reduced. */
+.thinking-mascot-still {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinking-mascot-motion {
+    display: none;
+  }
+  .thinking-mascot-still {
+    display: block;
+  }
 }
 .is-error {
   align-self: stretch;
@@ -276,62 +298,6 @@ a:hover { color: var(--chg-arcilla); }
 .greeting p { margin: 0 0 12px; line-height: 1.6; color: var(--muted); }
 .greeting-hint { font-size: 14px; font-weight: 600; color: var(--text); margin: 16px 0 8px; }
 
-.greeting-timeline {
-  list-style: none;
-  margin: 0 0 4px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-.greeting-timeline-item {
-  display: flex;
-  gap: 12px;
-  align-items: stretch;
-}
-.greeting-timeline-rail {
-  width: 22px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 0 0 auto;
-}
-.greeting-timeline-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--chg-sunflower);
-  border: 2px solid var(--chg-espresso);
-  flex: 0 0 auto;
-  margin-top: 14px;
-}
-.greeting-timeline-line {
-  width: 2px;
-  flex: 1;
-  min-height: 16px;
-  background: var(--chg-arcilla);
-  opacity: 0.55;
-  margin: 4px 0 0;
-}
-.greeting-timeline-card {
-  flex: 1;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 12px 14px;
-  margin-bottom: 12px;
-}
-.greeting-timeline-item:last-child .greeting-timeline-card { margin-bottom: 0; }
-.greeting-timeline-card h3 {
-  margin: 0 0 4px;
-  font-size: 15px;
-  color: var(--text);
-}
-.greeting-timeline-card p {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--muted);
-}
 .starters { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .starter {
   width: 100%;
@@ -480,8 +446,9 @@ a:hover { color: var(--chg-arcilla); }
      controls (3px outline + 2px offset on the field, 3px + 3px on Enviar).
      Inline padding keeps that ring, including the left rounded corner, inside
      the clip instead of shearing it off at the content edge. 8px is the ring
-     plus a pixel so antialiasing is not the new clip. */
-  padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
+     plus a pixel so antialiasing is not the new clip.
+     The home-indicator inset lives on .app-footer, under this bar. */
+  padding: 10px 8px;
   margin: 0;
   border-top: 1px solid var(--border);
   background: var(--bg);
@@ -529,7 +496,10 @@ a:hover { color: var(--chg-arcilla); }
   .masthead { flex-direction: column; gap: 8px; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   .wallet { width: 100%; }
-  .thread { padding: 12px 0; }
+  .thread {
+    padding-block: 12px;
+    padding-inline-start: 0;
+  }
   /* A long placeholder must not inflate the bar once a conversation exists. */
   .composer-input {
     min-height: 48px;
@@ -569,7 +539,34 @@ a:hover { color: var(--chg-arcilla); }
 .wallet-warn { color: var(--warn); }
 .wallet-muted { color: var(--muted); }
 .wallet-error { margin: 0; font-size: 12px; color: var(--warn); }
-.wallet-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+/* One row, including at phone width. Icon controls keep a 44px hit box. */
+.wallet-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.wallet-actions .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-height: 44px;
+}
+.wallet-icon-btn {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+}
+.wallet-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .wallet-off { opacity: 0.7; }
 
 .btn-sm { padding: 5px 12px; font-size: 12px; font-weight: 600; min-height: 32px; }
@@ -776,6 +773,45 @@ a:hover { color: var(--chg-arcilla); }
   color: var(--chg-arcilla);
 }
 
+.app-footer {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 2px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+/* Wide: one sentence, copyright first. Narrow: names, then the copyright line. */
+.chg-trust {
+  container-type: inline-size;
+  container-name: chg-trust;
+}
+.chg-trust-line { margin: 0; }
+.chg-trust-link {
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.chg-trust-link:hover { text-decoration-thickness: 2px; }
+.chg-trust-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@container chg-trust (max-width: 36rem) {
+  .chg-trust-line { display: flex; flex-direction: column-reverse; }
+  .chg-trust-sep { display: none; }
+}
+
 /* ------------------------------------------------- empty chat, phone only
    The first screen has to fit a ~390×844 CSS viewport, and a shorter
    ~360×740 one, with the composer on screen and the thread not scrolling.
@@ -847,6 +883,10 @@ a:hover { color: var(--chg-arcilla); }
   }
 
   .shell:has(.chat.is-empty) .thread {
+    /* The first screen is tuned to not scroll. Drop the reserved gutter and
+       the end gap here so starter chips keep their width; both return with
+       the first user bubble, when `.is-empty` is gone. */
+    scrollbar-gutter: auto;
     padding: 6px 0 0;
     gap: 0;
   }
@@ -857,40 +897,10 @@ a:hover { color: var(--chg-arcilla); }
     line-height: 1.15;
   }
 
-  .shell:has(.chat.is-empty) .greeting-timeline-item {
-    gap: 8px;
-  }
-
-  .shell:has(.chat.is-empty) .greeting-timeline-rail {
-    width: 16px;
-  }
-
-  .shell:has(.chat.is-empty) .greeting-timeline-dot {
-    width: 10px;
-    height: 10px;
-    margin-top: 7px;
-  }
-
-  .shell:has(.chat.is-empty) .greeting-timeline-line {
-    min-height: 4px;
-    margin-top: 2px;
-  }
-
-  .shell:has(.chat.is-empty) .greeting-timeline-card {
-    padding: 5px 10px;
-    margin-bottom: 4px;
-    border-radius: 10px;
-  }
-
-  .shell:has(.chat.is-empty) .greeting-timeline-card h3 {
-    margin: 0;
-    font-size: 13px;
-    line-height: 1.25;
-  }
-
-  .shell:has(.chat.is-empty) .greeting-timeline-card p {
-    font-size: 12px;
-    line-height: 1.25;
+  .shell:has(.chat.is-empty) .greeting-body {
+    margin: 0 0 8px;
+    font-size: 14px;
+    line-height: 1.35;
   }
 
   .shell:has(.chat.is-empty) .greeting-hint {
@@ -917,7 +927,7 @@ a:hover { color: var(--chg-arcilla); }
     /* Same ring gutter as .composer. The empty bar used to be 4px on the
        bottom, one pixel short of the field ring, so the lower stroke clipped
        too. 6px clears a 5px ring without giving back the tight first screen. */
-    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    padding: 6px 8px;
     margin: 0;
   }
 
@@ -951,5 +961,11 @@ a:hover { color: var(--chg-arcilla); }
     justify-content: center;
     min-height: 44px;
     padding: 0 8px;
+  }
+
+  .shell:has(.chat.is-empty) .app-footer {
+    padding: 0 8px calc(4px + env(safe-area-inset-bottom, 0px));
+    font-size: 11px;
+    line-height: 1.25;
   }
 }

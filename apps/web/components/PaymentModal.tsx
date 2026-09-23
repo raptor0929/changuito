@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { Cart } from '@changuito/mcp/types';
 
+import { track, trackLoginStart } from '../lib/analytics';
 import type { QuoteResponse } from '../app/api/quote/route.ts';
 import { DEPLOYMENTS } from '../lib/deployments.ts';
 import { basketHash, newOrderId, openArgs, toHex, type OpenedOrder } from '../lib/order.ts';
@@ -55,7 +56,9 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
         setQuote(json as QuoteResponse);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setQuoteError(err instanceof Error ? err.message : String(err));
+        if (cancelled) return;
+        track('payment_fail', { flow: 'checkout', code: 'quote' });
+        setQuoteError(err instanceof Error ? err.message : String(err));
       });
     return () => {
       cancelled = true;
@@ -107,6 +110,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
         );
       }
 
+      track('payment_success', { flow: 'checkout' });
       refresh();
       // The modal's job ends here. What comes next — finishing the basket at
       // the store, then settling — happens on the page, not behind a dialog.
@@ -122,6 +126,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
       });
       onClose();
     } catch (err) {
+      track('payment_fail', { flow: 'checkout', code: 'rejected' });
       setFailure(err instanceof Error ? err.message : String(err));
       setPhase('failed');
     }
@@ -200,7 +205,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
 
         <div className="modal-actions">
           {!address ? (
-            <button type="button" className="btn" onClick={openLoginModal}>
+            <button type="button" className="btn" onClick={() => trackLoginStart(openLoginModal)}>
               Empezá a comprar
             </button>
           ) : (

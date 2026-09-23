@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 
+import { Analytics } from '../components/Analytics';
 import { ViewportLock } from '../components/ViewportLock';
 import './globals.css';
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es-AR" className={inter.variable}>
       <body className={inter.className}>
+        <Analytics />
         <ViewportLock />
         {children}
       </body>

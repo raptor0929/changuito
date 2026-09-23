@@ -179,6 +179,22 @@ export function endTurn(state: ChatState, message?: string): ChatState {
 }
 
 /**
+ * Drop error bubbles whose text is exactly `message`.
+ * Same reference when nothing matches, so a no-op clear does not re-render.
+ */
+export function omitErrorMessage(state: ChatState, message: string): ChatState {
+  let changed = false;
+  const blocks = state.blocks.filter((b) => {
+    if (b.kind === 'error' && b.message === message) {
+      changed = true;
+      return false;
+    }
+    return true;
+  });
+  return changed ? { ...state, blocks } : state;
+}
+
+/**
  * End a turn that failed, telling the truth about how far it got.
  *
  * "Did the server receive this?" has an exact structural answer already in the

@@ -2,11 +2,13 @@
 
 import { useCallback, useRef, useState } from 'react';
 
+import { track } from './analytics';
 import {
   applyEvent,
   endTurn,
   failTurn,
   initialState,
+  omitErrorMessage,
   retryUser,
   sendUser,
   type ChatState,
@@ -15,6 +17,7 @@ import {
 import { notifyHumanRequired, SOLO_HUMANOS } from './human-gate-ui';
 import { LOGIN_REQUIRED, LOGIN_REQUIRED_MESSAGE } from './login-constants';
 import { parseEvents, type ChatRequest } from './protocol';
+import { ensureUserCookie } from './session-login';
 
 /**
  * One turn at a time against /api/chat, decoded from SSE.
@@ -28,7 +31,15 @@ import { parseEvents, type ChatRequest } from './protocol';
  * hits Parar (abort) or the stream ends — spam would otherwise pile up on the
  * local model lane and look like "Ollama is broken".
  */
-export function useChat() {
+export interface UseChatAuth {
+  isAuthenticated?: boolean;
+  /** Stellar address once Pollar has a session. Used to mint `chg_user`. */
+  address?: string | null;
+}
+
+const SESSION_SAVE_FAILED = 'No pude guardar la sesión. Probá de nuevo.';
+
+export function useChat(auth?: UseChatAuth) {
   const [state, setState] = useState<ChatState>(initialState);
   const [loginRequired, setLoginRequired] = useState(false);
   // A ref, not state: the snapshot is read inside the send closure and must be
@@ -38,6 +49,15 @@ export function useChat() {
   const abort = useRef<AbortController | null>(null);
   /** Sync lock — React state alone still lets a double-Enter race a second fetch. */
   const inFlight = useRef(false);
+  // Read at send time so a login that landed this render is visible before the
+  // latch effect has cleared `loginRequired`.
+  const authRef = useRef<UseChatAuth>({});
+  authRef.current = auth ?? {};
+
+  const clearLoginRequired = useCallback(() => {
+    setLoginRequired(false);
+    setState((s) => omitErrorMessage(s, LOGIN_REQUIRED_MESSAGE));
+  }, []);
 
   /**
    * The network half of a turn.
@@ -45,24 +65,33 @@ export function useChat() {
    * Deliberately without the `loginRequired` guard: that guard exists to stop
    * the composer sending into a closed gate, and a retry is the one send that
    * has to get past it. Keeping it in `send` alone means the retry path cannot
-   * be swallowed by a flag that has not been cleared yet.
+   * be swallowed by a flag that has not been cleared yet. The caller owns
+   * `inFlight`.
    */
   const run = useCallback(async (text: string) => {
-    if (inFlight.current) return;
-    inFlight.current = true;
-
     const controller = new AbortController();
     abort.current = controller;
-    try {
+
+    const post = () => {
       const body: ChatRequest = { sessionId: sessionId.current, message: text, snapshot: snapshot.current };
-      const res = await fetch('/api/chat', {
+      return fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream, application/json' },
         body: JSON.stringify(body),
         signal: controller.signal,
         credentials: 'same-origin',
       });
-      if (!res.ok || !res.body) {
+    };
+
+    const stopped = () => {
+      setState((s) => omitErrorMessage(endTurn(s), LOGIN_REQUIRED_MESSAGE));
+    };
+
+    try {
+      let res = await post();
+      let minted = false;
+
+      while (!res.ok || !res.body) {
         // Not a throw: the catch below would then handle this a second time.
         // Nothing was received either way — every one of these checks runs
         // before the route opens an MCP session or writes history — so the
@@ -79,6 +108,32 @@ export function useChat() {
             return;
           }
           if (json.error === LOGIN_REQUIRED) {
+            if (authRef.current.isAuthenticated) {
+              // Pollar can flip before `chg_user` is stored. Mint the cookie
+              // and retry once. Do not latch the guest gate or paint its copy.
+              const address = authRef.current.address;
+              if (controller.signal.aborted) {
+                stopped();
+                return;
+              }
+              if (!minted && address) {
+                minted = true;
+                const ok = await ensureUserCookie(address, { force: true });
+                if (controller.signal.aborted) {
+                  stopped();
+                  return;
+                }
+                if (ok) {
+                  res = await post();
+                  continue;
+                }
+              }
+              track('login_fail', { code: 'session' });
+              setState((s) =>
+                omitErrorMessage(failTurn(s, { reason: 'network', message: SESSION_SAVE_FAILED }), LOGIN_REQUIRED_MESSAGE),
+              );
+              return;
+            }
             setLoginRequired(true);
             reason = 'login';
             message = json.message ?? LOGIN_REQUIRED_MESSAGE;
@@ -119,21 +174,42 @@ export function useChat() {
         return;
       }
       setState((s) => failTurn(s, { reason: 'network', message: err instanceof Error ? err.message : 'Algo falló.' }));
-    } finally {
-      abort.current = null;
-      inFlight.current = false;
     }
   }, []);
 
-  const send = useCallback(async (message: string) => {
-    const text = message.trim();
-    if (!text) return;
-    if (loginRequired) return;
+  const begin = useCallback(
+    async (text: string, prepare: () => void) => {
+      if (inFlight.current) return;
+      inFlight.current = true;
+      if (authRef.current.isAuthenticated) setLoginRequired(false);
+      prepare();
+      try {
+        await run(text);
+      } finally {
+        abort.current = null;
+        inFlight.current = false;
+      }
+    },
+    [run],
+  );
 
-    sessionId.current ||= crypto.randomUUID();
-    setState((s) => (s.streaming ? s : sendUser(s, text)));
-    await run(text);
-  }, [loginRequired, run]);
+  const send = useCallback(
+    async (message: string) => {
+      const text = message.trim();
+      if (!text) return;
+      // The latch blocks guests only. A signed-in shopper keeps sending.
+      if (loginRequired && !authRef.current.isAuthenticated) return;
+
+      sessionId.current ||= crypto.randomUUID();
+      await begin(text, () => {
+        setState((s) => {
+          const base = authRef.current.isAuthenticated ? omitErrorMessage(s, LOGIN_REQUIRED_MESSAGE) : s;
+          return base.streaming ? base : sendUser(base, text);
+        });
+      });
+    },
+    [loginRequired, begin],
+  );
 
   /**
    * Send a message that never reached the server.
@@ -148,18 +224,21 @@ export function useChat() {
    * so the caller has it fresh, and the transcript stays the only record of
    * what was said.
    */
-  const retry = useCallback(async (id: string, text: string) => {
-    setLoginRequired(false);
-    sessionId.current ||= crypto.randomUUID();
-    setState((s) => retryUser(s, id));
-    await run(text);
-  }, [run]);
+  const retry = useCallback(
+    async (id: string, text: string) => {
+      if (inFlight.current) return;
+      setLoginRequired(false);
+      sessionId.current ||= crypto.randomUUID();
+      await begin(text, () => {
+        setState((s) => retryUser(s, id));
+      });
+    },
+    [begin],
+  );
 
   const stop = useCallback(() => {
     abort.current?.abort();
   }, []);
-
-  const clearLoginRequired = useCallback(() => setLoginRequired(false), []);
 
   return { state, send, retry, stop, loginRequired, clearLoginRequired };
 }

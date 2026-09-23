@@ -11,6 +11,8 @@ import {
   guestTurnCounter,
   LOGIN_CTA,
   LOGIN_REQUIRED_MESSAGE,
+  loginGateBannerText,
+  shouldShowLoginGate,
 } from '../login-gate.ts';
 
 describe('login-gate', () => {
@@ -47,6 +49,32 @@ describe('login-gate', () => {
   it('logged-in users skip the counter', () => {
     const v = guestChatVerdict({ loggedIn: true, sessionCount: 99 });
     assert.equal(v.allow, true);
+  });
+
+  it('authenticated shopper sees no login banner even after the free turns', () => {
+    for (const turnsUsed of [FREE_TURNS, 99]) {
+      const banner = loginGateBannerText({ isAuthenticated: true, loginRequired: true, turnsUsed });
+      assert.equal(shouldShowLoginGate({ isAuthenticated: true, loginRequired: true, turnsUsed }), false);
+      assert.equal(banner, null);
+    }
+  });
+
+  it('anonymous shopper still sees the login banner after 3 requests', () => {
+    assert.equal(
+      shouldShowLoginGate({ isAuthenticated: false, loginRequired: false, turnsUsed: FREE_TURNS }),
+      true,
+    );
+    assert.equal(
+      shouldShowLoginGate({ isAuthenticated: false, loginRequired: false, turnsUsed: FREE_TURNS - 1 }),
+      false,
+    );
+    const banner = loginGateBannerText({
+      isAuthenticated: false,
+      loginRequired: true,
+      turnsUsed: FREE_TURNS,
+    });
+    assert.equal(banner, LOGIN_REQUIRED_MESSAGE);
+    assert.match(banner ?? '', /Para seguir, iniciá sesión/);
   });
 
   it('blocks when IP soft ceiling is hit', () => {
