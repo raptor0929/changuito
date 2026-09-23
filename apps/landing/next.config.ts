@@ -48,6 +48,8 @@ function securityHeaders(): { key: string; value: string }[] {
 
 const config: NextConfig = {
   poweredByHeader: false,
+  // Shared footer trust line. Source is TypeScript, compiled with the app.
+  transpilePackages: ['@changuito/trust'],
   // Next 16 blocks the dev HMR socket when the browser host is 127.0.0.1.
   allowedDevOrigins: ['127.0.0.1'],
   // Hoisted workspace deps live at the repo root, not in this package.

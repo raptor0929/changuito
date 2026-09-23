@@ -2,7 +2,7 @@
 
 import { useLayoutEffect } from 'react';
 
-import { shellFrame } from '../../lib/bug-report/keyboard-inset.ts';
+import { keyboardInset, shellFrame } from '../../lib/bug-report/keyboard-inset.ts';
 
 /**
  * Pins /reportarbug to the visual viewport.
@@ -19,9 +19,15 @@ export function BugReportViewport() {
     const vv = window.visualViewport;
 
     const sync = () => {
-      const frame = shellFrame(window.innerHeight, vv?.height ?? window.innerHeight, vv?.offsetTop ?? 0);
+      const layout = window.innerHeight;
+      const visual = vv?.height ?? layout;
+      const frame = shellFrame(layout, visual, vv?.offsetTop ?? 0);
       root.style.setProperty('--vvh', `${frame.height}px`);
       root.style.setProperty('--vv-top', `${frame.top}px`);
+      // The trust line reads this and drops out while the keys are up,
+      // so the form keeps the visible band.
+      if (keyboardInset(layout, visual) > 0) root.dataset.keyboard = 'open';
+      else delete root.dataset.keyboard;
     };
 
     sync();
@@ -35,6 +41,7 @@ export function BugReportViewport() {
       window.removeEventListener('orientationchange', sync);
       root.style.removeProperty('--vvh');
       root.style.removeProperty('--vv-top');
+      delete root.dataset.keyboard;
     };
   }, []);
 
