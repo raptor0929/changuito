@@ -23,7 +23,7 @@ La lista de espera vive en `/whitelist`. No hace falta login de Vercel para merg
 
 ### Variables que el proyecto de Vercel de la landing tiene que tener
 
-El proyecto de `apps/web` (`app.changuito.me`) no comparte env con este. Las keys de Turnstile que ya usa el shopper hay que copiarlas al proyecto de la landing. Si falta alguna, `/whitelist` responde 503: «No pudimos anotarte. Probá de nuevo en un rato.» Producción no saltea el CAPTCHA.
+El proyecto de `apps/web` (`app.changuito.me`) no comparte env con este. Las keys de Turnstile que ya usa el shopper hay que copiarlas al proyecto de la landing. Si falta alguna, `/whitelist` responde 503: «No pudimos anotarte por un problema nuestro. Probá de nuevo en un rato.» Producción no saltea el CAPTCHA.
 
 En el proyecto de Vercel de **landing**, Production (y Preview si se prueba el alta ahí):
 

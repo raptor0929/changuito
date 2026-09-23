@@ -1,8 +1,29 @@
+import {
+  EMAIL_INVALID,
+  EMAIL_MISSING,
+  GROUP_MISSING,
+  NAME_CHARS,
+  NAME_LONG,
+  NAME_MISSING,
+  NAME_SHORT,
+  OTHER_CHARS,
+  OTHER_LONG,
+  OTHER_MISSING,
+  SOURCE_MISSING,
+  WHATSAPP_INVALID,
+} from './messages.ts';
 import { allowedSources, OTHER_SOURCE } from './options.ts';
 
-export type WaitlistField = 'name' | 'email' | 'source' | 'otherDetail' | 'whatsapp' | 'whatsappGroup';
+export type WaitlistField =
+  | 'name'
+  | 'email'
+  | 'source'
+  | 'otherDetail'
+  | 'whatsapp'
+  | 'whatsappGroup'
+  | 'turnstile';
 
-export type FieldErrors = Partial<Record<WaitlistField, string>>;
+export type FieldErrors = Partial<Record<WaitlistField | 'form', string>>;
 
 export type WaitlistEntry = {
   name: string;
@@ -39,30 +60,29 @@ export function validateWaitlist(
   const whatsappRaw = input.whatsapp.replace(/\s+/g, ' ').trim();
   const groupRaw = input.whatsappGroup.trim().toLowerCase();
 
-  if (!name) errors.name = 'Completá tu nombre.';
-  else if (name.length < 2) errors.name = 'El nombre es muy corto.';
-  else if (name.length > 80) errors.name = 'El nombre es muy largo.';
-  else if (!isPersonName(name)) errors.name = 'Usá solo letras en el nombre.';
+  if (!name) errors.name = NAME_MISSING;
+  else if (name.length < 2) errors.name = NAME_SHORT;
+  else if (name.length > 80) errors.name = NAME_LONG;
+  else if (!isPersonName(name)) errors.name = NAME_CHARS;
 
-  if (!email || email.length > 254 || !EMAIL.test(email) || email.includes('..')) {
-    errors.email = 'Ingresá un email válido.';
-  }
+  if (!email) errors.email = EMAIL_MISSING;
+  else if (email.length > 254 || !EMAIL.test(email) || email.includes('..')) errors.email = EMAIL_INVALID;
 
   if (!allowedSources().has(source)) {
-    errors.source = 'Elegí cómo te enteraste de nosotros.';
+    errors.source = SOURCE_MISSING;
   }
 
   if (source === OTHER_SOURCE) {
-    if (otherDetail.length < 2) errors.otherDetail = 'Contanos dónde, en pocas palabras.';
-    else if (otherDetail.length > 160) errors.otherDetail = 'Es muy largo. Dejalo en una oración.';
-    else if (hasControlChars(otherDetail)) errors.otherDetail = 'Sacale los caracteres raros y volvé a intentar.';
+    if (otherDetail.length < 2) errors.otherDetail = OTHER_MISSING;
+    else if (otherDetail.length > 160) errors.otherDetail = OTHER_LONG;
+    else if (hasControlChars(otherDetail)) errors.otherDetail = OTHER_CHARS;
   }
 
   let whatsapp: string | undefined;
-  if (!whatsappRaw) errors.whatsapp = 'Ingresá tu WhatsApp.';
+  if (!whatsappRaw) errors.whatsapp = WHATSAPP_INVALID;
   else {
     const normalized = normalizeWhatsapp(whatsappRaw);
-    if (!normalized) errors.whatsapp = 'Ingresá un WhatsApp válido, con código de país.';
+    if (!normalized) errors.whatsapp = WHATSAPP_INVALID;
     else whatsapp = normalized;
   }
 
@@ -72,7 +92,7 @@ export function validateWaitlist(
   } else if (groupRaw === 'no' || groupRaw === 'false' || groupRaw === '0') {
     whatsappGroup = false;
   } else {
-    errors.whatsappGroup = 'Decinos si querés sumarte al grupo de WhatsApp.';
+    errors.whatsappGroup = GROUP_MISSING;
   }
 
   if (Object.keys(errors).length > 0 || !whatsapp || whatsappGroup === undefined) {

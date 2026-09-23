@@ -6,6 +6,7 @@ import { JsonLd } from '../../components/seo/json-ld';
 import { WaitlistForm } from '../../components/waitlist/waitlist-form';
 import { WhitelistViewport } from '../../components/waitlist/whitelist-viewport';
 import styles from '../../components/waitlist/waitlist.module.css';
+import { noticeFromQuery } from '../../lib/waitlist/messages.ts';
 import { pageMetadata, publicPage, subpageJsonLd } from '../../lib/seo';
 
 export const viewport: Viewport = {
@@ -21,18 +22,18 @@ const page = publicPage('/whitelist');
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string }>;
+  searchParams: Promise<{ estado?: string; campo?: string }>;
 }): Promise<Metadata> {
-  const { estado } = await searchParams;
-  return pageMetadata(page, { noindex: Boolean(estado) });
+  const { estado, campo } = await searchParams;
+  return pageMetadata(page, { noindex: Boolean(estado || campo) });
 }
 
 export default async function WhitelistPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string }>;
+  searchParams: Promise<{ estado?: string; campo?: string }>;
 }) {
-  const { estado } = await searchParams;
+  const { estado, campo } = await searchParams;
   const listed = estado === 'listo';
 
   return (
@@ -81,7 +82,7 @@ export default async function WhitelistPage({
               <p className={styles.successLead}>Te escribimos por WhatsApp cuando puedas probar Changuito.</p>
             </div>
           ) : (
-            <WaitlistForm notice={estado === 'error' ? 'Revisá los datos e intentá de nuevo.' : undefined} />
+            <WaitlistForm notice={noticeFromQuery(estado, campo)} />
           )}
         </div>
         <FounderTrust className={styles.fine} />

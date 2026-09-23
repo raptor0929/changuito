@@ -3,13 +3,10 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 
 import { ACCESSORY_PX, keyboardInset, scrollDeltaToClear } from '../../lib/bug-report/keyboard-inset.ts';
+import { firstFieldMessage, SERVER_ERROR, TURNSTILE_MISSING } from '../../lib/waitlist/messages.ts';
 import { OTHER_SOURCE, SOURCE_GROUPS } from '../../lib/waitlist/options.ts';
-import { validateWaitlist } from '../../lib/waitlist/validate.ts';
+import { validateWaitlist, type FieldErrors } from '../../lib/waitlist/validate.ts';
 import styles from './waitlist.module.css';
-
-type FieldErrors = Partial<
-  Record<'name' | 'email' | 'source' | 'otherDetail' | 'whatsapp' | 'whatsappGroup' | 'form', string>
->;
 
 declare global {
   interface Window {
@@ -62,7 +59,7 @@ export function WaitlistForm({ notice }: { notice?: string }) {
       invalid.focus();
       return;
     }
-    if (errors.form || notice) errorSummaryRef.current?.focus();
+    if (errors.form || errors.turnstile || notice) errorSummaryRef.current?.focus();
   }, [errors, done, notice]);
 
   useEffect(() => {
@@ -170,8 +167,10 @@ export function WaitlistForm({ notice }: { notice?: string }) {
       { name, email, source, otherDetail, whatsapp, whatsappGroup },
       new Date().toISOString(),
     );
-    if (!checked.ok) {
-      setErrors(checked.errors);
+    const fieldErrors: FieldErrors = checked.ok ? {} : { ...checked.errors };
+    if (SITE_KEY && !turnstileToken) fieldErrors.turnstile = TURNSTILE_MISSING;
+    if (Object.keys(fieldErrors).length > 0) {
+      setErrors(fieldErrors);
       return;
     }
     setPending(true);
@@ -196,10 +195,13 @@ export function WaitlistForm({ notice }: { notice?: string }) {
         setDone(true);
         return;
       }
-      setErrors(payload.errors ?? { form: 'No pudimos anotarte. Probá de nuevo en un rato.' });
-      resetTurnstile();
+      const returned = payload.errors;
+      const named = returned ? firstFieldMessage(returned) : undefined;
+      const next = named || returned?.form ? (returned ?? { form: SERVER_ERROR }) : { form: SERVER_ERROR };
+      setErrors(next);
+      if (next.form === SERVER_ERROR || next.turnstile) resetTurnstile();
     } catch {
-      setErrors({ form: 'No pudimos anotarte. Probá de nuevo en un rato.' });
+      setErrors({ form: SERVER_ERROR });
       resetTurnstile();
     } finally {
       setPending(false);
@@ -218,7 +220,7 @@ export function WaitlistForm({ notice }: { notice?: string }) {
   }
 
   const showOther = source === OTHER_SOURCE;
-  const formNotice = errors.form ?? notice;
+  const formNotice = firstFieldMessage(errors) ?? errors.form ?? notice;
   const nameErrorId = `${baseId}-name-error`;
   const emailErrorId = `${baseId}-email-error`;
   const sourceErrorId = `${baseId}-source-error`;
@@ -227,6 +229,7 @@ export function WaitlistForm({ notice }: { notice?: string }) {
   const whatsappErrorId = `${baseId}-whatsapp-error`;
   const groupHintId = `${baseId}-group-hint`;
   const groupErrorId = `${baseId}-group-error`;
+  const turnstileErrorId = `${baseId}-turnstile-error`;
   const groupHint =
     whatsappGroup === 'no'
       ? 'Te contactaremos por WhatsApp por privado.'
@@ -443,9 +446,24 @@ export function WaitlistForm({ notice }: { notice?: string }) {
       </fieldset>
 
       {SITE_KEY ? (
-        <div className={styles.turnstile} data-testid="whitelist-turnstile">
+        <div
+          className={styles.turnstile}
+          data-testid="whitelist-turnstile"
+          aria-invalid={errors.turnstile ? true : undefined}
+          tabIndex={errors.turnstile ? -1 : undefined}
+        >
           <div ref={turnstileRef} />
           <input type="hidden" name="turnstileToken" value={turnstileToken} />
+          {errors.turnstile ? (
+            <p
+              id={turnstileErrorId}
+              className={styles.fieldError}
+              role="alert"
+              data-testid="whitelist-turnstile-error"
+            >
+              {errors.turnstile}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
