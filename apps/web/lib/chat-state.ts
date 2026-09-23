@@ -20,8 +20,17 @@ export interface ToolRun {
   ok?: boolean;
 }
 
+/**
+ * Why a turn never landed.
+ *
+ * `login` is the only one worth resuming on its own: the gate is a door the
+ * user can open, and once it is open the same message is still what they meant
+ * to say. Everything else needs a human to decide whether to try again.
+ */
+export type SendFailure = { reason: 'login' | 'network'; message: string };
+
 export type Block =
-  | { kind: 'user'; id: string; text: string }
+  | { kind: 'user'; id: string; text: string; failed?: SendFailure }
   | { kind: 'say'; id: string; text: string; thinking: string; tools: ToolRun[] }
   | { kind: 'products'; id: string; items: Product[]; note?: string }
   | { kind: 'cart'; id: string; cart: Cart; handoffUrl?: string }
@@ -167,4 +176,68 @@ export function endTurn(state: ChatState, message?: string): ChatState {
     ? [...state.blocks, { kind: 'error' as const, id: nextId(), message, recoverable: true }]
     : state.blocks;
   return { ...state, streaming: false, blocks };
+}
+
+/**
+ * End a turn that failed, telling the truth about how far it got.
+ *
+ * "Did the server receive this?" has an exact structural answer already in the
+ * transcript: if the last block is still the user's own bubble, nothing came
+ * back, so nothing was received — /api/chat writes history only after a clean
+ * return. Mark that bubble and the screen stops claiming a message landed when
+ * it did not, which is the bug in CLAUDE.md §4 seen from the client side.
+ *
+ * Once anything has rendered the answer is different. The user is reading half
+ * a reply, the server has the message, and "no se envió" would be a visible
+ * lie — so that case keeps the error block it has always had.
+ */
+export function failTurn(state: ChatState, failure: SendFailure): ChatState {
+  if (!state.streaming) return state;
+  const last = state.blocks.at(-1);
+  if (last?.kind !== 'user' || last.failed) return endTurn(state, failure.message);
+  return {
+    ...state,
+    streaming: false,
+    blocks: [...state.blocks.slice(0, -1), { ...last, failed: failure }],
+  };
+}
+
+/**
+ * Send an undelivered message again.
+ *
+ * The block is reused, not appended: the text is already on screen, and a
+ * second identical bubble would read as having said it twice. Keeping the id
+ * keeps the React key, so the bubble changes in place instead of unmounting
+ * and animating back in — the same reasoning as the cart dedupe above.
+ */
+export function retryUser(state: ChatState, id: string): ChatState {
+  if (state.streaming) return state;
+  const i = lastIndexWhere(state.blocks, (b) => b.kind === 'user' && b.id === id && Boolean(b.failed));
+  if (i === -1) return state;
+  const b = state.blocks[i] as Extract<Block, { kind: 'user' }>;
+  // Rebuilt rather than destructured: `failed` has to be absent, not
+  // undefined, so a retried block is indistinguishable from one that never
+  // failed.
+  const cleared: Block = { kind: 'user', id: b.id, text: b.text };
+  return {
+    ...state,
+    streaming: true,
+    blocks: state.blocks.map((x, j) => (j === i ? cleared : x)),
+  };
+}
+
+/**
+ * Only the newest message gets a retry control.
+ *
+ * A network failure leaves the composer usable, so the user can type something
+ * else and move on. Re-sending the older message then would reach the server
+ * after the newer one, and the history the agent reasons over would be in a
+ * different order than the transcript the user is looking at — §4 again, with
+ * the two sides swapped. The mark stays on the old bubble as a record of what
+ * happened; the button does not.
+ */
+export function canRetry(state: ChatState, id: string): boolean {
+  if (state.streaming) return false;
+  const last = state.blocks.at(-1);
+  return last?.kind === 'user' && last.id === id && Boolean(last.failed);
 }

@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { applyEvent, endTurn, initialState, resetIds, sendUser, type ChatState } from '../chat-state.ts';
+import {
+  applyEvent,
+  canRetry,
+  endTurn,
+  failTurn,
+  initialState,
+  resetIds,
+  retryUser,
+  sendUser,
+  type ChatState,
+} from '../chat-state.ts';
 import type { UiEvent } from '../protocol.ts';
 
 const run = (events: UiEvent[], from: ChatState = initialState) => events.reduce(applyEvent, from);
@@ -152,5 +162,125 @@ describe('endTurn', () => {
       t: 'done', stopReason: 'end_turn', snapshot: { location: undefined, carts: {} } as never,
     });
     assert.deepEqual(endTurn(done, 'x'), done);
+  });
+});
+
+// The message from the bug report: the supermarket and the postal code the
+// agent had just asked for, typed once and never received.
+const JUMBO = 'jumbo 1430';
+const login = { reason: 'login' as const, message: 'Para seguir, iniciá sesión.' };
+const dropped = { reason: 'network' as const, message: 'Se cortó la conexión.' };
+
+describe('failTurn', () => {
+  it('marks the message itself when nothing came back, instead of stacking a notice under it', () => {
+    const s = failTurn(sendUser(initialState, JUMBO), login);
+    assert.equal(s.streaming, false);
+    assert.equal(s.blocks.length, 1);
+    const b = s.blocks[0];
+    assert.equal(b.kind === 'user' && b.text, JUMBO);
+    assert.deepEqual(b.kind === 'user' ? b.failed : undefined, login);
+  });
+
+  it('appends the notice instead once the agent has said something', () => {
+    // Half an answer is on screen: the server has the message, so "no se
+    // envió" would be a lie.
+    const said = applyEvent(sendUser(initialState, JUMBO), { t: 'text', delta: 'Buscando…' });
+    const s = failTurn(said, dropped);
+    assert.deepEqual(s.blocks.map((b) => b.kind), ['user', 'say', 'error']);
+    assert.equal(s.blocks[0].kind === 'user' && s.blocks[0].failed, undefined);
+  });
+
+  it('does nothing once the turn ended — the user pressing Parar is not a failure', () => {
+    const stopped = endTurn(sendUser(initialState, JUMBO));
+    assert.deepEqual(failTurn(stopped, dropped), stopped);
+  });
+
+  it('does nothing after a fatal error already closed the turn', () => {
+    const fatal = applyEvent(sendUser(initialState, JUMBO), {
+      t: 'error', message: 'No puedo responder eso.', recoverable: false,
+    });
+    assert.deepEqual(failTurn(fatal, dropped), fatal);
+  });
+
+  it('marks only the newest message, leaving delivered turns alone', () => {
+    const first = applyEvent(sendUser(initialState, 'hola'), {
+      t: 'done', stopReason: 'end_turn', snapshot: { location: undefined, carts: {} } as never,
+    });
+    const s = failTurn(sendUser(first, JUMBO), login);
+    assert.equal(s.blocks[0].kind === 'user' && s.blocks[0].failed, undefined);
+    const last = s.blocks.at(-1);
+    assert.equal(last?.kind === 'user' && last.failed?.reason, 'login');
+  });
+
+  it('carries the reason through, so the UI can tell a gate from a dropped connection', () => {
+    const gate = failTurn(sendUser(initialState, JUMBO), login);
+    const net = failTurn(sendUser(initialState, JUMBO), dropped);
+    assert.equal(gate.blocks[0].kind === 'user' && gate.blocks[0].failed?.reason, 'login');
+    assert.equal(net.blocks[0].kind === 'user' && net.blocks[0].failed?.reason, 'network');
+  });
+});
+
+describe('retryUser', () => {
+  const failed = () => failTurn(sendUser(initialState, JUMBO), login);
+
+  it('clears the mark and reopens the turn', () => {
+    const s = retryUser(failed(), 'b1');
+    assert.equal(s.streaming, true);
+    assert.equal(s.blocks[0].kind === 'user' && s.blocks[0].failed, undefined);
+  });
+
+  it('reuses the bubble instead of saying it twice', () => {
+    const before = failed();
+    const s = retryUser(before, 'b1');
+    assert.equal(s.blocks.length, before.blocks.length);
+    assert.equal(s.blocks[0].id, 'b1');
+  });
+
+  it('keeps the text, which is the whole point', () => {
+    const b = retryUser(failed(), 'b1').blocks[0];
+    assert.equal(b.kind === 'user' && b.text, JUMBO);
+  });
+
+  it('removes the key rather than setting it undefined', () => {
+    const b = retryUser(failed(), 'b1').blocks[0];
+    assert.ok(!('failed' in b));
+  });
+
+  it('ignores an id that is not a failed message', () => {
+    const s = failed();
+    assert.deepEqual(retryUser(s, 'b99'), s);
+    const delivered = sendUser(initialState, 'hola');
+    assert.deepEqual(retryUser(endTurn(delivered), 'b1'), endTurn(delivered));
+  });
+
+  it('ignores a retry while a turn is already running', () => {
+    const streaming = sendUser(failed(), 'otra cosa');
+    assert.deepEqual(retryUser(streaming, 'b1'), streaming);
+  });
+
+  it('marks the same single bubble when the retry fails too', () => {
+    const s = failTurn(retryUser(failed(), 'b1'), login);
+    assert.equal(s.blocks.length, 1);
+    assert.equal(s.blocks[0].kind === 'user' && s.blocks[0].failed?.reason, 'login');
+  });
+});
+
+describe('canRetry', () => {
+  it('offers the button on the newest failed message', () => {
+    assert.equal(canRetry(failTurn(sendUser(initialState, JUMBO), login), 'b1'), true);
+  });
+
+  it('takes it back once the user has moved on', () => {
+    // Re-sending now would reach the server after a message that came later.
+    const moved = sendUser(failTurn(sendUser(initialState, JUMBO), login), 'continuar');
+    assert.equal(canRetry(endTurn(moved), 'b1'), false);
+  });
+
+  it('is false while a turn is streaming', () => {
+    assert.equal(canRetry(retryUser(failTurn(sendUser(initialState, JUMBO), login), 'b1'), 'b1'), false);
+  });
+
+  it('is false for a message that was delivered', () => {
+    assert.equal(canRetry(endTurn(sendUser(initialState, 'hola')), 'b1'), false);
   });
 });
