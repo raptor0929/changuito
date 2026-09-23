@@ -107,8 +107,19 @@ export const BOFU = {
 export const FOOTER = {
   legal: 'Changuito te ayuda a armar el súper. No es un supermercado.',
   siteLabel: 'www.changuito.me',
-  appLabel: 'app.changuito.me',
 } as const;
+
+/**
+ * Credit line for every footer. The year and the mark live in this
+ * sentence, so a second copyright line is not rendered. Link text is
+ * the visible label, so the accessible name matches the screen.
+ */
+export const FOUNDERS = [
+  { name: 'SimonethG', href: 'https://www.linkedin.com/in/simonethg/' },
+  { name: 'Fabio', href: 'https://www.linkedin.com/in/fabio-laura-yavi/' },
+] as const;
+
+export const FOUNDER_TRUST = `© 2026 Changuito® · Hecho en 🇦🇷 por ${FOUNDERS[0].name} y ${FOUNDERS[1].name}.`;
 
 /** Public social profiles. Keep labels short; aria-labels carry the brand. */
 export const SOCIAL = [

@@ -80,13 +80,16 @@
 .main {
   max-width: 40rem;
   margin: 0 auto;
-  padding: 28px 20px 8px;
+  padding: 28px 20px 64px;
 }
 
-.footer {
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 0 20px 32px;
+/* Same quiet weight as the home footer .fine. Sits under the form card. */
+.fine {
+  max-width: 1120px;
+  margin: 28px auto 0;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 .card {

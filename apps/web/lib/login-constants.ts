@@ -10,5 +10,5 @@ export const LOGIN_REQUIRED = 'login_required' as const;
 export const LOGIN_REQUIRED_MESSAGE =
   'Para seguir, iniciá sesión. Así podemos anotarte y seguir mejorando Changuito.';
 
-/** Primary CTA after gate / in WalletWidget — warm rioplatense, not wallet jargon. */
-export const LOGIN_CTA = 'Empezá a comprar';
+/** Primary button on the soft-limit login gate. Rioplatense voseo. */
+export const LOGIN_CTA = 'Iniciá sesión';

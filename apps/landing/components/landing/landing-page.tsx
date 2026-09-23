@@ -11,19 +11,14 @@ import {
   STEPS,
   STEPS_TITLE,
 } from '../../lib/copy';
+import { FounderLine } from '../trust/founder-line';
 import { BrandLockup } from './brand-lockup';
 import { FaqList } from './faq-list';
-import { CheckIcon, InstagramIcon, StepIcon, XIcon } from './icons';
+import { CheckIcon, InstagramIcon, StepIcon } from './icons';
 import { SiteHeader } from './site-header';
-import { TrustLine } from './trust-line';
 import { TryLink } from './try-link';
 
 import styles from './landing.module.css';
-
-const SOCIAL_ICONS = {
-  x: XIcon,
-  instagram: InstagramIcon,
-} as const;
 
 export function LandingPage() {
   return (
@@ -122,42 +117,22 @@ export function LandingPage() {
           data-testid="landing-payments"
         >
           <div className={styles.sectionInner}>
-            <div className={styles.payLayout}>
-              <div>
-                <h2 id="pagos-titulo" className={styles.h2}>
-                  {PAYMENTS.title}
-                </h2>
-                <p className={styles.lead}>{PAYMENTS.lead}</p>
-                <ul className={styles.payGrid}>
-                  {PAYMENTS.methods.map((method) => (
-                    <li key={method.title} className={styles.card}>
-                      <h3 className={styles.cardTitle}>{method.title}</h3>
-                      <p className={styles.cardBody}>{method.body}</p>
-                    </li>
-                  ))}
-                </ul>
-                <p className={styles.assurance}>
-                  <CheckIcon className={styles.assuranceIcon} />
-                  <span>{PAYMENTS.assurance}</span>
-                </p>
-              </div>
-              <div className={styles.payMascotFrame}>
-                <img
-                  className={`${styles.payMascot} ${styles.mascotMotion}`}
-                  src="/brand/animacion-cargando.gif"
-                  alt="Le caen los productos al carrito de Changuito"
-                  width={480}
-                  height={360}
-                />
-                <img
-                  className={`${styles.payMascot} ${styles.mascotStill}`}
-                  src="/brand/mascot-idle.png"
-                  alt="Mascota de Changuito, un carrito sonriente con el súper"
-                  width={397}
-                  height={583}
-                />
-              </div>
-            </div>
+            <h2 id="pagos-titulo" className={styles.h2}>
+              {PAYMENTS.title}
+            </h2>
+            <p className={styles.lead}>{PAYMENTS.lead}</p>
+            <ul className={styles.payGrid}>
+              {PAYMENTS.methods.map((method) => (
+                <li key={method.title} className={styles.card}>
+                  <h3 className={styles.cardTitle}>{method.title}</h3>
+                  <p className={styles.cardBody}>{method.body}</p>
+                </li>
+              ))}
+            </ul>
+            <p className={styles.assurance}>
+              <CheckIcon className={styles.assuranceIcon} />
+              <span>{PAYMENTS.assurance}</span>
+            </p>
           </div>
         </section>
 
@@ -213,27 +188,24 @@ export function LandingPage() {
                     {FOOTER.siteLabel}
                   </a>
                 </li>
-                <li>
-                  {/* Beta: domain stays as text so the footer does not open the shopper. */}
-                  <span className={styles.footerLabel} data-testid="landing-footer-app">
-                    {FOOTER.appLabel}
-                  </span>
-                </li>
               </ul>
             </nav>
             <ul className={styles.footerSocial} data-testid="landing-social">
               {SOCIAL.map((link) => {
-                const Icon = SOCIAL_ICONS[link.icon];
+                // The X glyph sits before the label "X" and reads as a second link.
+                const showInstagram = link.icon === 'instagram';
                 return (
                   <li key={link.href}>
                     <a
-                      className={styles.socialLink}
+                      className={
+                        showInstagram ? styles.socialLink : `${styles.socialLink} ${styles.socialText}`
+                      }
                       href={link.href}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={link.ariaLabel}
                     >
-                      <Icon className={styles.socialIcon} />
+                      {showInstagram ? <InstagramIcon className={styles.socialIcon} /> : null}
                       <span>{link.label}</span>
                     </a>
                   </li>
@@ -243,7 +215,7 @@ export function LandingPage() {
           </div>
         </div>
         <p className={styles.fine}>{FOOTER.legal}</p>
-        <TrustLine />
+        <FounderLine className={styles.fine} />
       </footer>
     </div>
   );

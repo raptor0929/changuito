@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import Image from 'next/image';
 
 import { BugReportPanel } from '../../components/bug-report/bug-report-panel';
-import { TrustLine } from '../../components/landing/trust-line';
+import { FounderLine } from '../../components/trust/founder-line';
 import { BugReportViewport } from '../../components/bug-report/bug-report-viewport';
 import { JsonLd } from '../../components/seo/json-ld';
 import styles from '../../components/bug-report/bug-report.module.css';
@@ -72,7 +72,7 @@ export default async function ReportarBugPage({
         notice={estado === 'error' ? 'Revisá los datos e intentá de nuevo.' : undefined}
       />
       <footer className={styles.footer} data-testid="bug-report-footer">
-        <TrustLine />
+        <FounderLine className={styles.fine} />
       </footer>
     </div>
   );

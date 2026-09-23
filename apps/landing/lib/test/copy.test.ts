@@ -13,6 +13,8 @@ import {
   DESCRIPTION,
   FAQ,
   FOOTER,
+  FOUNDER_TRUST,
+  FOUNDERS,
   HERO,
   NO_CHARGE,
   PAYMENTS,
@@ -52,11 +54,20 @@ test('footer social profiles point at @appchanguito', () => {
       },
     ],
   );
+  assert.equal(SOCIAL.filter((link) => link.href === 'https://x.com/appchanguito').length, 1);
+  assert.equal(SOCIAL.filter((link) => link.href.includes('twitter.com')).length, 0);
   const page = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
   assert.equal(page.includes('SOCIAL'), true);
   assert.equal(page.includes('landing-social'), true);
   assert.equal(page.includes('target="_blank"'), true);
   assert.equal(page.includes('noopener noreferrer'), true);
+  assert.equal(page.includes('XIcon'), false);
+  assert.equal(page.includes('https://x.com/appchanguito'), false);
+  assert.equal(page.split('SOCIAL.map').length - 1, 1);
+  assert.equal(page.includes('landing-footer-app'), false);
+  assert.equal(page.includes('FOOTER.appLabel'), false);
+  const css = readFileSync(join(root, 'components/landing/landing.module.css'), 'utf8');
+  assert.equal(css.includes('.footerLabel'), false);
 });
 
 test('hero copy matches the locked brief', () => {
@@ -89,6 +100,8 @@ test('landing copy stays free of jargon and a refund promise', () => {
     FAQ,
     BOFU,
     FOOTER,
+    FOUNDER_TRUST,
+    FOUNDERS,
     SOCIAL,
     DESCRIPTION,
   }).toLowerCase();
@@ -140,8 +153,18 @@ test('landing copy stays free of jargon and a refund promise', () => {
 test('the landing serves the loading GIF and not the éxito pose', () => {
   const page = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
   const css = readFileSync(join(root, 'components/landing/landing.module.css'), 'utf8');
-  assert.equal(page.split('/brand/animacion-cargando.gif').length - 1, 2);
-  assert.equal(page.split('Le caen los productos al carrito de Changuito').length - 1, 2);
+  assert.equal(page.split('/brand/animacion-cargando.gif').length - 1, 1);
+  assert.equal(page.split('Le caen los productos al carrito de Changuito').length - 1, 1);
+  const payments = page.slice(
+    page.indexOf('data-testid="landing-payments"'),
+    page.indexOf('data-testid="landing-faq"'),
+  );
+  assert.equal(payments.includes('<img'), false);
+  assert.equal(payments.includes('payMascot'), false);
+  assert.equal(payments.includes('animacion-'), false);
+  assert.equal(payments.includes('mascot-'), false);
+  assert.equal(css.includes('.payLayout'), false);
+  assert.equal(css.includes('.payMascot'), false);
   assert.equal(page.includes('animacion-busqueda'), false);
   assert.equal(page.includes('mascot-exito'), false);
   assert.equal(page.includes('mascot-idle.png'), true);
@@ -191,4 +214,49 @@ test('source does not reintroduce the refund line or a tiled pattern', () => {
   }
   walk(root);
   assert.deepEqual(hits, []);
+});
+
+test('founder trust copy is the chosen line, linked from the fine print', () => {
+  assert.equal(FOUNDER_TRUST, '© 2026 Changuito® · Hecho en 🇦🇷 por SimonethG y Fabio.');
+  assert.equal(/© 2026 Changuito(?!®)/.test(FOUNDER_TRUST), false);
+  assert.equal('copyright' in FOOTER, false);
+  assert.equal(FOUNDER_TRUST.includes('\u2014'), false);
+  assert.equal(FOUNDER_TRUST.includes('\u2013'), false);
+  assert.deepEqual(
+    FOUNDERS.map((person) => ({ name: person.name, href: person.href })),
+    [
+      { name: 'SimonethG', href: 'https://www.linkedin.com/in/simonethg/' },
+      { name: 'Fabio', href: 'https://www.linkedin.com/in/fabio-laura-yavi/' },
+    ],
+  );
+
+  const line = readFileSync(join(root, 'components/trust/founder-line.tsx'), 'utf8');
+  assert.equal(line.includes('© 2026 Changuito® · Hecho en 🇦🇷 por'), true);
+  assert.equal(line.includes('target="_blank"'), true);
+  assert.equal(line.includes('rel="noopener noreferrer"'), true);
+  assert.equal(line.includes('aria-label'), false);
+  assert.equal(line.includes('Simoneth Gomez'), false);
+  assert.equal(line.includes('Fabio Laura'), false);
+
+  const home = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
+  const footer = home.slice(home.indexOf('<footer'));
+  const legalAt = footer.indexOf('{FOOTER.legal}');
+  const trustAt = footer.indexOf('<FounderLine');
+  const navClose = footer.indexOf('</nav>');
+  assert.ok(navClose !== -1 && navClose < legalAt);
+  assert.ok(legalAt !== -1 && legalAt < trustAt);
+  assert.equal(footer.includes('{FOOTER.copyright}'), false);
+  assert.equal(footer.includes('TrustLine'), false);
+  assert.equal(footer.slice(0, navClose).includes('FounderLine'), false);
+
+  const whitelist = readFileSync(join(root, 'app/whitelist/page.tsx'), 'utf8');
+  const cardAt = whitelist.indexOf('styles.card');
+  const whitelistTrust = whitelist.indexOf('<FounderLine');
+  const mainClose = whitelist.indexOf('</main>');
+  assert.ok(cardAt !== -1 && cardAt < whitelistTrust && whitelistTrust < mainClose);
+
+  const bug = readFileSync(join(root, 'app/reportarbug/page.tsx'), 'utf8');
+  const panel = readFileSync(join(root, 'components/bug-report/bug-report-panel.tsx'), 'utf8');
+  assert.equal(bug.includes('FounderLine'), true);
+  assert.equal(panel.includes('FounderLine'), false);
 });
