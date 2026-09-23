@@ -219,62 +219,6 @@ a:hover { color: var(--chg-arcilla); }
 .greeting p { margin: 0 0 12px; line-height: 1.6; color: var(--muted); }
 .greeting-hint { font-size: 14px; font-weight: 600; color: var(--text); margin: 16px 0 8px; }
 
-.greeting-timeline {
-  list-style: none;
-  margin: 0 0 4px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-.greeting-timeline-item {
-  display: flex;
-  gap: 12px;
-  align-items: stretch;
-}
-.greeting-timeline-rail {
-  width: 22px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 0 0 auto;
-}
-.greeting-timeline-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--chg-sunflower);
-  border: 2px solid var(--chg-espresso);
-  flex: 0 0 auto;
-  margin-top: 14px;
-}
-.greeting-timeline-line {
-  width: 2px;
-  flex: 1;
-  min-height: 16px;
-  background: var(--chg-arcilla);
-  opacity: 0.55;
-  margin: 4px 0 0;
-}
-.greeting-timeline-card {
-  flex: 1;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 12px 14px;
-  margin-bottom: 12px;
-}
-.greeting-timeline-item:last-child .greeting-timeline-card { margin-bottom: 0; }
-.greeting-timeline-card h3 {
-  margin: 0 0 4px;
-  font-size: 15px;
-  color: var(--text);
-}
-.greeting-timeline-card p {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--muted);
-}
 .starters { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .starter {
   width: 100%;
@@ -800,40 +744,10 @@ a:hover { color: var(--chg-arcilla); }
     line-height: 1.15;
   }
 
-  .shell:has(.chat.is-empty) .greeting-timeline-item {
-    gap: 8px;
-  }
-
-  .shell:has(.chat.is-empty) .greeting-timeline-rail {
-    width: 16px;
-  }
-
-  .shell:has(.chat.is-empty) .greeting-timeline-dot {
-    width: 10px;
-    height: 10px;
-    margin-top: 7px;
-  }
-
-  .shell:has(.chat.is-empty) .greeting-timeline-line {
-    min-height: 4px;
-    margin-top: 2px;
-  }
-
-  .shell:has(.chat.is-empty) .greeting-timeline-card {
-    padding: 5px 10px;
-    margin-bottom: 4px;
-    border-radius: 10px;
-  }
-
-  .shell:has(.chat.is-empty) .greeting-timeline-card h3 {
-    margin: 0;
-    font-size: 13px;
-    line-height: 1.25;
-  }
-
-  .shell:has(.chat.is-empty) .greeting-timeline-card p {
-    font-size: 12px;
-    line-height: 1.25;
+  .shell:has(.chat.is-empty) .greeting-body {
+    margin: 0 0 8px;
+    font-size: 14px;
+    line-height: 1.35;
   }
 
   .shell:has(.chat.is-empty) .greeting-hint {
