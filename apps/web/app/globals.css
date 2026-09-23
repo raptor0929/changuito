@@ -538,7 +538,34 @@ a:hover { color: var(--chg-arcilla); }
 .wallet-warn { color: var(--warn); }
 .wallet-muted { color: var(--muted); }
 .wallet-error { margin: 0; font-size: 12px; color: var(--warn); }
-.wallet-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+/* One row, including at phone width. Icon controls keep a 44px hit box. */
+.wallet-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.wallet-actions .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-height: 44px;
+}
+.wallet-icon-btn {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+}
+.wallet-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .wallet-off { opacity: 0.7; }
 
 .btn-sm { padding: 5px 12px; font-size: 12px; font-weight: 600; min-height: 32px; }
