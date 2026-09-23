@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 
+import { TrustLine } from '../../components/landing/trust-line';
 import { JsonLd } from '../../components/seo/json-ld';
 import { WaitlistForm } from '../../components/waitlist/waitlist-form';
 import styles from '../../components/waitlist/waitlist.module.css';
@@ -74,6 +75,9 @@ export default async function WhitelistPage({
           )}
         </div>
       </main>
+      <footer className={styles.footer} data-testid="whitelist-footer">
+        <TrustLine />
+      </footer>
     </div>
   );
 }

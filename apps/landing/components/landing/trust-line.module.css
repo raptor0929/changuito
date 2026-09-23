@@ -1,0 +1,28 @@
+.trust {
+  max-width: 1120px;
+  margin: 16px auto 0;
+  color: var(--ink-soft, #4a332c);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.trust a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 2px;
+  border-radius: 6px;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.trust a:hover {
+  color: var(--ink, #2a1a14);
+}
+
+.trust a:focus-visible {
+  outline: 3px solid var(--ink, #2a1a14);
+  outline-offset: 2px;
+}

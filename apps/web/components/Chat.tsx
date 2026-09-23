@@ -24,7 +24,7 @@ import { OrderPanel } from './OrderPanel';
 import { PaymentModal } from './PaymentModal';
 import { ProductGrid } from './ProductGrid';
 import { MarkdownText } from './MarkdownText';
-import { ReportBug } from './ReportBug';
+import { AppFooter } from './AppFooter';
 import { ToolTrail } from './ToolTrail';
 
 export function Chat() {
@@ -162,7 +162,6 @@ function ChatCore({
             Buscando en el súper…
           </p>
         ) : null}
-        <ReportBug />
       </div>
 
       {gated ? (
@@ -190,6 +189,8 @@ function ChatCore({
       ) : null}
 
       {order ? <OrderPanel order={order} onDismiss={() => setOrder(null)} /> : null}
+
+      <AppFooter />
 
       <form
         className="composer"

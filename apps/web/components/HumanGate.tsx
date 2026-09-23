@@ -7,7 +7,7 @@ import {
   HUMAN_REQUIRED_EVENT,
   type ClientGateDecision,
 } from '../lib/human-gate-ui';
-import { ReportBug } from './ReportBug';
+import { AppFooter } from './AppFooter';
 
 declare global {
   interface Window {
@@ -313,35 +313,37 @@ export function HumanGate({
   const body = needWidget ? COPY.widgetBody : blocked ? COPY.blockedBody : COPY.checkingBody;
 
   return (
-    <section className="human-gate" data-testid="human-gate" aria-labelledby="human-gate-title" aria-busy={busy || (!needWidget && !blocked)}>
-      <img
-        className="human-gate-mascot"
-        src="/brand/mascot-idle.png"
-        alt=""
-        aria-hidden="true"
-        width={120}
-        height={120}
-      />
-      <h2 id="human-gate-title">{title}</h2>
-      <p>{body}</p>
-      {error ? (
-        <p className="human-gate-error" role="alert" data-testid="human-gate-error">
-          {error}
-        </p>
-      ) : null}
-      <div ref={host} className="human-gate-widget" data-testid="human-gate-widget" />
-      {needWidget || blocked || error || slow ? (
-        <button
-          type="button"
-          className="btn human-gate-retry"
-          data-testid="human-gate-retry"
-          onClick={onRetry}
-          disabled={busy}
-        >
-          {COPY.retry}
-        </button>
-      ) : null}
-      <ReportBug />
-    </section>
+    <div className="gate-frame">
+      <section className="human-gate" data-testid="human-gate" aria-labelledby="human-gate-title" aria-busy={busy || (!needWidget && !blocked)}>
+        <img
+          className="human-gate-mascot"
+          src="/brand/mascot-idle.png"
+          alt=""
+          aria-hidden="true"
+          width={120}
+          height={120}
+        />
+        <h2 id="human-gate-title">{title}</h2>
+        <p>{body}</p>
+        {error ? (
+          <p className="human-gate-error" role="alert" data-testid="human-gate-error">
+            {error}
+          </p>
+        ) : null}
+        <div ref={host} className="human-gate-widget" data-testid="human-gate-widget" />
+        {needWidget || blocked || error || slow ? (
+          <button
+            type="button"
+            className="btn human-gate-retry"
+            data-testid="human-gate-retry"
+            onClick={onRetry}
+            disabled={busy}
+          >
+            {COPY.retry}
+          </button>
+        ) : null}
+      </section>
+      <AppFooter />
+    </div>
   );
 }

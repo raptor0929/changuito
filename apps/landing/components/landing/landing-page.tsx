@@ -15,6 +15,7 @@ import { BrandLockup } from './brand-lockup';
 import { FaqList } from './faq-list';
 import { CheckIcon, InstagramIcon, StepIcon, XIcon } from './icons';
 import { SiteHeader } from './site-header';
+import { TrustLine } from './trust-line';
 import { TryLink } from './try-link';
 
 import styles from './landing.module.css';
@@ -242,7 +243,7 @@ export function LandingPage() {
           </div>
         </div>
         <p className={styles.fine}>{FOOTER.legal}</p>
-        <p className={styles.fine}>{FOOTER.copyright}</p>
+        <TrustLine />
       </footer>
     </div>
   );

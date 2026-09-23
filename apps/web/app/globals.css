@@ -614,6 +614,14 @@ a:hover { color: var(--chg-arcilla); }
 
 /* -------------------------------------------------------------- human gate */
 
+.gate-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .human-gate {
   flex: 1 1 auto;
   min-height: 0;
@@ -704,19 +712,58 @@ a:hover { color: var(--chg-arcilla); }
   color: var(--muted);
 }
 
-.report-bug {
+/* One quiet line above the composer. Type matches landing `.fine`
+   (14px, ink-soft / --muted on off-white). The row is 44px so each
+   link clears the touch target; the sentence itself stays small.
+   Horizontal padding keeps the focus ring inside the shell clip. */
+.app-footer {
+  flex-shrink: 0;
   margin: 0;
-  padding: 8px 0 4px;
-  text-align: center;
-  font-size: 13px;
-}
-.report-bug a {
+  padding: 0 8px;
+  background: var(--bg);
   color: var(--muted);
+  font-size: 14px;
+  line-height: 1.25;
+  text-align: center;
+}
+.app-footer-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0 6px;
+  margin: 0;
+}
+.app-footer-trust {
+  max-width: 100%;
+  min-width: 0;
+}
+.app-footer-sep {
+  color: var(--muted);
+  user-select: none;
+}
+.app-footer a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 4px;
+  border-radius: 6px;
+  color: inherit;
+  font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
+  white-space: nowrap;
 }
-.report-bug a:hover {
+.app-footer a:hover {
   color: var(--chg-arcilla);
+}
+.app-footer a:focus-visible {
+  /* Inset so the ring stays inside the 44px row. An outward ring would
+     be clipped by the shell, or force the strip taller than the first
+     screen can spare. */
+  outline: 3px solid var(--chg-espresso);
+  outline-offset: -3px;
 }
 
 /* ------------------------------------------------- empty chat, phone only
@@ -882,17 +929,34 @@ a:hover { color: var(--chg-arcilla); }
     padding: 8px 14px;
   }
 
-  .shell:has(.chat.is-empty) .report-bug {
-    padding: 2px 0 0;
-    font-size: 12px;
-    line-height: 1.2;
+  .shell:has(.chat.is-empty) .app-footer {
+    padding: 0 4px;
+    line-height: 1.25;
+  }
+}
+
+/* Phone footer. These rules sit after the base strip so they win.
+   The marketing host is hidden: with the credit line it needs a third
+   row, and that row sits on the composer during a chat. Links stay
+   at least 32px, over the 24px minimum, without a 44px row per wrap. */
+@media (max-width: 560px) {
+  .app-footer {
+    font-size: 13px;
+    line-height: 1.25;
+    padding: 0 6px;
   }
 
-  .shell:has(.chat.is-empty) .report-bug a {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 44px;
-    padding: 0 8px;
+  .app-footer-line {
+    gap: 0 8px;
+  }
+
+  .app-footer a {
+    min-height: 32px;
+    padding: 4px 4px;
+  }
+
+  a.app-footer-site,
+  .app-footer-site-sep {
+    display: none;
   }
 }
