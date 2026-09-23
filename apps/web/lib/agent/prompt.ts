@@ -77,6 +77,6 @@ export function stateBanner(state: {
 /** Shown before the first message. Three things worth trying, in the user's words. */
 export const STARTERS = [
   'Armá un desayuno para dos por menos de $10.000',
-  'Compará precios de leche descremada',
+  'Compará precios de leche con proteína',
   'Carrito básico para la semana: arroz, fideos, aceite y huevos',
 ];

@@ -5,7 +5,8 @@
  * apps draw one family: currentColor stroke, width 2, round cap and join, no
  * fill, aria-hidden. The 24-unit box at 16px matches that file's social icons
  * rather than its 32px feature icons — this one sits inline with 12px button
- * text, not in a card.
+ * text, not in a card. Footer marks use the same box: Instagram is the
+ * landing stroke glyph, and X is filled so it does not read as a close icon.
  */
 export function RetryIcon({ className }: { className?: string }) {
   return (
@@ -23,6 +24,47 @@ export function RetryIcon({ className }: { className?: string }) {
     >
       <path d="M21 12a9 9 0 1 1-2.64-6.36L21 8" />
       <path d="M21 3v5h-5" />
+    </svg>
+  );
+}
+
+/** Same 24-unit social box as the landing footer glyphs. */
+function socialGlyph(className: string | undefined, size: number) {
+  return {
+    className,
+    viewBox: '0 0 24 24',
+    width: size,
+    height: size,
+    fill: 'none' as const,
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    'aria-hidden': true as const,
+  };
+}
+
+/** Camera mark. Path matches apps/landing/components/landing/icons.tsx. */
+export function InstagramIcon({ className }: { className?: string }) {
+  return (
+    <svg {...socialGlyph(className, 18)}>
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/**
+ * X mark. The landing prints the word "X" instead of a glyph, because the
+ * glyph next to that word reads as a second link. Here the control is the
+ * icon alone, so the mark is the logo, slightly smaller than the stroked
+ * camera so the two weights match.
+ */
+export function XIcon({ className }: { className?: string }) {
+  return (
+    <svg {...socialGlyph(className, 16)} fill="currentColor" stroke="none">
+      <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" />
     </svg>
   );
 }

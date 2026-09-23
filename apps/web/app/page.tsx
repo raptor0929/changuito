@@ -1,4 +1,5 @@
 import { Chat } from '../components/Chat';
+import { FooterSocial } from '../components/FooterSocial';
 import { FounderTrust } from '../components/FounderTrust';
 import { HumanGate } from '../components/HumanGate';
 import { WalletProvider } from '../components/WalletProvider';
@@ -47,6 +48,7 @@ export default function Home() {
         </HumanGate>
         <footer className="app-footer">
           <FounderTrust />
+          <FooterSocial />
         </footer>
       </main>
     </WalletProvider>
