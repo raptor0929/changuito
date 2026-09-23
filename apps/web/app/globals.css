@@ -775,18 +775,29 @@ a:hover { color: var(--chg-arcilla); }
 
 .app-footer {
   flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  column-gap: 2px;
   margin: 0;
   padding: 2px 8px calc(8px + env(safe-area-inset-bottom, 0px));
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
   text-align: center;
+  /* The trust sentence used to query its own box. The icons sit beside
+     that box now, so the query has to be the footer: a shrink-wrapped
+     sentence is under 36rem even on a wide screen, and would stack. */
+  container-type: inline-size;
+  container-name: app-footer;
 }
 
 /* Wide: one sentence, copyright first. Narrow: names, then the copyright line. */
 .chg-trust {
-  container-type: inline-size;
-  container-name: chg-trust;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
 }
 .chg-trust-line { margin: 0; }
 .chg-trust-link {
@@ -807,9 +818,50 @@ a:hover { color: var(--chg-arcilla); }
   white-space: nowrap;
   border: 0;
 }
-@container chg-trust (max-width: 36rem) {
+@container app-footer (max-width: 36rem) {
   .chg-trust-line { display: flex; flex-direction: column-reverse; }
   .chg-trust-sep { display: none; }
+}
+
+/* Profile icons. 44px is the touch target; the glyph inside is 16 to 18px
+   so the row stays about as tall as the target and does not cover the
+   composer (the footer is the flex sibling under it). The ring is inset
+   because the shell clips overflow and the empty-state footer padding is
+   only a few pixels. Hover stays on --muted / --text: arcilla on the page
+   background is under 3:1. */
+.app-social {
+  flex: 0 0 auto;
+}
+.app-social-list {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.app-social-list > li {
+  display: flex;
+  margin: 0;
+  padding: 0;
+}
+.app-social-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: var(--muted);
+  border-radius: 10px;
+  text-decoration: none;
+}
+.app-social-link:hover {
+  color: var(--text);
+  background: rgba(42, 26, 20, 0.06);
+}
+.app-social-link:focus-visible {
+  outline: 3px solid var(--chg-espresso);
+  outline-offset: -3px;
 }
 
 /* ------------------------------------------------- empty chat, phone only
