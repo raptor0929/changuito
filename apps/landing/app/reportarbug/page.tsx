@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import Image from 'next/image';
 
+import { FounderTrust } from '@changuito/trust/ui';
+import { AnalyticsView } from '../../components/analytics/analytics-view';
 import { BugReportPanel } from '../../components/bug-report/bug-report-panel';
 import { BugReportViewport } from '../../components/bug-report/bug-report-viewport';
 import { JsonLd } from '../../components/seo/json-ld';
@@ -36,6 +38,8 @@ export default async function ReportarBugPage({
 
   return (
     <div className={styles.page} data-testid="bug-report-screen">
+      <AnalyticsView event="bug_report_view" />
+      {listed ? <AnalyticsView event="bug_report_success" /> : null}
       <BugReportViewport />
       <JsonLd data={subpageJsonLd(page)} />
       <a className={styles.skip} href="#reporte">
@@ -70,6 +74,11 @@ export default async function ReportarBugPage({
         initialDone={listed}
         notice={estado === 'error' ? 'Revisá los datos e intentá de nuevo.' : undefined}
       />
+      {/* Outside the form. Hidden while the keyboard is open so it does not
+          take a row from the visible band. */}
+      <footer className={styles.trust}>
+        <FounderTrust />
+      </footer>
     </div>
   );
 }

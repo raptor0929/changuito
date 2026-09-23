@@ -11,7 +11,7 @@ import {
   STEPS,
   STEPS_TITLE,
 } from '../../lib/copy';
-import { FounderLine } from '../trust/founder-line';
+import { FounderTrust } from '@changuito/trust/ui';
 import { BrandLockup } from './brand-lockup';
 import { FaqList } from './faq-list';
 import { CheckIcon, InstagramIcon, StepIcon } from './icons';
@@ -215,8 +215,7 @@ export function LandingPage() {
           </div>
         </div>
         <p className={styles.fine}>{FOOTER.legal}</p>
-        <FounderLine className={styles.fine} />
-        <p className={styles.fine}>{FOOTER.copyright}</p>
+        <FounderTrust className={styles.fine} />
       </footer>
     </div>
   );

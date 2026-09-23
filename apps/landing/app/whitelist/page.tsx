@@ -1,33 +1,47 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import Image from 'next/image';
 
+import { FounderTrust } from '@changuito/trust/ui';
+import { AnalyticsView } from '../../components/analytics/analytics-view';
 import { JsonLd } from '../../components/seo/json-ld';
-import { FounderLine } from '../../components/trust/founder-line';
 import { WaitlistForm } from '../../components/waitlist/waitlist-form';
+import { WhitelistViewport } from '../../components/waitlist/whitelist-viewport';
 import styles from '../../components/waitlist/waitlist.module.css';
+import { noticeFromQuery } from '../../lib/waitlist/messages.ts';
 import { pageMetadata, publicPage, subpageJsonLd } from '../../lib/seo';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  // Chrome shrinks the layout viewport with the keyboard. iOS Safari
+  // ignores this; the form scrolls the focused field itself.
+  interactiveWidget: 'resizes-content',
+};
 
 const page = publicPage('/whitelist');
 
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string }>;
+  searchParams: Promise<{ estado?: string; campo?: string }>;
 }): Promise<Metadata> {
-  const { estado } = await searchParams;
-  return pageMetadata(page, { noindex: Boolean(estado) });
+  const { estado, campo } = await searchParams;
+  return pageMetadata(page, { noindex: Boolean(estado || campo) });
 }
 
 export default async function WhitelistPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string }>;
+  searchParams: Promise<{ estado?: string; campo?: string }>;
 }) {
-  const { estado } = await searchParams;
+  const { estado, campo } = await searchParams;
   const listed = estado === 'listo';
 
   return (
     <div className={styles.page} data-testid="whitelist-screen">
+      <AnalyticsView event="whitelist_view" />
+      {listed ? <AnalyticsView event="whitelist_submit_success" /> : null}
+      <WhitelistViewport />
       <JsonLd data={subpageJsonLd(page)} />
       <a className={styles.skip} href="#lista">
         Saltar al formulario
@@ -71,10 +85,10 @@ export default async function WhitelistPage({
               <p className={styles.successLead}>Te escribimos por WhatsApp cuando puedas probar Changuito.</p>
             </div>
           ) : (
-            <WaitlistForm notice={estado === 'error' ? 'Revisá los datos e intentá de nuevo.' : undefined} />
+            <WaitlistForm notice={noticeFromQuery(estado, campo)} />
           )}
         </div>
-        <FounderLine className={styles.fine} />
+        <FounderTrust className={styles.fine} />
       </main>
     </div>
   );

@@ -16,6 +16,10 @@
   --muted: #4a332c;
   --ok: #1a7f4b;
   --warn: var(--chg-arcilla);
+  /* Arcilla is an accent, not a text colour: #e07a5f on --bg is about 2.9:1.
+     This is the same hue pushed dark enough to clear 4.5:1. It lived inline in
+     .human-gate-error first; promoted here now that error text has two homes. */
+  --warn-ink: #7a2e12;
   --radius: 14px;
   --radius-pill: 999px;
 
@@ -158,9 +162,13 @@ a:hover { color: var(--chg-arcilla); }
   -webkit-overflow-scrolling: touch;
   /* Overlay scrollbars paint on top of this box. `stable` reserves their
      gutter, and the extra inline-end padding is the gap so a right-aligned
-     espresso bubble — and the rest of the thread — stays clear of the bar.
-     Inline-start stays tight so agent copy keeps its left edge. Later
-     padding rules must not use the shorthand: it would zero this end gap. */
+     espresso bubble — and the retry control under an undelivered message —
+     stays clear of the bar. overflow-y:auto makes overflow-x compute to
+     non-visible, so a focus ring painted at that right edge would be sheared
+     off; 16px covers the ring (the composer uses 8px for the same reason)
+     and the scrollbar gap. Inline-start stays tight so agent copy keeps its
+     left edge. Later padding rules must not use the shorthand: it would zero
+     this end gap. */
   scrollbar-gutter: stable;
   padding-block: 24px;
   padding-inline-start: 2px;
@@ -174,8 +182,6 @@ a:hover { color: var(--chg-arcilla); }
 
 .bubble { margin: 0; line-height: 1.55; }
 .is-user {
-  align-self: flex-end;
-  max-width: 85%;
   background: var(--chg-espresso);
   color: var(--chg-offwhite);
   padding: 10px 14px;
@@ -233,8 +239,58 @@ a:hover { color: var(--chg-arcilla); }
   align-self: stretch;
   border-left: 3px solid var(--warn);
   padding-left: 12px;
-  color: var(--warn);
+  color: var(--warn-ink);
   font-size: 14px;
+}
+
+/* ------------------------------------------------- undelivered message
+
+   A turn that never reached the server leaves the user's own bubble as the
+   last thing in the thread. Marking that bubble, rather than stacking a red
+   line under it, is the only rendering that matches what the server has: the
+   message is not history yet, it is a draft that still has to go. The red line
+   stays for the other shape of failure — one that broke halfway through an
+   answer the user is already reading. See CLAUDE.md §4. */
+
+.msg-user {
+  align-self: flex-end;
+  max-width: 85%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.is-undelivered {
+  /* Outline, not opacity. Fading the solid bubble takes the off-white text
+     down with it and the message stops being readable — and the message is
+     the thing the user is about to send again. Espresso on --bg is 14.6:1;
+     the dashed arcilla edge is what carries "not sent". */
+  background: transparent;
+  color: var(--text);
+  border: 1px dashed var(--chg-arcilla);
+  /* One pixel under .is-user's 10px/14px, so gaining a border does not resize
+     the bubble the moment it fails. */
+  padding: 9px 13px;
+}
+
+.msg-failed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--warn-ink);
+}
+.msg-failed-note { font-weight: 600; }
+
+.msg-retry { position: relative; flex: 0 0 auto; }
+/* .btn-sm is 32px on purpose: a full 44px pill next to 13px caption text reads
+   as the turn's main action, which it is not. The tap target comes back as an
+   invisible overlay instead. */
+.msg-retry::after {
+  content: '';
+  position: absolute;
+  inset: -6px -8px;
 }
 
 .greeting { color: var(--text); }
@@ -642,8 +698,8 @@ a:hover { color: var(--chg-arcilla); }
   display: block;
 }
 .human-gate-error {
-  /* Darker than brand arcilla so error text clears 4.5:1 on --bg. */
-  color: #7a2e12 !important;
+  /* !important because .human-gate p wins on specificity otherwise. */
+  color: var(--warn-ink) !important;
   font-weight: 600;
 }
 .human-gate-widget {

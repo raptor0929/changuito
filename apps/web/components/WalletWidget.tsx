@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { track, trackLoginStart } from '../lib/analytics';
 import { pollarEnabled, shortAddress } from '../lib/pollar.ts';
-import { ensureUserSession, forgetUserSession } from '../lib/session-client.ts';
+import { ensureUserCookie, forgetUserCookie } from '../lib/session-login.ts';
 import { useBalances } from '../lib/use-balances.ts';
 
 /**
@@ -39,8 +39,9 @@ function ConnectedWallet() {
   const [funding, setFunding] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
-  // After Pollar login, set httpOnly chg_user so /api/chat skips the guest turn limit.
-  // Shared with the chat retry so a turn that races this POST waits on it.
+  // After Pollar login, set httpOnly chg_user so /api/chat skips the guest turn
+  // limit. Shared with the chat, which awaits the same promise before it
+  // re-sends a message the gate rejected — see lib/session-login.ts.
   const wasAuthed = useRef(isAuthenticated);
   useEffect(() => {
     if (!wasAuthed.current && isAuthenticated) track('login_success');
@@ -55,7 +56,7 @@ function ConnectedWallet() {
   useEffect(() => {
     if (!isAuthenticated || !address) return;
     let cancelled = false;
-    void ensureUserSession(address).then((ok) => {
+    void ensureUserCookie(address).then((ok) => {
       if (!cancelled && !ok) track('login_fail', { code: 'session' });
     });
     return () => {
@@ -161,7 +162,7 @@ function ConnectedWallet() {
           aria-label="Salir"
           onClick={() => {
             track('logout');
-            forgetUserSession();
+            forgetUserCookie();
             void fetch('/api/session/logout', { method: 'POST', credentials: 'same-origin' }).finally(() => logout());
           }}
         >

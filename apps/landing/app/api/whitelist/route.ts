@@ -1,3 +1,4 @@
+import { codeForMessage, firstFieldMessage } from '../../../lib/waitlist/messages.ts';
 import { submitWaitlist } from '../../../lib/waitlist/submit.ts';
 
 export const runtime = 'nodejs';
@@ -29,8 +30,16 @@ export async function POST(request: Request) {
   });
 
   if (parsed.formPost) {
-    const estado = result.ok ? 'listo' : 'error';
-    return Response.redirect(new URL(`/whitelist?estado=${estado}`, request.url), 303);
+    const url = new URL('/whitelist', request.url);
+    if (result.ok) url.searchParams.set('estado', 'listo');
+    else if (result.status === 503) url.searchParams.set('estado', 'nuestro');
+    else if (result.status === 429) url.searchParams.set('estado', 'espera');
+    else {
+      url.searchParams.set('estado', 'datos');
+      const code = codeForMessage(firstFieldMessage(result.errors));
+      if (code) url.searchParams.set('campo', code);
+    }
+    return Response.redirect(url, 303);
   }
 
   if (result.ok) return Response.json({ ok: true });

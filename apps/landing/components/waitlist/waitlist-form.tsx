@@ -2,13 +2,12 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 
+import { ACCESSORY_PX, keyboardInset, scrollDeltaToClear } from '../../lib/bug-report/keyboard-inset.ts';
+import { track } from '../../lib/analytics.ts';
+import { firstFieldMessage, SERVER_ERROR, TURNSTILE_MISSING } from '../../lib/waitlist/messages.ts';
 import { OTHER_SOURCE, SOURCE_GROUPS } from '../../lib/waitlist/options.ts';
-import { validateWaitlist } from '../../lib/waitlist/validate.ts';
+import { validateWaitlist, type FieldErrors } from '../../lib/waitlist/validate.ts';
 import styles from './waitlist.module.css';
-
-type FieldErrors = Partial<
-  Record<'name' | 'email' | 'source' | 'otherDetail' | 'whatsapp' | 'whatsappGroup' | 'form', string>
->;
 
 declare global {
   interface Window {
@@ -61,8 +60,60 @@ export function WaitlistForm({ notice }: { notice?: string }) {
       invalid.focus();
       return;
     }
-    if (errors.form || notice) errorSummaryRef.current?.focus();
+    if (errors.form || errors.turnstile || notice) errorSummaryRef.current?.focus();
   }, [errors, done, notice]);
+
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    if (!window.matchMedia('(hover: none) and (pointer: coarse)').matches) return;
+
+    const vv = window.visualViewport;
+    let timer = 0;
+
+    const settle = () => {
+      const layout = window.innerHeight;
+      const visual = vv?.height ?? layout;
+      if (keyboardInset(layout, visual) <= 0) return;
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement) || !form.contains(active)) return;
+      if (!active.matches('input, textarea, select')) return;
+      if (active.closest('[aria-hidden="true"]')) return;
+      const scroller = form.closest<HTMLElement>('[data-testid="whitelist-screen"]');
+      if (!scroller) return;
+      const target =
+        active.closest<HTMLElement>(`.${CSS.escape(styles.field)}, .${CSS.escape(styles.fieldset)}`) ?? active;
+      const rect = target.getBoundingClientRect();
+      const delta = scrollDeltaToClear(rect.top, rect.height, 8, visual - ACCESSORY_PX);
+      if (delta !== 0) scroller.scrollBy({ top: delta, left: 0, behavior: 'auto' });
+    };
+
+    const schedule = (delay: number) => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(settle, delay);
+    };
+
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (!target.matches('input, textarea, select')) return;
+      if (target.closest('[aria-hidden="true"]')) return;
+      schedule(320);
+    };
+
+    const onViewport = () => schedule(80);
+
+    form.addEventListener('focusin', onFocusIn);
+    vv?.addEventListener('resize', onViewport);
+    window.addEventListener('orientationchange', onViewport);
+
+    return () => {
+      window.clearTimeout(timer);
+      form.removeEventListener('focusin', onFocusIn);
+      vv?.removeEventListener('resize', onViewport);
+      window.removeEventListener('orientationchange', onViewport);
+    };
+  }, []);
 
   useEffect(() => {
     if (!SITE_KEY || !turnstileRef.current) return;
@@ -117,10 +168,14 @@ export function WaitlistForm({ notice }: { notice?: string }) {
       { name, email, source, otherDetail, whatsapp, whatsappGroup },
       new Date().toISOString(),
     );
-    if (!checked.ok) {
-      setErrors(checked.errors);
+    const fieldErrors: FieldErrors = checked.ok ? {} : { ...checked.errors };
+    if (SITE_KEY && !turnstileToken) fieldErrors.turnstile = TURNSTILE_MISSING;
+    if (Object.keys(fieldErrors).length > 0) {
+      track('whitelist_submit_error', { error_type: 'field' });
+      setErrors(fieldErrors);
       return;
     }
+    track('whitelist_submit_attempt');
     setPending(true);
     try {
       const response = await fetch('/api/whitelist', {
@@ -139,14 +194,20 @@ export function WaitlistForm({ notice }: { notice?: string }) {
       });
       const payload = (await response.json()) as { ok?: boolean; errors?: FieldErrors };
       if (payload.ok) {
+        track('whitelist_submit_success');
         setErrors({});
         setDone(true);
         return;
       }
-      setErrors(payload.errors ?? { form: 'No pudimos anotarte. Probá de nuevo en un rato.' });
-      resetTurnstile();
+      const returned = payload.errors;
+      const named = returned ? firstFieldMessage(returned) : undefined;
+      const next = named || returned?.form ? (returned ?? { form: SERVER_ERROR }) : { form: SERVER_ERROR };
+      track('whitelist_submit_error', { error_type: named ? 'field' : 'server' });
+      setErrors(next);
+      if (next.form === SERVER_ERROR || next.turnstile) resetTurnstile();
     } catch {
-      setErrors({ form: 'No pudimos anotarte. Probá de nuevo en un rato.' });
+      track('whitelist_submit_error', { error_type: 'server' });
+      setErrors({ form: SERVER_ERROR });
       resetTurnstile();
     } finally {
       setPending(false);
@@ -165,7 +226,7 @@ export function WaitlistForm({ notice }: { notice?: string }) {
   }
 
   const showOther = source === OTHER_SOURCE;
-  const formNotice = errors.form ?? notice;
+  const formNotice = firstFieldMessage(errors) ?? errors.form ?? notice;
   const nameErrorId = `${baseId}-name-error`;
   const emailErrorId = `${baseId}-email-error`;
   const sourceErrorId = `${baseId}-source-error`;
@@ -174,6 +235,7 @@ export function WaitlistForm({ notice }: { notice?: string }) {
   const whatsappErrorId = `${baseId}-whatsapp-error`;
   const groupHintId = `${baseId}-group-hint`;
   const groupErrorId = `${baseId}-group-error`;
+  const turnstileErrorId = `${baseId}-turnstile-error`;
   const groupHint =
     whatsappGroup === 'no'
       ? 'Te contactaremos por WhatsApp por privado.'
@@ -203,7 +265,7 @@ export function WaitlistForm({ notice }: { notice?: string }) {
         </p>
       ) : null}
 
-      <div className={styles.field}>
+      <div className={`${styles.field} ${styles.fieldName}`}>
         <label className={styles.label} htmlFor={`${baseId}-name`}>
           Nombre
         </label>
@@ -228,7 +290,7 @@ export function WaitlistForm({ notice }: { notice?: string }) {
         ) : null}
       </div>
 
-      <div className={styles.field}>
+      <div className={`${styles.field} ${styles.fieldEmail}`}>
         <label className={styles.label} htmlFor={`${baseId}-email`}>
           Email
         </label>
@@ -254,7 +316,7 @@ export function WaitlistForm({ notice }: { notice?: string }) {
         ) : null}
       </div>
 
-      <div className={styles.field}>
+      <div className={`${styles.field} ${styles.fieldSource}`}>
         <label className={styles.label} htmlFor={`${baseId}-source`}>
           ¿Dónde te enteraste de nosotros?
         </label>
@@ -311,7 +373,7 @@ export function WaitlistForm({ notice }: { notice?: string }) {
         ) : null}
       </div>
 
-      <div className={styles.field}>
+      <div className={`${styles.field} ${styles.fieldWhatsapp}`}>
         <label className={styles.label} htmlFor={`${baseId}-whatsapp`}>
           WhatsApp
         </label>
@@ -359,7 +421,10 @@ export function WaitlistForm({ notice }: { notice?: string }) {
               value="si"
               checked={whatsappGroup === 'si'}
               data-testid="whitelist-whatsapp-group-si"
-              onChange={() => setWhatsappGroup('si')}
+              onChange={() => {
+                setWhatsappGroup('si');
+                track('whitelist_group_optin', { value: 'yes' });
+              }}
               required
             />
             Sí
@@ -371,7 +436,10 @@ export function WaitlistForm({ notice }: { notice?: string }) {
               value="no"
               checked={whatsappGroup === 'no'}
               data-testid="whitelist-whatsapp-group-no"
-              onChange={() => setWhatsappGroup('no')}
+              onChange={() => {
+                setWhatsappGroup('no');
+                track('whitelist_group_optin', { value: 'no' });
+              }}
               required
             />
             No
@@ -390,9 +458,24 @@ export function WaitlistForm({ notice }: { notice?: string }) {
       </fieldset>
 
       {SITE_KEY ? (
-        <div className={styles.turnstile} data-testid="whitelist-turnstile">
+        <div
+          className={styles.turnstile}
+          data-testid="whitelist-turnstile"
+          aria-invalid={errors.turnstile ? true : undefined}
+          tabIndex={errors.turnstile ? -1 : undefined}
+        >
           <div ref={turnstileRef} />
           <input type="hidden" name="turnstileToken" value={turnstileToken} />
+          {errors.turnstile ? (
+            <p
+              id={turnstileErrorId}
+              className={styles.fieldError}
+              role="alert"
+              data-testid="whitelist-turnstile-error"
+            >
+              {errors.turnstile}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
