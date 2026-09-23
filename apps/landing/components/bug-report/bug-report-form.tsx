@@ -9,6 +9,7 @@ import {
   formatBytes,
   unreadableFileMessage,
 } from '../../lib/bug-report/attachments.ts';
+import { track } from '../../lib/analytics.ts';
 import { ACCESSORY_PX, keyboardInset, scrollDeltaToClear } from '../../lib/bug-report/keyboard-inset.ts';
 import { SEVERITIES } from '../../lib/bug-report/options.ts';
 import styles from './bug-report.module.css';
@@ -176,6 +177,7 @@ export function BugReportForm({ notice, onSuccess }: { notice?: string; onSucces
       });
       const payload = (await response.json()) as { ok?: boolean; errors?: FieldErrors };
       if (payload.ok) {
+        track('bug_report_success');
         setErrors({});
         onSuccess();
         return;

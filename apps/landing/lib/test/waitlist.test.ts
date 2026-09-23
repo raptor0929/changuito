@@ -5,6 +5,13 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import {
+  SERVER_ERROR,
+  TURNSTILE_MISSING,
+  WHATSAPP_INVALID,
+  firstFieldMessage,
+  noticeFromQuery,
+} from '../waitlist/messages.ts';
 import { EVENT_SOURCES, OTHER_SOURCE, SOCIAL_SOURCES, SOURCE_GROUPS, allowedSources } from '../waitlist/options.ts';
 import { saveWaitlistEntry } from '../waitlist/persist.ts';
 import type { RateBuckets } from '../waitlist/rate-limit.ts';
@@ -97,6 +104,36 @@ test('waitlist fields use the same inset as the bug report controls', () => {
   assert.equal(css.includes('\u2013'), false);
 });
 
+test('the whitelist page fits the visual viewport and hides trust while the keyboard is open', () => {
+  const css = readFileSync(join(root, 'components/waitlist/waitlist.module.css'), 'utf8');
+  const page = readFileSync(join(root, 'app/whitelist/page.tsx'), 'utf8');
+  const form = readFileSync(join(root, 'components/waitlist/waitlist-form.tsx'), 'utf8');
+  const viewport = readFileSync(join(root, 'components/waitlist/whitelist-viewport.tsx'), 'utf8');
+  const globals = readFileSync(join(root, 'app/globals.css'), 'utf8');
+
+  assert.equal(/\btransform\s*:/.test(css), false);
+  assert.equal(/\bfilter\s*:/.test(css), false);
+  assert.equal(/\bperspective\s*:/.test(css), false);
+  assert.equal(/\bwill-change\s*:/.test(css), false);
+  assert.equal(css.includes('100dvh'), false);
+  assert.equal(css.includes('100vh'), false);
+  assert.match(css, /position:\s*fixed/);
+  assert.match(css, /top:\s*var\(--vv-top, 0px\)/);
+  assert.match(css, /height:\s*var\(--vvh, 100svh\)/);
+  assert.match(css, /overflow-y:\s*auto/);
+  assert.match(css, /data-keyboard='open'/);
+  assert.match(page, /interactiveWidget:\s*'resizes-content'/);
+  assert.match(page, /WhitelistViewport/);
+  assert.match(viewport, /dataset\.keyboard = 'open'/);
+  assert.match(form, /scrollDeltaToClear/);
+  assert.match(form, /whitelist-screen/);
+  assert.match(globals, /html:has\(\[data-testid='whitelist-screen'\]\) body/);
+  assert.equal(css.includes('\u2014'), false);
+  assert.equal(css.includes('\u2013'), false);
+  assert.equal(viewport.includes('\u2014'), false);
+  assert.equal(viewport.includes('\u2013'), false);
+});
+
 test('the waitlist form asks for a required WhatsApp and the beta group', () => {
   const form = readFileSync(join(root, 'components/waitlist/waitlist-form.tsx'), 'utf8');
   const page = readFileSync(join(root, 'app/whitelist/page.tsx'), 'utf8');
@@ -147,12 +184,12 @@ test('WhatsApp is required and the beta group answer is required', () => {
   const missingGroup = validateWaitlist({ ...valid, whatsappGroup: '' }, CREATED);
   assert.equal(missingGroup.ok, false);
   if (missingGroup.ok) return;
-  assert.equal(missingGroup.errors.whatsappGroup, 'Decinos si querés sumarte al grupo de WhatsApp.');
+  assert.equal(missingGroup.errors.whatsappGroup, 'Elegí si querés sumarte al grupo.');
 
   const missingPhone = validateWaitlist({ ...valid, whatsapp: '   ' }, CREATED);
   assert.equal(missingPhone.ok, false);
   if (missingPhone.ok) return;
-  assert.equal(missingPhone.errors.whatsapp, 'Ingresá tu WhatsApp.');
+  assert.equal(missingPhone.errors.whatsapp, 'Revisá tu WhatsApp (con código de país).');
 
   const noGroup = validateWaitlist({ ...valid, whatsappGroup: 'no' }, CREATED);
   assert.equal(noGroup.ok, true);
@@ -172,7 +209,7 @@ test('WhatsApp is required and the beta group answer is required', () => {
   const badPhone = validateWaitlist({ ...valid, whatsapp: '123' }, CREATED);
   assert.equal(badPhone.ok, false);
   if (badPhone.ok) return;
-  assert.equal(badPhone.errors.whatsapp, 'Ingresá un WhatsApp válido, con código de país.');
+  assert.equal(badPhone.errors.whatsapp, 'Revisá tu WhatsApp (con código de país).');
 });
 
 test('WhatsApp normalization accepts Argentina and explicit international numbers', () => {
@@ -196,8 +233,61 @@ test('rejects an unknown source, a bad email and a one-letter name', () => {
   assert.equal(result.ok, false);
   if (result.ok) return;
   assert.equal(result.errors.name, 'El nombre es muy corto.');
-  assert.equal(result.errors.email, 'Ingresá un email válido.');
+  assert.equal(result.errors.email, 'Revisá tu email.');
+  const emptyEmail = validateWaitlist({ ...valid, email: '  ' }, CREATED);
+  assert.equal(emptyEmail.ok, false);
+  if (!emptyEmail.ok) assert.equal(emptyEmail.errors.email, 'Completá tu email.');
   assert.equal(result.errors.source, 'Elegí cómo te enteraste de nosotros.');
+});
+
+test('a field failure names the field and a server failure does not', () => {
+  const checked = validateWaitlist(
+    { ...valid, name: '', whatsapp: '123' },
+    CREATED,
+  );
+  assert.equal(checked.ok, false);
+  if (checked.ok) return;
+  assert.equal(firstFieldMessage(checked.errors), 'Completá tu nombre.');
+  assert.equal(checked.errors.whatsapp, WHATSAPP_INVALID);
+  assert.notEqual(SERVER_ERROR, WHATSAPP_INVALID);
+  assert.notEqual(SERVER_ERROR, TURNSTILE_MISSING);
+  assert.equal(noticeFromQuery('nuestro'), SERVER_ERROR);
+  assert.equal(noticeFromQuery('datos', 'whatsapp'), WHATSAPP_INVALID);
+  assert.equal(noticeFromQuery('datos', 'turnstile'), TURNSTILE_MISSING);
+  assert.equal(noticeFromQuery('error'), 'Revisá los datos del formulario.');
+  assert.equal(noticeFromQuery('listo'), undefined);
+
+  const form = readFileSync(join(root, 'components/waitlist/waitlist-form.tsx'), 'utf8');
+  const page = readFileSync(join(root, 'app/whitelist/page.tsx'), 'utf8');
+  assert.equal(form.includes('No pudimos anotarte. Probá de nuevo en un rato.'), false);
+  assert.match(form, /firstFieldMessage/);
+  assert.match(form, /SERVER_ERROR/);
+  assert.equal(page.includes('Revisá los datos e intentá de nuevo.'), false);
+  assert.equal(form.includes('\u2014'), false);
+  assert.equal(page.includes('\u2014'), false);
+});
+
+test('a missing Turnstile token is a field error, not a server failure', async () => {
+  resetTurnstileDevLog();
+  const result = await submitWaitlist(
+    { ...valid, company: '', turnstileToken: '' },
+    {
+      ip: '198.51.100.12',
+      now: Date.parse(CREATED),
+      buckets: new Map(),
+      env: {
+        NODE_ENV: 'production',
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'site',
+        TURNSTILE_SECRET_KEY: 'secret',
+      },
+      fetch: async () => Response.json({ success: true }),
+    },
+  );
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.status, 400);
+  assert.equal(result.errors.turnstile, TURNSTILE_MISSING);
+  assert.equal(result.errors.form, undefined);
 });
 
 test('rate limit allows eight calls from one ip and blocks the ninth', () => {
@@ -483,7 +573,8 @@ test('production submit without Turnstile keys is refused', async () => {
   assert.equal(result.ok, false);
   if (result.ok) return;
   assert.equal(result.status, 503);
-  assert.equal(result.errors.form, 'No pudimos anotarte. Probá de nuevo en un rato.');
+  assert.equal(result.errors.form, 'No pudimos anotarte por un problema nuestro. Probá de nuevo en un rato.');
+  assert.equal(result.errors.form?.includes('Revisá'), false);
   assert.equal(called, false);
 });
 
@@ -499,7 +590,7 @@ test('Turnstile siteverify accepts a valid token and rejects a bad one', async (
     env,
     fetch: async () => Response.json({ success: true }),
   });
-  assert.deepEqual(missing, { ok: false, error: 'Confirmá que no sos un robot.' });
+  assert.deepEqual(missing, { ok: false, error: 'Completá la verificación (Turnstile) y probá de nuevo.' });
 
   const calls: string[] = [];
   const ok = await verifyTurnstile('token-ok', {
@@ -522,7 +613,16 @@ test('Turnstile siteverify accepts a valid token and rejects a bad one', async (
     env,
     fetch: async () => Response.json({ success: false }),
   });
-  assert.deepEqual(bad, { ok: false, error: 'No pudimos verificar que no seas un robot. Probá de nuevo.' });
+  assert.deepEqual(bad, { ok: false, error: 'Completá la verificación (Turnstile) y probá de nuevo.' });
+
+  const down = await verifyTurnstile('token-ok', {
+    env,
+    fetch: async () => new Response(null, { status: 503 }),
+  });
+  assert.deepEqual(down, {
+    ok: false,
+    error: 'No pudimos anotarte por un problema nuestro. Probá de nuevo en un rato.',
+  });
 });
 
 test('submit with Turnstile keys verifies before saving', async () => {

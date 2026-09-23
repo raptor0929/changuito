@@ -1,3 +1,4 @@
+import { RATE_ERROR, SERVER_ERROR } from './messages.ts';
 import { allowSubmission, type RateBuckets } from './rate-limit.ts';
 import { saveWaitlistEntry, type SaveDeps } from './persist.ts';
 import { verifyTurnstile } from './turnstile.ts';
@@ -18,9 +19,6 @@ export type SubmitResult =
   | { ok: true }
   | { ok: false; status: 400 | 429 | 503; errors: FieldErrors & { form?: string } };
 
-const FORM_ERROR = 'No pudimos anotarte. Probá de nuevo en un rato.';
-const RATE_ERROR = 'Esperá un toque y volvé a intentar.';
-
 export async function submitWaitlist(
   body: SubmitBody,
   ctx: { ip: string; now: number; buckets?: RateBuckets; userAgent?: string } & SaveDeps,
@@ -33,8 +31,8 @@ export async function submitWaitlist(
     ip: ctx.ip,
   });
   if (!captcha.ok) {
-    const status = captcha.error === FORM_ERROR ? 503 : 400;
-    return { ok: false, status, errors: { form: captcha.error } };
+    if (captcha.error === SERVER_ERROR) return { ok: false, status: 503, errors: { form: SERVER_ERROR } };
+    return { ok: false, status: 400, errors: { turnstile: captcha.error } };
   }
 
   const input = {
@@ -56,7 +54,7 @@ export async function submitWaitlist(
   if (userAgent) validated.entry.userAgent = userAgent;
 
   const saved = await saveWaitlistEntry(validated.entry, ctx);
-  if (!saved.ok) return { ok: false, status: 503, errors: { form: FORM_ERROR } };
+  if (!saved.ok) return { ok: false, status: 503, errors: { form: SERVER_ERROR } };
   return { ok: true };
 }
 

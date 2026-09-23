@@ -9,11 +9,9 @@
  * — logged once per process.
  */
 
-const SITEVERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+import { SERVER_ERROR, TURNSTILE_MISSING } from './messages.ts';
 
-const MISSING_TOKEN = 'Confirmá que no sos un robot.';
-const VERIFY_FAILED = 'No pudimos verificar que no seas un robot. Probá de nuevo.';
-const UNCONFIGURED = 'No pudimos anotarte. Probá de nuevo en un rato.';
+const SITEVERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
 export type TurnstileDeps = {
   env: NodeJS.ProcessEnv;
@@ -41,7 +39,7 @@ export async function verifyTurnstile(token: string, deps: TurnstileDeps): Promi
       console.error(
         '[waitlist] Turnstile keys missing in production. Set NEXT_PUBLIC_TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY.',
       );
-      return { ok: false, error: UNCONFIGURED };
+      return { ok: false, error: SERVER_ERROR };
     }
     if (!loggedDevSkip) {
       loggedDevSkip = true;
@@ -51,7 +49,7 @@ export async function verifyTurnstile(token: string, deps: TurnstileDeps): Promi
   }
 
   const responseToken = token.trim();
-  if (!responseToken) return { ok: false, error: MISSING_TOKEN };
+  if (!responseToken) return { ok: false, error: TURNSTILE_MISSING };
 
   try {
     const body = new URLSearchParams();
@@ -67,14 +65,14 @@ export async function verifyTurnstile(token: string, deps: TurnstileDeps): Promi
     });
     if (!response.ok) {
       console.error(`[waitlist] Turnstile siteverify status ${response.status}`);
-      return { ok: false, error: VERIFY_FAILED };
+      return { ok: false, error: SERVER_ERROR };
     }
     const payload = (await response.json()) as { success?: boolean };
     if (payload.success === true) return { ok: true };
-    return { ok: false, error: VERIFY_FAILED };
+    return { ok: false, error: TURNSTILE_MISSING };
   } catch (error) {
     console.error('[waitlist] Turnstile verify failed', error instanceof Error ? error.message : 'unknown');
-    return { ok: false, error: VERIFY_FAILED };
+    return { ok: false, error: SERVER_ERROR };
   }
 }
 
