@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 
+import { track } from './analytics';
 import { applyEvent, endTurn, initialState, omitErrorMessage, sendUser, type ChatState } from './chat-state';
 import { notifyHumanRequired, SOLO_HUMANOS } from './human-gate-ui';
 import { LOGIN_REQUIRED, LOGIN_REQUIRED_MESSAGE } from './login-constants';
@@ -106,6 +107,7 @@ export function useChat(auth?: UseChatAuth) {
                     return;
                   }
                 }
+                track('login_fail', { code: 'session' });
                 setState((s) =>
                   omitErrorMessage(
                     endTurn(s, 'No pude guardar la sesión. Probá de nuevo.'),

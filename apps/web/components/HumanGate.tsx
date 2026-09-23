@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
+import { track } from '../lib/analytics';
 import {
   clientGateDecision,
   HUMAN_REQUIRED_EVENT,
@@ -123,6 +124,7 @@ export function HumanGate({
       setNeedWidget(false);
       setBlocked(false);
       setError(null);
+      track('human_gate_pass', { mode: status.mode === 'open' ? 'open' : 'cookie' });
       if (status.mode === 'open') {
         console.warn(
           '[changuito] human-gate abierto en local (sin Turnstile). En producción hace falta NEXT_PUBLIC_TURNSTILE_SITE_KEY + TURNSTILE_SECRET_KEY.',
@@ -151,6 +153,7 @@ export function HumanGate({
     setNeedWidget(false);
     setBlocked(true);
     setError(decision.reason === 'unconfigured' ? COPY.startFailed : null);
+    track('human_gate_fail', { code: decision.reason });
   }, [siteKey]);
 
   const refresh = useCallback(async () => {
@@ -179,7 +182,9 @@ export function HumanGate({
       setNeedWidget(false);
       setBlocked(false);
       setError(null);
+      track('human_gate_pass', { mode: 'turnstile' });
     } catch (err: unknown) {
+      track('human_gate_fail', { code: 'verify' });
       setError(err instanceof Error ? err.message : COPY.widgetFailed);
       if (widgetId.current && window.turnstile) {
         try {
@@ -260,9 +265,18 @@ export function HumanGate({
         callback: (token) => {
           void exchange(token);
         },
-        'error-callback': () => setError(COPY.widgetFailed),
-        'expired-callback': () => setError(COPY.widgetExpired),
-        'timeout-callback': () => setError(COPY.widgetFailed),
+        'error-callback': () => {
+          track('human_gate_fail', { code: 'widget' });
+          setError(COPY.widgetFailed);
+        },
+        'expired-callback': () => {
+          track('human_gate_fail', { code: 'expired' });
+          setError(COPY.widgetExpired);
+        },
+        'timeout-callback': () => {
+          track('human_gate_fail', { code: 'timeout' });
+          setError(COPY.widgetFailed);
+        },
       });
     };
 

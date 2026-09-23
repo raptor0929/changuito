@@ -15,6 +15,7 @@ const COMPOSER_PLACEHOLDERS = [
   '¿Semana laboral o juntada? Decime cuántos son y qué comen, y armamos el carrito.',
 ];
 
+import { errorCode, track, trackLoginStart } from '../lib/analytics';
 import { FREE_TURNS, LOGIN_CTA, LOGIN_REQUIRED_MESSAGE, loginGateBannerText } from '../lib/login-constants';
 import type { OpenedOrder } from '../lib/order';
 import { pollarEnabled } from '../lib/pollar';
@@ -96,10 +97,25 @@ function ChatCore({
   }, [state.streaming, gated]);
 
   const submit = (text: string) => {
-    if (state.streaming || gated) return;
+    if (state.streaming || gated || !text.trim()) return;
     setDraft('');
+    track('search_submit');
     void send(text);
   };
+
+  const sawGate = useRef(false);
+  useEffect(() => {
+    if (gated && !sawGate.current) track('search_limit_hit');
+    sawGate.current = gated;
+  }, [gated]);
+
+  const seenError = useRef<string | null>(null);
+  useEffect(() => {
+    const last = [...state.blocks].reverse().find((b) => b.kind === 'error');
+    if (!last || last.kind !== 'error' || seenError.current === last.id) return;
+    seenError.current = last.id;
+    track('error_shown', { code: errorCode(last.message) });
+  }, [state.blocks]);
 
   return (
     // `is-empty` is the hook for the mobile first-screen layout. The class is
@@ -144,7 +160,10 @@ function ChatCore({
                   // button that opens a modal with nothing to sign with.
                   onPay={
                     pollarEnabled
-                      ? (cart) => setPaying({ cart, handoffUrl: b.handoffUrl })
+                      ? (cart) => {
+                          track('payment_start', { flow: 'checkout' });
+                          setPaying({ cart, handoffUrl: b.handoffUrl });
+                        }
                       : undefined
                   }
                 />
@@ -203,7 +222,14 @@ function ChatCore({
             <p>{gateText}</p>
           </div>
           {openLoginModal ? (
-            <button type="button" className="btn" onClick={openLoginModal}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                track('login_cta_from_limit');
+                trackLoginStart(openLoginModal);
+              }}
+            >
               {LOGIN_CTA}
             </button>
           ) : (

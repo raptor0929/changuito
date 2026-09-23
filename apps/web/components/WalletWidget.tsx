@@ -1,8 +1,9 @@
 'use client';
 
 import { usePollar } from '@pollar/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
+import { track, trackLoginStart } from '../lib/analytics';
 import { pollarEnabled, shortAddress } from '../lib/pollar.ts';
 import { ensureUserSession, forgetUserSession } from '../lib/session-client.ts';
 import { useBalances } from '../lib/use-balances.ts';
@@ -19,6 +20,9 @@ export function WalletWidget() {
 }
 
 function NoWallet() {
+  useEffect(() => {
+    track('payment_view', { state: 'unconfigured' });
+  }, []);
   return (
     <div className="wallet wallet-off" title="Falta NEXT_PUBLIC_POLLAR_API_KEY. Ver DEPLOY.md">
       <span className="wallet-label">Tu pago</span>
@@ -37,14 +41,32 @@ function ConnectedWallet() {
 
   // After Pollar login, set httpOnly chg_user so /api/chat skips the guest turn limit.
   // Shared with the chat retry so a turn that races this POST waits on it.
+  const wasAuthed = useRef(isAuthenticated);
+  useEffect(() => {
+    if (!wasAuthed.current && isAuthenticated) track('login_success');
+    wasAuthed.current = isAuthenticated;
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!address) return;
+    track('payment_view', { state: 'ready' });
+  }, [address]);
+
   useEffect(() => {
     if (!isAuthenticated || !address) return;
-    void ensureUserSession(address);
+    let cancelled = false;
+    void ensureUserSession(address).then((ok) => {
+      if (!cancelled && !ok) track('login_fail', { code: 'session' });
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [isAuthenticated, address]);
 
 
   async function fund() {
     if (!address) return;
+    track('payment_start', { flow: 'faucet' });
     setFunding(true);
     setNote(null);
     try {
@@ -56,6 +78,7 @@ function ConnectedWallet() {
       const json = await res.json();
       // 429 carries a real answer ("you already have enough"), not a failure.
       if (!res.ok && res.status !== 429) throw new Error(json.error ?? `faucet failed (${res.status})`);
+      track('payment_success', { flow: 'faucet', code: res.status === 429 ? 'enough' : 'ok' });
       setNote(
         json.note ??
           (json.created
@@ -64,6 +87,7 @@ function ConnectedWallet() {
       );
       refresh();
     } catch (err) {
+      track('payment_fail', { flow: 'faucet', code: 'error' });
       setNote(err instanceof Error ? err.message : String(err));
     } finally {
       setFunding(false);
@@ -73,7 +97,7 @@ function ConnectedWallet() {
   if (!address) {
     return (
       <div className="wallet">
-        <button type="button" className="btn" onClick={openLoginModal}>
+        <button type="button" className="btn" onClick={() => trackLoginStart(openLoginModal)}>
           Empezá a comprar
         </button>
       </div>
@@ -136,6 +160,7 @@ function ConnectedWallet() {
           data-testid="wallet-logout"
           aria-label="Salir"
           onClick={() => {
+            track('logout');
             forgetUserSession();
             void fetch('/api/session/logout', { method: 'POST', credentials: 'same-origin' }).finally(() => logout());
           }}
