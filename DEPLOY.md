@@ -126,8 +126,19 @@ Preview:
 | `KV_REST_API_URL` | set by the Redis integration | server only |
 | `KV_REST_API_TOKEN` | set by the Redis integration | server only |
 | `FAUCET_ALLOWLIST_ADDRESSES` | tester wallet addresses, e.g. `GABC…XYZ,GDEF…UVW` | server only |
+| `CHG_SESSION_SECRET` | **required**, `openssl rand -base64 32` | server only |
 
 The two `KV_` ones you do not type — see [2.4](#24-conversation-history) below.
+They are **required** in production now: the chat and faucet quotas count in
+Redis and fail closed, so without them (or with Redis down) `/api/chat` and
+`/api/faucet` answer 503 instead of running unlimited turns.
+
+`CHG_SESSION_SECRET` signs the `chg_user` cookie that lifts the guest limits.
+Production reads nothing else for it (no fallback to the Turnstile secret):
+unset, sign-in answers 503 and everyone is a guest. The cookie is issued only
+after the wallet signs a login message (SEP-53), so an address alone is not a
+login. Setting or rotating it signs everyone out, which only costs them a
+signature on their next visit.
 
 `FAUCET_ALLOWLIST_ADDRESSES` decides who sees **Cargar USDC**. The faucet signs
 with the resolver key, so it is closed by default: in production (Previews
