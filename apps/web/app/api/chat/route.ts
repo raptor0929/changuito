@@ -18,6 +18,9 @@ const turns = turnStore();
 
 const HEARTBEAT_MS = 15_000;
 
+const MAX_MESSAGE_CHARS = 4_000;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(req: Request): Promise<Response> {
   const gated = await requireHuman(req);
   if (gated) return gated;
@@ -31,6 +34,19 @@ export async function POST(req: Request): Promise<Response> {
 
   if (!body.sessionId || typeof body.message !== 'string' || !body.message.trim()) {
     return Response.json({ error: 'sessionId and a non-empty message are required.' }, { status: 400 });
+  }
+  // The browser mints a UUID. Anything else is a caller choosing keys for
+  // the turn store and the counters.
+  if (typeof body.sessionId !== 'string' || !UUID.test(body.sessionId)) {
+    return Response.json({ error: 'sessionId must be a UUID.' }, { status: 400 });
+  }
+  // A grocery list is short. Megabytes of text would ride every hop of the
+  // turn, twelve times, on someone's model bill.
+  if (body.message.length > MAX_MESSAGE_CHARS) {
+    return Response.json(
+      { error: 'message_too_long', message: `El mensaje es muy largo. Probá con menos de ${MAX_MESSAGE_CHARS} caracteres.` },
+      { status: 413 },
+    );
   }
 
   // Guests: at most FREE_TURNS chat POSTs per sessionId (server-side). Logged-in

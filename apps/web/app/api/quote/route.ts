@@ -26,6 +26,11 @@ export interface QuoteResponse {
 }
 
 export async function GET(req: Request): Promise<Response> {
+  // The middleware checks this too; a handler that trusts only the matcher
+  // is open the day the matcher changes.
+  const gated = await requireHuman(req);
+  if (gated) return gated;
+
   const raw = new URL(req.url).searchParams.get('centavos') ?? '';
   const centavos = Number(raw);
   if (!Number.isInteger(centavos) || centavos <= 0) {
