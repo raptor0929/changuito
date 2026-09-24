@@ -246,6 +246,25 @@ The failure detail (`El servidor respondió 504.`, `Se cortó la conexión…`)
 is now printed under an undelivered bubble. It used to be discarded, which is
 why the QA report could say *that* it failed and not *how*.
 
+### 7. The first question is not a model call
+
+*Same QA pass. Reproduced on production as a guest: the starter chip took
+41.7s to come back with "¿cuál es tu código postal?", and the basket after it
+178s, on the local model.*
+
+The prompt requires a store and a postal code before anything else, so the
+first reply to a starter chip is always the same question — and on a local
+model it cost a full hop of prompt evaluation over twelve tool schemas.
+`agent/early-ask.ts` answers it in-process when **all three** hold: it is the
+first message of the conversation, no location is set, and nothing in the
+text looks like a postal code. The question and the user's message go into
+`turn.messages` like any other exchange, so the next hop reads the original
+request, the question, and the answer in order.
+
+Keep it that narrow. A follow-up ("no sé", "¿qué es un CPA?") deserves a
+model; a false negative on the postal-code regex only means the model gets
+the message, which is what used to happen to every message.
+
 ---
 
 ## Things that are the way they are on purpose
