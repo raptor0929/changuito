@@ -535,10 +535,14 @@
   justify-content: flex-end;
 }
 
+/* 44×44 at least (WCAG 2.5.5). The X link is a single letter, so padding
+   alone left it about 32px wide; min-width is what makes the square. */
 .socialLink {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  min-width: 44px;
   min-height: 44px;
   padding: 8px 10px;
   color: var(--ink);
