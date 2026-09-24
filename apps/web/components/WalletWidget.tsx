@@ -6,9 +6,11 @@ import { useEffect, useRef, useState } from 'react';
 import { track, trackLoginStart } from '../lib/analytics';
 import { pollarEnabled, shortAddress } from '../lib/pollar.ts';
 import { ensureUserCookie, forgetUserCookie } from '../lib/session-login.ts';
-import { faucetProofMessage, type FaucetProof } from '../lib/faucet-proof.ts';
+import type { FaucetProof } from '../lib/faucet-proof.ts';
 import { useBalances } from '../lib/use-balances.ts';
 import { useFaucetAccess } from '../lib/use-faucet-access.ts';
+import { useWalletSigner } from '../lib/use-wallet-signer.ts';
+import { signWalletProof } from '../lib/wallet-proof.ts';
 import { FaucetConfirm } from './FaucetConfirm';
 
 /**
@@ -35,7 +37,8 @@ function NoWallet() {
 }
 
 function ConnectedWallet() {
-  const { wallet, isAuthenticated, verified, openLoginModal, logout, getClient } = usePollar();
+  const { wallet, isAuthenticated, verified, openLoginModal, logout } = usePollar();
+  const sign = useWalletSigner();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
   const { data, loading, error, refresh } = useBalances(address);
   // Only testers on the server's allowlist get the faucet. Everyone else never
@@ -70,13 +73,13 @@ function ConnectedWallet() {
   useEffect(() => {
     if (!isAuthenticated || !address) return;
     let cancelled = false;
-    void ensureUserCookie(address).then((ok) => {
+    void ensureUserCookie(address, sign).then((ok) => {
       if (!cancelled && !ok) track('login_fail', { code: 'session' });
     });
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, address]);
+  }, [isAuthenticated, address, sign]);
 
 
   async function fund() {
@@ -89,12 +92,9 @@ function ConnectedWallet() {
       // for it (SEP-53), which Pollar does only for a live session.
       let proof: FaucetProof | undefined;
       if (faucet?.mode === 'allowlist') {
-        const message = faucetProofMessage(address, Date.now());
-        const signed = await getClient().stellar.sep53.signMessage(message);
-        if (signed.status !== 'signed') {
-          throw new Error('No pudimos confirmar tu sesión para cargar USDC. Probá de nuevo.');
-        }
-        proof = { message, signature: signed.signature };
+        const signed = await signWalletProof(sign, 'faucet', address);
+        if (!signed) throw new Error('No pudimos confirmar tu sesión para cargar USDC. Probá de nuevo.');
+        proof = signed;
       }
       const res = await fetch('/api/faucet', {
         method: 'POST',

@@ -42,17 +42,6 @@ export interface FaucetResponse {
   txHash: string | null;
 }
 
-/**
- * Last grant per address, in memory.
- *
- * Deliberately not a database: this is a testnet faucet handing out play money
- * from an admin-gated mint, and the cooldown exists to stop a stuck button from
- * making our one hot key sign fifty transactions, not to stop a determined
- * adversary. On Vercel each lambda instance keeps its own map, so the real
- * ceiling is the ENOUGH_UNITS balance check, which is on-chain and shared.
- */
-const lastGrant = new Map<string, number>();
-
 export async function GET(req: Request): Promise<Response> {
   const gated = await requireHuman(req);
   if (gated) return gated;
@@ -84,7 +73,6 @@ export async function POST(req: Request): Promise<Response> {
     const before = await usdcBalance(address);
     const verdict = faucetVerdict({
       balanceUnits: before,
-      lastGrantAt: lastGrant.get(address),
       now: Date.now(),
     });
 
@@ -105,7 +93,6 @@ export async function POST(req: Request): Promise<Response> {
 
     const tx = await usdcAsAdmin().mint({ to: address, amount: verdict.amount });
     const sent = await tx.signAndSend();
-    lastGrant.set(address, Date.now());
 
     const after = before + verdict.amount;
     const body: FaucetResponse = {
@@ -118,7 +105,8 @@ export async function POST(req: Request): Promise<Response> {
     };
     return Response.json(body);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return Response.json({ error: message }, { status: 502 });
+    // Friendbot and Soroban errors carry URLs and XDR; the log keeps them.
+    console.error('[faucet] failed:', err);
+    return Response.json({ error: 'No pudimos cargar USDC de prueba. Probá de nuevo en un momento.' }, { status: 502 });
   }
 }

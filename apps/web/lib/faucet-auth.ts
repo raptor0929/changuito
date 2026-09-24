@@ -1,14 +1,7 @@
-import { createHash } from 'node:crypto';
+import { StrKey } from '@stellar/stellar-sdk';
 
-import { Keypair, StrKey } from '@stellar/stellar-sdk';
-
-import {
-  FAUCET_PROOF_SKEW_MS,
-  FAUCET_PROOF_TTL_MS,
-  parseFaucetProofMessage,
-  type FaucetAccess,
-  type FaucetProof,
-} from './faucet-proof.ts';
+import type { FaucetAccess, FaucetProof } from './faucet-proof.ts';
+import { verifyWalletProof } from './wallet-proof-verify.ts';
 
 /**
  * Who may mint demo USDC. Server-only.
@@ -56,20 +49,6 @@ export function faucetAccess(address: string, env: NodeJS.ProcessEnv = process.e
   return { mode, allowed: faucetAllowlist(env).has(address) };
 }
 
-const SEP53_PREFIX = 'Stellar Signed Message:\n';
-
-/** SEP-53: ed25519 over SHA-256(prefix + message), signature base64. */
-export function verifySep53(address: string, message: string, signatureB64: string): boolean {
-  try {
-    const signature = Buffer.from(signatureB64, 'base64');
-    if (signature.length !== 64) return false;
-    const digest = createHash('sha256').update(SEP53_PREFIX + message, 'utf8').digest();
-    return Keypair.fromPublicKey(address).verify(digest, signature);
-  } catch {
-    return false;
-  }
-}
-
 export type FaucetAuth =
   | { ok: true }
   | { ok: false; status: 401 | 403; error: string; message: string };
@@ -97,21 +76,14 @@ export function authorizeFaucet(args: {
     return deny(403, 'faucet_not_allowed', 'Esta cuenta no puede cargar USDC de prueba.');
   }
 
-  const message = typeof args.proof?.message === 'string' ? args.proof.message : '';
-  const signature = typeof args.proof?.signature === 'string' ? args.proof.signature : '';
-  if (!message || !signature) {
-    return deny(401, 'faucet_session_required', 'Iniciá sesión con la cuenta de prueba para cargar USDC.');
-  }
-
-  const parsed = parseFaucetProofMessage(message);
-  if (!parsed || parsed.address !== args.address) {
-    return deny(401, 'faucet_proof_invalid', 'No pudimos confirmar tu sesión. Probá de nuevo.');
-  }
-  const age = args.now - parsed.issuedAt;
-  if (age > FAUCET_PROOF_TTL_MS || age < -FAUCET_PROOF_SKEW_MS) {
-    return deny(401, 'faucet_proof_expired', 'La confirmación venció. Probá de nuevo.');
-  }
-  if (!verifySep53(args.address, message, signature)) {
+  const proof = verifyWalletProof({ intent: 'faucet', address: args.address, proof: args.proof, now: args.now });
+  if (!proof.ok) {
+    if (proof.error === 'proof_missing') {
+      return deny(401, 'faucet_session_required', 'Iniciá sesión con la cuenta de prueba para cargar USDC.');
+    }
+    if (proof.error === 'proof_expired') {
+      return deny(401, 'faucet_proof_expired', 'La confirmación venció. Probá de nuevo.');
+    }
     return deny(401, 'faucet_proof_invalid', 'No pudimos confirmar tu sesión. Probá de nuevo.');
   }
   return { ok: true };

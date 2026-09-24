@@ -14,6 +14,8 @@ import { pollarEnabled } from '../lib/pollar';
 import { ensureUserCookie } from '../lib/session-login';
 import { progressCopy } from '../lib/turn-progress.ts';
 import { useChat } from '../lib/use-chat';
+import { useWalletSigner } from '../lib/use-wallet-signer.ts';
+import type { WalletSigner } from '../lib/wallet-proof.ts';
 import { CartCard } from './CartCard';
 import { RetryIcon } from './icons';
 import { OrderPanel } from './OrderPanel';
@@ -91,20 +93,24 @@ export function Chat() {
 
 function ChatWithPollar() {
   const { isAuthenticated, openLoginModal, wallet } = usePollar();
+  const sign = useWalletSigner();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
-  return <ChatCore isAuthenticated={isAuthenticated} openLoginModal={openLoginModal} address={address} />;
+  return <ChatCore isAuthenticated={isAuthenticated} openLoginModal={openLoginModal} address={address} sign={sign} />;
 }
 
 function ChatCore({
   isAuthenticated = false,
   address = null,
   openLoginModal,
+  sign,
 }: {
   isAuthenticated?: boolean;
   address?: string | null;
   openLoginModal?: () => void;
+  /** The wallet's SEP-53 signer. Absent in a build without Pollar. */
+  sign?: WalletSigner;
 }) {
-  const { state, send, retry, stop, loginRequired, clearLoginRequired } = useChat({ isAuthenticated, address });
+  const { state, send, retry, stop, loginRequired, clearLoginRequired } = useChat({ isAuthenticated, address, sign });
   const [draft, setDraft] = useState('');
   const placeholder = useComposerPlaceholder();
   // The basket the payment modal is open over. A cart, not a block id: the
@@ -147,12 +153,12 @@ function ChatCore({
   // otherwise the retry POSTs into the same 401. Keyed on the address because
   // `wallet` can still be null when the flag flips.
   useEffect(() => {
-    if (!isAuthenticated || !address) {
+    if (!isAuthenticated || !address || !sign) {
       setSessionReady(false);
       return;
     }
     let live = true;
-    void ensureUserCookie(address).then((ok) => {
+    void ensureUserCookie(address, sign).then((ok) => {
       if (!live) return;
       clearLoginRequired();
       if (ok) setSessionReady(true);
@@ -160,7 +166,7 @@ function ChatCore({
     return () => {
       live = false;
     };
-  }, [isAuthenticated, address, clearLoginRequired]);
+  }, [isAuthenticated, address, sign, clearLoginRequired]);
 
   // Guests at the limit. Signed-in shoppers never match, even if the latch is
   // still true for this render or the free-turn count is already spent.

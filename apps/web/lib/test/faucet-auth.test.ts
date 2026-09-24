@@ -4,8 +4,10 @@ import { describe, it } from 'node:test';
 
 import { Keypair } from '@stellar/stellar-sdk';
 
-import { authorizeFaucet, faucetAccess, faucetAllowlist, faucetMode, verifySep53 } from '../faucet-auth.ts';
-import { FAUCET_PROOF_TTL_MS, faucetProofMessage, parseFaucetProofMessage } from '../faucet-proof.ts';
+import { authorizeFaucet, faucetAccess, faucetAllowlist, faucetMode } from '../faucet-auth.ts';
+import { WALLET_PROOF_TTL_MS, walletProofMessage } from '../wallet-proof.ts';
+
+const faucetProofMessage = (address: string, at: number) => walletProofMessage('faucet', address, at);
 
 const now = 1_790_000_000_000;
 const tester = Keypair.random();
@@ -54,28 +56,6 @@ describe('faucet mode', () => {
   });
 });
 
-describe('proof message', () => {
-  it('round-trips the address and the moment', () => {
-    assert.deepEqual(parseFaucetProofMessage(faucetProofMessage(tester.publicKey(), now)), { address: tester.publicKey(), issuedAt: now });
-  });
-
-  it('rejects anything else', () => {
-    assert.equal(parseFaucetProofMessage('hola'), null);
-    assert.equal(parseFaucetProofMessage(faucetProofMessage(tester.publicKey(), now) + ' extra'), null);
-  });
-});
-
-describe('verifySep53', () => {
-  it('accepts the wallet’s own signature and nobody else’s', () => {
-    const { message, signature } = proofFor(tester);
-    assert.equal(verifySep53(tester.publicKey(), message, signature), true);
-    assert.equal(verifySep53(stranger.publicKey(), message, signature), false);
-    assert.equal(verifySep53(tester.publicKey(), message + '.', signature), false);
-    assert.equal(verifySep53(tester.publicKey(), message, 'bm9wZQ=='), false);
-    assert.equal(verifySep53('not-an-address', message, signature), false);
-  });
-});
-
 describe('authorizeFaucet', () => {
   const run = (address: string, proof: unknown, env = prod, at = now) =>
     authorizeFaucet({ address, proof: proof as never, now: at, env });
@@ -118,8 +98,15 @@ describe('authorizeFaucet', () => {
     assert.equal(r.ok === false && r.error, 'faucet_proof_invalid');
   });
 
+  it('refuses a proof signed for another purpose', () => {
+    // A login signature must not double as permission to mint.
+    const message = walletProofMessage('login', tester.publicKey(), now);
+    const r = run(tester.publicKey(), { message, signature: sep53(tester, message) });
+    assert.equal(r.ok === false && r.error, 'faucet_proof_invalid');
+  });
+
   it('refuses a stale proof, and one from too far in the future', () => {
-    const old = run(tester.publicKey(), proofFor(tester), prod, now + FAUCET_PROOF_TTL_MS + 1);
+    const old = run(tester.publicKey(), proofFor(tester), prod, now + WALLET_PROOF_TTL_MS + 1);
     assert.equal(old.ok === false && old.error, 'faucet_proof_expired');
     const future = run(tester.publicKey(), proofFor(tester, tester.publicKey(), now + 5 * 60_000));
     assert.equal(future.ok === false && future.error, 'faucet_proof_expired');
