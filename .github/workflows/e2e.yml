@@ -1,26 +1,93 @@
+# Playwright against production.
+#
+# Automatic runs: a push to main (a merge) whose diff touches a backend path
+# below. That run always executes both the landing project and the app project.
+# Anything else, including pull requests and frontend-only pushes, does not
+# start this workflow. Use workflow_dispatch and pick landing, app, or both.
+#
+# Backend, for this filter:
+# - packages/mcp — supermarket MCP server
+# - packages/usdc-bindings, packages/escrow-bindings — contract clients the API calls
+# - contracts, deployments.json, scripts that rewrite those bindings
+# - apps/web API routes, middleware, and the server modules under lib/
+#   (agent loop, MCP bridge, login gate, human gate, faucet, Stellar)
+# - apps/landing API routes, waitlist server, bug-report server, CSP
+# - root package.json and package-lock.json — a dependency change can move the server
+#
+# Not backend, so they do not auto-run this workflow:
+# - apps/web/components, apps/landing/components, and the page files
+# - packages/trust — shared footer copy, rendered in the browser
+# - apps/branding, docs, e2e specs
 name: E2E
 
 on:
-  pull_request:
   push:
     branches: [main]
+    paths:
+      - packages/mcp/**
+      - packages/usdc-bindings/**
+      - packages/escrow-bindings/**
+      - contracts/**
+      - deployments.json
+      - scripts/write-deployments-module.mjs
+      - scripts/fixup-bindings.mjs
+      - apps/web/app/api/**
+      - apps/web/middleware.ts
+      - apps/web/next.config.ts
+      - apps/web/lib/agent/**
+      - apps/web/lib/mcp/**
+      - apps/web/lib/server/**
+      - apps/web/lib/login-gate.ts
+      - apps/web/lib/human-gate.ts
+      - apps/web/lib/faucet-policy.ts
+      - apps/web/lib/stellar.ts
+      - apps/web/lib/token.ts
+      - apps/web/lib/deployments.ts
+      - apps/web/lib/pollar.ts
+      - apps/web/lib/protocol.ts
+      - apps/web/lib/order.ts
+      - apps/landing/app/api/**
+      - apps/landing/lib/waitlist/**
+      - apps/landing/lib/bug-report/submit.ts
+      - apps/landing/lib/bug-report/persist.ts
+      - apps/landing/lib/bug-report/validate.ts
+      - apps/landing/lib/bug-report/attachments.ts
+      - apps/landing/lib/csp.ts
+      - apps/landing/next.config.ts
+      - package.json
+      - package-lock.json
   workflow_dispatch:
-  schedule:
-    # Weekly production smoke. Drop this block if the schedule is unwanted.
-    - cron: '0 12 * * 1'
-
-concurrency:
-  group: e2e-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    inputs:
+      suite:
+        description: Which smoke to run
+        required: true
+        type: choice
+        default: both
+        options:
+          - both
+          - landing
+          - app
 
 permissions:
   contents: read
 
 jobs:
-  unit-and-e2e:
-    name: Unit tests and Playwright smoke
+  smoke:
+    name: Playwright ${{ matrix.project }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    concurrency:
+      group: e2e-${{ github.ref }}-${{ matrix.project }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [landing, app]
+    # A merge to main runs both. A manual run runs the chosen suite.
+    if: >-
+      github.event_name == 'push' ||
+      inputs.suite == 'both' ||
+      inputs.suite == matrix.project
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,26 +101,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Unit tests
-        run: npm test
-
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
       - name: Playwright smoke
-        run: npm run test:e2e
+        run: npm run test:e2e -- --project=${{ matrix.project }}
         env:
           CI: true
           LANDING_BASE_URL: https://www.changuito.me
           APP_BASE_URL: https://app.changuito.me
           CHANGUTO_E2E_EMAIL: ${{ secrets.CHANGUTO_E2E_EMAIL }}
           CHANGUTO_E2E_PASSWORD: ${{ secrets.CHANGUTO_E2E_PASSWORD }}
+          CHANGUTO_E2E_OTP: ${{ secrets.CHANGUTO_E2E_OTP }}
 
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.project }}
           path: |
             playwright-report/
             test-results/
