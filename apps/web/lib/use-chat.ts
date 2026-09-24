@@ -173,7 +173,12 @@ export function useChat(auth?: UseChatAuth) {
         setState((s) => endTurn(s));
         return;
       }
-      setState((s) => failTurn(s, { reason: 'network', message: err instanceof Error ? err.message : 'Algo falló.' }));
+      // The browser's own text ("Failed to fetch", "Load failed") is English
+      // and names nothing the user can do. The console keeps it for a report.
+      console.warn('[chat] request failed:', err);
+      setState((s) =>
+        failTurn(s, { reason: 'network', message: 'No pudimos hablar con el servidor. Revisá tu conexión y reintentá.' }),
+      );
     }
   }, []);
 

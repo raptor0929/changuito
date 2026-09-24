@@ -235,6 +235,19 @@ a:hover { color: var(--chg-arcilla); }
     display: block;
   }
 }
+/* The waiting line under the composer: stage, seconds, and a hint. */
+.turn-progress { display: flex; flex-direction: column; gap: 2px; }
+.turn-progress p { margin: 0; }
+.turn-progress-stage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-weight: 600;
+  color: var(--text);
+}
+.turn-progress-time { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+
 .is-error {
   align-self: stretch;
   border-left: 3px solid var(--warn);
@@ -281,7 +294,8 @@ a:hover { color: var(--chg-arcilla); }
   font-size: 13px;
   color: var(--warn-ink);
 }
-.msg-failed-note { font-weight: 600; }
+.msg-failed-note { font-weight: 600; text-align: right; }
+.msg-failed-detail { display: block; font-weight: 400; }
 
 .msg-retry { position: relative; flex: 0 0 auto; }
 /* .btn-sm is 32px on purpose: a full 44px pill next to 13px caption text reads

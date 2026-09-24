@@ -164,6 +164,8 @@ export async function runTurn(
         onThinking: (delta: string) => emit({ t: 'thinking', delta }),
       };
 
+      emit({ t: 'status', stage: 'thinking', hop });
+
       let msg: HopResult;
       for (;;) {
         const active = local?.provider ?? brains.remote;
@@ -203,6 +205,7 @@ export async function runTurn(
           }
           // Round again. `local` is gone, so this picks the hosted model,
           // which either answers or throws — the loop cannot spin.
+          emit({ t: 'status', stage: 'fallback', hop });
         }
       }
 

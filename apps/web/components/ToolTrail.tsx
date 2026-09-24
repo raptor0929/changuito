@@ -1,4 +1,5 @@
 import type { ToolRun } from '../lib/chat-state';
+import { TOOL_LABELS } from '../lib/tool-labels.ts';
 
 /**
  * What the agent actually did, in the user's language.
@@ -9,21 +10,6 @@ import type { ToolRun } from '../lib/chat-state';
  * The back-and-forth cart GIF sits on the last trail row only, so the eye
  * always finds the step that is still moving.
  */
-
-const LABELS: Record<string, string> = {
-  set_location: 'Ubicando la sucursal',
-  search_products: 'Buscando productos',
-  price_check: 'Verificando precios',
-  add_to_cart: 'Agregando al carrito',
-  update_cart_line: 'Ajustando cantidades',
-  remove_from_cart: 'Sacando del carrito',
-  view_cart: 'Revisando el carrito',
-  get_cart_link: 'Armando el link del carrito',
-  list_retailers: 'Mirando qué supermercados hay',
-  compare_retailers: 'Comparando supermercados',
-  render_products: 'Mostrando productos',
-  render_cart: 'Mostrando el carrito',
-};
 
 export function ToolTrail({ tools }: { tools: ToolRun[] }) {
   if (tools.length === 0) return null;
@@ -56,7 +42,7 @@ export function ToolTrail({ tools }: { tools: ToolRun[] }) {
                 {t.ok === undefined ? '◌' : t.ok ? '●' : '×'}
               </span>
             )}
-            <span>{LABELS[t.name] ?? t.name}</span>
+            <span>{TOOL_LABELS[t.name] ?? t.name}</span>
             {t.ms !== undefined ? (
               <span className="trail-ms">{(t.ms / 1000).toFixed(1)}s</span>
             ) : null}

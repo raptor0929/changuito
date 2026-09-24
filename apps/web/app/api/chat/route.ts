@@ -71,6 +71,11 @@ export async function POST(req: Request): Promise<Response> {
       // and an idle stream is a stream a proxy feels free to close.
       const beat = setInterval(() => write(HEARTBEAT), HEARTBEAT_MS);
 
+      // First byte of the body, before the MCP boot and the model. The
+      // browser now knows the message landed, and so does anything between
+      // us and it that waits for a byte before committing to the response.
+      emit({ t: 'status', stage: 'received' });
+
       // Hoisted out of the callback so the `done` event can carry it.
       let brain: string | undefined;
 

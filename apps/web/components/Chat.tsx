@@ -7,11 +7,12 @@ import type { Cart } from '@changuito/mcp/types';
 
 import { STARTERS } from '../lib/agent/prompt';
 import { errorCode, track, trackLoginStart } from '../lib/analytics';
-import { canRetry, type Block } from '../lib/chat-state';
+import { canRetry, type Block, type ChatState } from '../lib/chat-state';
 import { FREE_TURNS, LOGIN_CTA, LOGIN_REQUIRED_MESSAGE, loginGateBannerText } from '../lib/login-constants';
 import type { OpenedOrder } from '../lib/order';
 import { pollarEnabled } from '../lib/pollar';
 import { ensureUserCookie } from '../lib/session-login';
+import { progressCopy } from '../lib/turn-progress.ts';
 import { useChat } from '../lib/use-chat';
 import { CartCard } from './CartCard';
 import { RetryIcon } from './icons';
@@ -33,6 +34,7 @@ const COMPOSER_PLACEHOLDERS = [
 /** Copy for a message that never left. Rioplatense, short, no jargon. */
 const COPY = {
   undelivered: 'No se envió',
+  dropped: 'Se cortó antes de responder',
   undeliveredLogin: 'No se envió. Iniciá sesión y lo reenviamos',
   retry: 'Reintentar',
   retryAria: 'Reintentar enviar este mensaje',
@@ -330,11 +332,7 @@ function ChatCore({
             Enviar
           </button>
         )}
-        {state.streaming ? (
-          <p className="composer-hint" role="status">
-            Esperá a que termine, o tocá Parar para mandar otro mensaje.
-          </p>
-        ) : null}
+        {state.streaming ? <TurnProgressLine state={state} /> : null}
       </form>
 
       {paying ? (
@@ -370,7 +368,16 @@ export function UserBubble({
       {block.failed ? (
         <div className="msg-failed">
           <span className="msg-failed-note" role="alert">
-            {block.failed.reason === 'login' ? COPY.undeliveredLogin : COPY.undelivered}
+            {block.failed.reason === 'login'
+              ? COPY.undeliveredLogin
+              : block.failed.reason === 'dropped'
+                ? COPY.dropped
+                : COPY.undelivered}
+            {/* The why, so "no se envió" is something the user (and a bug
+                report) can act on. The login copy already is the why. */}
+            {block.failed.reason !== 'login' && block.failed.message ? (
+              <span className="msg-failed-detail">{block.failed.message}</span>
+            ) : null}
           </span>
           {retryable ? (
             <button
@@ -386,6 +393,37 @@ export function UserBubble({
           ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * What the turn is doing and for how long, under the composer.
+ *
+ * Mounted only while a turn streams, so its first render is the turn's start.
+ * The seconds are aria-hidden: announcing a counter every second would drown
+ * the stage changes, which are the part worth hearing.
+ */
+function TurnProgressLine({ state }: { state: ChatState }) {
+  const [startedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(startedAt);
+  useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, []);
+
+  const copy = progressCopy(state, now - startedAt);
+  return (
+    <div className="composer-hint turn-progress" data-testid="turn-progress">
+      <p className="turn-progress-stage">
+        <span role="status">{copy.stage}</span>
+        <span className="turn-progress-time" aria-hidden="true">
+          {copy.seconds} s
+        </span>
+      </p>
+      <p className="turn-progress-hint" aria-live="polite">
+        {copy.hint}
+      </p>
     </div>
   );
 }
