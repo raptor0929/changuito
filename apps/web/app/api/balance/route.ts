@@ -27,6 +27,11 @@ export interface BalanceResponse {
 }
 
 export async function GET(req: Request): Promise<Response> {
+  // The middleware checks this too; a handler that trusts only the matcher
+  // is open the day the matcher changes.
+  const gated = await requireHuman(req);
+  if (gated) return gated;
+
   const address = new URL(req.url).searchParams.get('address') ?? '';
   const kind = addressKind(address);
   if (!kind) {

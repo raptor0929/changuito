@@ -14,6 +14,8 @@
   --border: rgba(42, 26, 20, 0.14);
   --text: var(--chg-espresso);
   --muted: #4a332c;
+  /* Espresso lifted toward offWhite: 5.67:1 on --surface, 5.42:1 on --bg. */
+  --placeholder: #76635b;
   --ok: #1a7f4b;
   --warn: var(--chg-arcilla);
   /* Arcilla is an accent, not a text colour: #e07a5f on --bg is about 2.9:1.
@@ -44,6 +46,18 @@ html, body {
   color: var(--text);
   font-family: var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 ::selection {
@@ -235,6 +249,19 @@ a:hover { color: var(--chg-arcilla); }
     display: block;
   }
 }
+/* The waiting line under the composer: stage, seconds, and a hint. */
+.turn-progress { display: flex; flex-direction: column; gap: 2px; }
+.turn-progress p { margin: 0; }
+.turn-progress-stage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-weight: 600;
+  color: var(--text);
+}
+.turn-progress-time { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+
 .is-error {
   align-self: stretch;
   border-left: 3px solid var(--warn);
@@ -281,7 +308,8 @@ a:hover { color: var(--chg-arcilla); }
   font-size: 13px;
   color: var(--warn-ink);
 }
-.msg-failed-note { font-weight: 600; }
+.msg-failed-note { font-weight: 600; text-align: right; }
+.msg-failed-detail { display: block; font-weight: 400; }
 
 .msg-retry { position: relative; flex: 0 0 auto; }
 /* .btn-sm is 32px on purpose: a full 44px pill next to 13px caption text reads
@@ -482,8 +510,12 @@ a:hover { color: var(--chg-arcilla); }
   color: var(--muted);
 }
 
+/* Solid, not an alpha of espresso: the old rgba(42,26,20,.45) composited to
+   about #9f9895 on white, 2.8:1. This clears WCAG 1.4.3's 4.5:1 on --surface
+   and on --bg while staying lighter than typed text (--text, 17:1). */
 .composer-input::placeholder {
-  color: rgba(42, 26, 20, 0.45);
+  color: var(--placeholder);
+  opacity: 1;
   white-space: pre-wrap;
 }
 
@@ -504,6 +536,11 @@ a:hover { color: var(--chg-arcilla); }
   .composer-input {
     min-height: 48px;
     max-height: 96px;
+  }
+  /* Empty means there is nothing to scroll to. A placeholder that still
+     overflows (large text settings) is clipped instead of wearing a bar. */
+  .composer-input:placeholder-shown {
+    overflow-y: hidden;
   }
 }
 
@@ -864,6 +901,13 @@ a:hover { color: var(--chg-arcilla); }
   outline-offset: -3px;
 }
 
+/* Pollar's modal fades its version tag to opacity .6 over --pollar-muted,
+   2.3:1 on white (axe color-contrast, serious). Full opacity restores the
+   muted grey Pollar uses for the rest of its footer. Scoped to its overlay. */
+.pollar-overlay .pollar-footer-version {
+  opacity: 1;
+}
+
 /* ------------------------------------------------- empty chat, phone only
    The first screen has to fit a ~390×844 CSS viewport, and a shorter
    ~360×740 one, with the composer on screen and the thread not scrolling.
@@ -995,6 +1039,10 @@ a:hover { color: var(--chg-arcilla); }
     line-height: 1.3;
     border-radius: 16px;
     overflow-y: auto;
+  }
+
+  .shell:has(.chat.is-empty) .composer-input:placeholder-shown {
+    overflow-y: hidden;
   }
 
   .shell:has(.chat.is-empty) .composer .btn {

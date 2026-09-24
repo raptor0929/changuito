@@ -3,6 +3,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { callMcpTool, mcpToolsToAnthropic } from '../mcp/bridge';
 import type { Session } from '../mcp/session';
 import type { UiEvent } from '../protocol';
+import { earlyLocationAsk } from './early-ask';
 import { CHANGUITO_PROMPT, stateBanner } from './prompt';
 import { selectBrains } from './provider';
 import type { HopResult } from './providers/types';
@@ -65,6 +66,21 @@ export async function runTurn(
   emit: (e: UiEvent) => void,
 ): Promise<{ brain: string }> {
   const t0 = Date.now();
+
+  // Before the model and before a local lane is taken: see early-ask.ts.
+  const ask = earlyLocationAsk({
+    hasLocation: Boolean(session.state.getLocation()),
+    firstMessage: turn.messages.length === 0,
+    text: userText,
+  });
+  if (ask) {
+    turn.messages.push(
+      { role: 'user', content: [{ type: 'text', text: userText }, { type: 'text', text: stateBanner({}) }] },
+      { role: 'assistant', content: [{ type: 'text', text: ask }] },
+    );
+    emit({ t: 'text', delta: ask });
+    return { brain: 'early-ask' };
+  }
 
   const brains = await selectBrains();
   let local = brains.local;
@@ -164,6 +180,8 @@ export async function runTurn(
         onThinking: (delta: string) => emit({ t: 'thinking', delta }),
       };
 
+      emit({ t: 'status', stage: 'thinking', hop });
+
       let msg: HopResult;
       for (;;) {
         const active = local?.provider ?? brains.remote;
@@ -203,6 +221,7 @@ export async function runTurn(
           }
           // Round again. `local` is gone, so this picks the hosted model,
           // which either answers or throws — the loop cannot spin.
+          emit({ t: 'status', stage: 'fallback', hop });
         }
       }
 

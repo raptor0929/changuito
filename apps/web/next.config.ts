@@ -1,6 +1,13 @@
 import type { NextConfig } from 'next';
 
+import { appSecurityHeaders } from './lib/security-headers.ts';
+
 const config: NextConfig = {
+  // www already drops it; there is no reason to advertise the framework.
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: '/:path*', headers: appSecurityHeaders() }];
+  },
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
   // `@changuito/mcp` is a workspace package of compiled ESM. It gets bundled
   // rather than marked external, because a symlinked workspace package that

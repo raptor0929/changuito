@@ -1,5 +1,5 @@
 /**
- * POST /api/faucet { address }  ->  { xlm, usdc, usdcDisplay, txHash, created }
+ * POST /api/faucet { address, proof }  ->  { xlm, usdc, usdcDisplay, txHash, created }
  *
  * Two steps, in this order, and the order is the point:
  *
@@ -10,8 +10,18 @@
  *   2. mint demo USDC.
  *
  * Doing it the other way round hands someone money they cannot spend.
+ *
+ * Both steps sign with our keys, so neither runs until `authorizeFaucet` says
+ * so: in production only allowlisted testers, proving the wallet with a fresh
+ * SEP-53 signature. See lib/faucet-auth.ts.
+ *
+ * GET /api/faucet?address=…  ->  { mode, allowed }, so the widget can leave
+ * the button out instead of showing one that can only fail.
  */
+import { faucetAccess } from '../../../lib/faucet-auth.ts';
+import { gateFaucet } from '../../../lib/faucet-gate.ts';
 import { faucetVerdict } from '../../../lib/faucet-policy.ts';
+import type { FaucetAccess } from '../../../lib/faucet-proof.ts';
 import { usdcAsAdmin } from '../../../lib/server/resolver.ts';
 import { addressKind, ensureFunded, formatUsdc } from '../../../lib/stellar.ts';
 import { usdcBalance } from '../../../lib/token.ts';
@@ -32,28 +42,22 @@ export interface FaucetResponse {
   txHash: string | null;
 }
 
-/**
- * Last grant per address, in memory.
- *
- * Deliberately not a database: this is a testnet faucet handing out play money
- * from an admin-gated mint, and the cooldown exists to stop a stuck button from
- * making our one hot key sign fifty transactions, not to stop a determined
- * adversary. On Vercel each lambda instance keeps its own map, so the real
- * ceiling is the ENOUGH_UNITS balance check, which is on-chain and shared.
- */
-const lastGrant = new Map<string, number>();
+export async function GET(req: Request): Promise<Response> {
+  const gated = await requireHuman(req);
+  if (gated) return gated;
+
+  const address = new URL(req.url).searchParams.get('address') ?? '';
+  const access: FaucetAccess = addressKind(address)
+    ? faucetAccess(address)
+    : { mode: faucetAccess('').mode, allowed: false };
+  return Response.json(access, { headers: { 'cache-control': 'no-store' } });
+}
 
 export async function POST(req: Request): Promise<Response> {
-  let address: string;
-  try {
-    const body = (await req.json()) as { address?: unknown };
-    address = typeof body.address === 'string' ? body.address : '';
-  } catch {
-    return Response.json({ error: 'expected a JSON body' }, { status: 400 });
-  }
-
-  const kind = addressKind(address);
-  if (!kind) return Response.json({ error: 'not a Stellar address' }, { status: 400 });
+  // Before friendbot and before the mint: both are signed by us.
+  const gate = await gateFaucet(req);
+  if (gate instanceof Response) return gate;
+  const { address, kind } = gate;
 
   try {
     // 1. XLM first. A contract wallet has no Horizon account to fund.
@@ -69,7 +73,6 @@ export async function POST(req: Request): Promise<Response> {
     const before = await usdcBalance(address);
     const verdict = faucetVerdict({
       balanceUnits: before,
-      lastGrantAt: lastGrant.get(address),
       now: Date.now(),
     });
 
@@ -90,7 +93,6 @@ export async function POST(req: Request): Promise<Response> {
 
     const tx = await usdcAsAdmin().mint({ to: address, amount: verdict.amount });
     const sent = await tx.signAndSend();
-    lastGrant.set(address, Date.now());
 
     const after = before + verdict.amount;
     const body: FaucetResponse = {
@@ -103,7 +105,8 @@ export async function POST(req: Request): Promise<Response> {
     };
     return Response.json(body);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return Response.json({ error: message }, { status: 502 });
+    // Friendbot and Soroban errors carry URLs and XDR; the log keeps them.
+    console.error('[faucet] failed:', err);
+    return Response.json({ error: 'No pudimos cargar USDC de prueba. Probá de nuevo en un momento.' }, { status: 502 });
   }
 }

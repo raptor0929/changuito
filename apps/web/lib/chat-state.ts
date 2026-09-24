@@ -1,7 +1,7 @@
 import type { Cart, Product } from '@changuito/mcp/types';
 import type { SessionSnapshot } from '@changuito/mcp/session';
 
-import type { UiEvent } from './protocol';
+import type { TurnStage, UiEvent } from './protocol';
 
 /**
  * The transcript, as a reducer over UiEvents.
@@ -26,8 +26,21 @@ export interface ToolRun {
  * `login` is the only one worth resuming on its own: the gate is a door the
  * user can open, and once it is open the same message is still what they meant
  * to say. Everything else needs a human to decide whether to try again.
+ *
+ * `dropped` is a `network` failure after the server said `received`: the
+ * message did get there, the answer never came back. Retrying is just as safe
+ * — history is written only on a clean return — but "no se envió" would be
+ * untrue, so the copy differs.
  */
-export type SendFailure = { reason: 'login' | 'network'; message: string };
+export type SendFailure = { reason: 'login' | 'network' | 'dropped'; message: string };
+
+/** What the server last said it was doing. Absent between turns. */
+export interface TurnProgress {
+  stage: TurnStage;
+  hop: number;
+  /** Reply text has arrived since the last status. */
+  writing: boolean;
+}
 
 export type Block =
   | { kind: 'user'; id: string; text: string; failed?: SendFailure }
@@ -40,6 +53,8 @@ export interface ChatState {
   blocks: Block[];
   /** True between send and `done`. Drives the composer's disabled state. */
   streaming: boolean;
+  /** Set by `status` events during a turn, cleared when it ends. */
+  progress?: TurnProgress;
   /** Opaque to the browser; handed back on the next turn so the agent remembers. */
   snapshot?: SessionSnapshot;
   /** The newest cart seen, wherever it appeared. What the pay button settles. */
@@ -56,9 +71,16 @@ export function resetIds(): void {
   seq = 0;
 }
 
+/** The state with no turn in progress. Removes the key rather than setting it undefined. */
+function settled(state: ChatState): ChatState {
+  if (!('progress' in state)) return state;
+  const { progress: _done, ...rest } = state;
+  return rest;
+}
+
 export function sendUser(state: ChatState, text: string): ChatState {
   return {
-    ...state,
+    ...settled(state),
     streaming: true,
     blocks: [...state.blocks, { kind: 'user', id: nextId(), text }],
   };
@@ -86,8 +108,21 @@ function lastIndexWhere(blocks: Block[], match: (b: Block, i: number) => boolean
 
 export function applyEvent(state: ChatState, e: UiEvent): ChatState {
   switch (e.t) {
+    case 'status':
+      // A late status after the turn ended (Parar, then a buffered frame)
+      // must not bring the waiting row back.
+      if (!state.streaming) return state;
+      return {
+        ...state,
+        progress: { stage: e.stage, hop: e.hop ?? state.progress?.hop ?? 0, writing: false },
+      };
+
     case 'text':
-      return { ...state, blocks: intoSay(state.blocks, (b) => ({ ...b, text: b.text + e.delta })) };
+      return {
+        ...state,
+        ...(state.progress && !state.progress.writing ? { progress: { ...state.progress, writing: true } } : {}),
+        blocks: intoSay(state.blocks, (b) => ({ ...b, text: b.text + e.delta })),
+      };
 
     case 'thinking':
       return { ...state, blocks: intoSay(state.blocks, (b) => ({ ...b, thinking: b.thinking + e.delta })) };
@@ -156,16 +191,17 @@ export function applyEvent(state: ChatState, e: UiEvent): ChatState {
       };
     }
 
-    case 'error':
-      return {
-        ...state,
-        // An unrecoverable error ends the turn; nothing further is coming.
-        streaming: e.recoverable ? state.streaming : false,
-        blocks: [...state.blocks, { kind: 'error', id: nextId(), message: e.message, recoverable: e.recoverable }],
-      };
+    case 'error': {
+      const blocks: Block[] = [
+        ...state.blocks,
+        { kind: 'error', id: nextId(), message: e.message, recoverable: e.recoverable },
+      ];
+      // An unrecoverable error ends the turn; nothing further is coming.
+      return e.recoverable ? { ...state, blocks } : { ...settled(state), streaming: false, blocks };
+    }
 
     case 'done':
-      return { ...state, streaming: false, snapshot: e.snapshot };
+      return { ...settled(state), streaming: false, snapshot: e.snapshot };
   }
 }
 
@@ -175,7 +211,7 @@ export function endTurn(state: ChatState, message?: string): ChatState {
   const blocks = message
     ? [...state.blocks, { kind: 'error' as const, id: nextId(), message, recoverable: true }]
     : state.blocks;
-  return { ...state, streaming: false, blocks };
+  return { ...settled(state), streaming: false, blocks };
 }
 
 /**
@@ -206,15 +242,20 @@ export function omitErrorMessage(state: ChatState, message: string): ChatState {
  * Once anything has rendered the answer is different. The user is reading half
  * a reply, the server has the message, and "no se envió" would be a visible
  * lie — so that case keeps the error block it has always had.
+ *
+ * In between is a turn the server acknowledged (`received`) that died before
+ * saying anything. The bubble still gets the retry control, since nothing was
+ * written, but as `dropped`: the message did arrive.
  */
 export function failTurn(state: ChatState, failure: SendFailure): ChatState {
   if (!state.streaming) return state;
   const last = state.blocks.at(-1);
   if (last?.kind !== 'user' || last.failed) return endTurn(state, failure.message);
+  const reason = failure.reason === 'network' && state.progress ? 'dropped' : failure.reason;
   return {
-    ...state,
+    ...settled(state),
     streaming: false,
-    blocks: [...state.blocks.slice(0, -1), { ...last, failed: failure }],
+    blocks: [...state.blocks.slice(0, -1), { ...last, failed: { ...failure, reason } }],
   };
 }
 
@@ -236,7 +277,7 @@ export function retryUser(state: ChatState, id: string): ChatState {
   // failed.
   const cleared: Block = { kind: 'user', id: b.id, text: b.text };
   return {
-    ...state,
+    ...settled(state),
     streaming: true,
     blocks: state.blocks.map((x, j) => (j === i ? cleared : x)),
   };

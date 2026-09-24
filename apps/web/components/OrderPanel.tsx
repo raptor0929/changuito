@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { SettleResponse } from '../app/api/settle/route.ts';
 import type { OpenedOrder, SettleAction } from '../lib/order.ts';
 import { explorer, formatUsdc } from '../lib/stellar.ts';
+import { signWalletProof, type WalletSigner } from '../lib/wallet-proof.ts';
 
 /**
  * Steps 5 and 6: the money is locked, and this is what closes it out.
@@ -15,7 +16,17 @@ import { explorer, formatUsdc } from '../lib/stellar.ts';
  */
 // onDismiss is optional: a server-rendered page cannot pass a function prop,
 // and the fixtures page mounts this panel without one.
-export function OrderPanel({ order, onDismiss }: { order: OpenedOrder; onDismiss?: () => void }) {
+// `sign` is the buyer's wallet. Closing an order needs its signature: the
+// server will not move an escrow on anyone else's say-so.
+export function OrderPanel({
+  order,
+  onDismiss,
+  sign,
+}: {
+  order: OpenedOrder;
+  onDismiss?: () => void;
+  sign?: WalletSigner;
+}) {
   const [closing, setClosing] = useState<SettleAction | null>(null);
   const [outcome, setOutcome] = useState<SettleResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +37,8 @@ export function OrderPanel({ order, onDismiss }: { order: OpenedOrder; onDismiss
     setClosing(action);
     setError(null);
     try {
+      const proof = sign ? await signWalletProof(sign, action, order.buyer, order.orderId) : null;
+      if (!proof) throw new Error('Necesitamos que confirmes con la billetera que pagó la orden. Probá de nuevo.');
       const res = await fetch('/api/settle', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -33,13 +46,12 @@ export function OrderPanel({ order, onDismiss }: { order: OpenedOrder; onDismiss
           action,
           orderId: order.orderId,
           basketHash: order.basketHash,
-          retailer: order.retailer,
-          cartId: order.cartId,
-          handoffUrl: order.handoffUrl,
+          address: order.buyer,
+          proof,
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? `settle failed (${res.status})`);
+      if (!res.ok) throw new Error(json.message ?? json.error ?? `settle failed (${res.status})`);
       setOutcome(json as SettleResponse);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

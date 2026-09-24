@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation';
 
 import { CartCard } from '../../../components/CartCard';
-import { UserBubble } from '../../../components/Chat';
 import { OrderPanel } from '../../../components/OrderPanel';
 import { ProductGrid } from '../../../components/ProductGrid';
+import { Fixtures } from './Fixtures';
 
 /**
  * Every rendered block, with fixed data, on one page.
@@ -26,14 +26,7 @@ export default function DevUi() {
         </div>
       </header>
       <div className="thread">
-        {/* Reaching an undelivered message for real costs three free turns and
-            a logged-out browser, so the three states live here instead. */}
-        <UserBubble block={DELIVERED} canRetry={false} onRetry={() => {}} />
-        <UserBubble block={FAILED_LOGIN} canRetry onRetry={() => {}} />
-        <UserBubble block={FAILED_OLD} canRetry={false} onRetry={() => {}} />
-        <p className="bubble is-error" role="alert">
-          Se cortó la respuesta. Probá de nuevo.
-        </p>
+        <Fixtures />
 
         <ProductGrid items={PRODUCTS} note="4 opciones de leche descremada en 1414" />
         <CartCard cart={CART} handoffUrl="https://diaonline.supermercadosdia.com.ar/checkout/" />
@@ -45,24 +38,6 @@ export default function DevUi() {
     </main>
   );
 }
-
-const DELIVERED = { kind: 'user' as const, id: 'd1', text: 'galletas de avena para 4' };
-
-/** The bug this scheme exists for: the supermarket and the postal code, lost. */
-const FAILED_LOGIN = {
-  kind: 'user' as const,
-  id: 'd2',
-  text: 'jumbo 1430',
-  failed: { reason: 'login' as const, message: 'Para seguir, iniciá sesión.' },
-};
-
-/** Failed, but the user typed something after it — the mark stays, the button goes. */
-const FAILED_OLD = {
-  kind: 'user' as const,
-  id: 'd3',
-  text: 'sumale dos docenas de huevos',
-  failed: { reason: 'network' as const, message: 'Se cortó la conexión antes de terminar.' },
-};
 
 const money = (centavos: number) => ({
   centavos,
@@ -129,6 +104,7 @@ const CART = {
 /** A real order: the one settled in commit 14, with its actual hashes. */
 const ORDER = {
   orderId: '20f8af41e9932bbf0d2d3c00bde344a087d3d0c1c8f9a2c0045f97f9fb736e6e',
+  buyer: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
   basketHash: '09f717841992aabcb6a6925fdae396718d5e9b2c43b6bb35330429523ed89798',
   amountUnits: '34400000',
   hash: 'a72b4f33bc155b8de1b2f2c15a975b31a04048a3bc6f881bc306e8a1080782a2',

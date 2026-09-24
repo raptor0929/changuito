@@ -148,6 +148,8 @@ export function openArgs({
  */
 export interface OpenedOrder {
   orderId: string;
+  /** The wallet that signed `open`. Only it may confirm or refund. */
+  buyer: string;
   basketHash: string;
   amountUnits: string;
   /** The `escrow.open` transaction. */
@@ -161,10 +163,14 @@ export interface OpenedOrder {
 /* ------------------------------------------------------------ the receipt */
 
 export interface ReceiptInput {
-  retailer: string;
-  cartId: string;
-  /** The store link the user was handed. */
-  handoffUrl?: string;
+  /** Hex, as the contract stores it. */
+  orderId: string;
+  /** The order's buyer, as read from the contract. */
+  buyer: string;
+  /** Hex of the basket_hash the buyer locked. */
+  basketHash: string;
+  /** Token units escrowed. */
+  amountUnits: string;
   /** ISO 8601. Chosen by the server and returned, so the hash can be re-derived. */
   settledAt: string;
 }
@@ -172,18 +178,21 @@ export interface ReceiptInput {
 /**
  * What `settle` writes on-chain as `receipt_hash`.
  *
- * In a full product this would hash the store's own order number, which is the
- * thing an auditor can take back to Día. changuito's read-only MCP path stops
- * at the cart link, so it hashes the handoff instead: the cart the user was
- * given, and when the resolver released the money for it. Honest about what it
- * proves, and the shape does not change when a real order number arrives.
+ * Every field is one the server read from the contract or chose itself. v1
+ * hashed the retailer, cart id and handoff link the browser sent, which let
+ * anyone put any text on-chain as a "receipt". In a full product this would
+ * hash the store's own order number; until the resolver can check the store,
+ * it records what is actually known: this order, this buyer, this basket,
+ * released on the buyer's signed word at this moment.
  */
 export function canonicalReceipt(r: ReceiptInput): string {
   return [
-    'changuito/receipt/v1',
-    `retailer|${r.retailer}`,
-    `cart|${r.cartId}`,
-    `handoff|${r.handoffUrl ?? ''}`,
+    'changuito/receipt/v2',
+    `order|${r.orderId}`,
+    `buyer|${r.buyer}`,
+    `basket|${r.basketHash}`,
+    `amount|${r.amountUnits}`,
+    'basis|buyer-confirmed',
     `settled|${r.settledAt}`,
     '',
   ].join('\n');

@@ -306,3 +306,73 @@ describe('canRetry', () => {
     assert.equal(canRetry(endTurn(sendUser(initialState, 'hola')), 'b1'), false);
   });
 });
+
+describe('turn progress', () => {
+  const received: UiEvent = { t: 'status', stage: 'received' };
+
+  it('records the stage without adding anything to the transcript', () => {
+    const s = run([received, { t: 'status', stage: 'thinking', hop: 0 }], sendUser(initialState, JUMBO));
+    assert.deepEqual(s.blocks.map((b) => b.kind), ['user']);
+    assert.deepEqual(s.progress, { stage: 'thinking', hop: 0, writing: false });
+  });
+
+  it('keeps the hop across a fallback that does not name one', () => {
+    const s = run(
+      [{ t: 'status', stage: 'thinking', hop: 2 }, { t: 'status', stage: 'fallback' }],
+      sendUser(initialState, JUMBO),
+    );
+    assert.deepEqual(s.progress, { stage: 'fallback', hop: 2, writing: false });
+  });
+
+  it('notes when reply text starts, and forgets it at the next status', () => {
+    const writing = run([received, { t: 'text', delta: 'Busco' }], sendUser(initialState, JUMBO));
+    assert.equal(writing.progress?.writing, true);
+    const next = applyEvent(writing, { t: 'status', stage: 'thinking', hop: 1 });
+    assert.equal(next.progress?.writing, false);
+  });
+
+  it('is gone once the turn ends, however it ends', () => {
+    const live = run([received], sendUser(initialState, JUMBO));
+    const done = applyEvent(live, {
+      t: 'done', stopReason: 'end_turn', snapshot: { location: undefined, carts: {} } as never,
+    });
+    assert.ok(!('progress' in done));
+    assert.ok(!('progress' in endTurn(live)));
+    assert.ok(!('progress' in applyEvent(live, { t: 'error', message: 'x', recoverable: false })));
+    assert.ok(!('progress' in failTurn(live, dropped)));
+  });
+
+  it('ignores a status that arrives after the user pressed Parar', () => {
+    const stopped = endTurn(sendUser(initialState, JUMBO));
+    assert.deepEqual(applyEvent(stopped, received), stopped);
+  });
+
+  it('starts every turn from nothing', () => {
+    const live = run([received], sendUser(initialState, JUMBO));
+    const failed = failTurn(live, dropped);
+    assert.ok(!('progress' in retryUser(failed, 'b1')));
+  });
+});
+
+describe('failTurn after the server acknowledged the message', () => {
+  it('says the answer was cut, not that the message never left', () => {
+    // The QA shape: "Buscando…" for half a minute, then the stream died with
+    // nothing on screen. The server had the message the whole time.
+    const live = applyEvent(sendUser(initialState, JUMBO), { t: 'status', stage: 'received' });
+    const s = failTurn(live, dropped);
+    const b = s.blocks[0];
+    assert.equal(b.kind === 'user' && b.failed?.reason, 'dropped');
+    assert.equal(b.kind === 'user' && b.failed?.message, dropped.message);
+    assert.equal(canRetry(s, 'b1'), true);
+  });
+
+  it('keeps "no se envió" when nothing was acknowledged', () => {
+    const s = failTurn(sendUser(initialState, JUMBO), dropped);
+    assert.equal(s.blocks[0].kind === 'user' && s.blocks[0].failed?.reason, 'network');
+  });
+
+  it('leaves a login refusal as a login refusal', () => {
+    const s = failTurn(sendUser(initialState, JUMBO), login);
+    assert.equal(s.blocks[0].kind === 'user' && s.blocks[0].failed?.reason, 'login');
+  });
+});

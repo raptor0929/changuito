@@ -18,6 +18,7 @@ import { notifyHumanRequired, SOLO_HUMANOS } from './human-gate-ui';
 import { LOGIN_REQUIRED, LOGIN_REQUIRED_MESSAGE } from './login-constants';
 import { parseEvents, type ChatRequest } from './protocol';
 import { ensureUserCookie } from './session-login';
+import type { WalletSigner } from './wallet-proof.ts';
 
 /**
  * One turn at a time against /api/chat, decoded from SSE.
@@ -35,6 +36,8 @@ export interface UseChatAuth {
   isAuthenticated?: boolean;
   /** Stellar address once Pollar has a session. Used to mint `chg_user`. */
   address?: string | null;
+  /** Signs the login proof `chg_user` needs. Absent without Pollar. */
+  sign?: WalletSigner;
 }
 
 const SESSION_SAVE_FAILED = 'No pude guardar la sesión. Probá de nuevo.';
@@ -111,14 +114,14 @@ export function useChat(auth?: UseChatAuth) {
             if (authRef.current.isAuthenticated) {
               // Pollar can flip before `chg_user` is stored. Mint the cookie
               // and retry once. Do not latch the guest gate or paint its copy.
-              const address = authRef.current.address;
+              const { address, sign } = authRef.current;
               if (controller.signal.aborted) {
                 stopped();
                 return;
               }
-              if (!minted && address) {
+              if (!minted && address && sign) {
                 minted = true;
-                const ok = await ensureUserCookie(address, { force: true });
+                const ok = await ensureUserCookie(address, sign, { force: true });
                 if (controller.signal.aborted) {
                   stopped();
                   return;
@@ -173,7 +176,12 @@ export function useChat(auth?: UseChatAuth) {
         setState((s) => endTurn(s));
         return;
       }
-      setState((s) => failTurn(s, { reason: 'network', message: err instanceof Error ? err.message : 'Algo falló.' }));
+      // The browser's own text ("Failed to fetch", "Load failed") is English
+      // and names nothing the user can do. The console keeps it for a report.
+      console.warn('[chat] request failed:', err);
+      setState((s) =>
+        failTurn(s, { reason: 'network', message: 'No pudimos hablar con el servidor. Revisá tu conexión y reintentá.' }),
+      );
     }
   }, []);
 

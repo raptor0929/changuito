@@ -1,18 +1,25 @@
 /**
- * Guest free-turn gate for /api/chat.
+ * Who may run a chat turn, and how many.
  *
- * Guests get FREE_TURNS chat POSTs per sessionId (and a softer IP ceiling so
- * rotating sessionIds cannot burn Anthropic forever). After Pollar login the
- * client hits /api/session/login, which sets an httpOnly `chg_user` cookie;
- * with that cookie the counter is skipped.
+ * Guests get FREE_TURNS chat POSTs per sessionId, a ceiling per Turnstile
+ * pass (the `chg_human` cookie, which costs a solved challenge to replace),
+ * and a softer ceiling per IP. After Pollar login the client proves the
+ * wallet to /api/session/login (lib/session-issue.ts), which sets the signed
+ * `chg_user` cookie; with it the guest counters are skipped and a per-wallet
+ * hourly cap applies instead.
  *
- * Redis when available (same credentials as turn-store); otherwise an
- * in-memory map with TTL — same compromise as turn-store on a single box.
+ * The counters fail closed. They are the only thing between a stranger and
+ * the Anthropic bill and the supermarkets' APIs, so a Redis error answers 503
+ * rather than waving the request through, and production without Redis
+ * credentials refuses too. Outside production an in-memory map stands in,
+ * the same compromise as turn-store on one developer's machine.
  */
+
+import { createHash } from 'node:crypto';
 
 import { Redis } from '@upstash/redis';
 
-import { readCookie } from './human-gate.ts';
+import { HUMAN_COOKIE, readCookie } from './human-gate.ts';
 import {
   FREE_TURNS,
   FREE_TURNS_PER_IP,
@@ -33,11 +40,21 @@ export {
 } from './login-constants.ts';
 export type { LoginGateInput } from './login-constants.ts';
 
+/** Guest turns per Turnstile pass. Rotating sessionId stops here. */
+export const FREE_TURNS_PER_HUMAN = FREE_TURNS * 3;
+
+/** Turns per verified wallet per hour. A basket is a handful; this is a lot of baskets. */
+export const USER_TURNS_PER_HOUR = 60;
+
 const TTL_SECONDS = 60 * 60; // match turn-store: abandon after an hour
+const HUMAN_TTL_SECONDS = 12 * 60 * 60; // as long as the chg_human cookie lives
 const USER_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 const KEY_SESSION = (sessionId: string) => `changuito:guest-turns:${sessionId}`;
 const KEY_IP = (ip: string) => `changuito:guest-turns-ip:${ip}`;
+const KEY_HUMAN = (token: string) =>
+  `changuito:guest-turns-human:${createHash('sha256').update(token).digest('hex').slice(0, 32)}`;
+const KEY_USER = (address: string) => `changuito:user-turns:${address}`;
 
 // ---------------------------------------------------------------- cookie
 
@@ -60,28 +77,41 @@ async function hmac(secret: string, payload: string): Promise<string> {
   return b64url(sig);
 }
 
-/** Prefer a dedicated secret; fall back to Turnstile secret; then a local-only default. */
+/**
+ * The key `chg_user` is signed with, or '' when there is none to use.
+ *
+ * Production takes CHG_SESSION_SECRET and nothing else: falling back to the
+ * Turnstile secret made one leak forge both cookies, and the local constant
+ * is public. Empty means no cookie is issued and none is accepted — signed-in
+ * shoppers fall back to guest limits until the secret is set.
+ */
 export function sessionSecret(env: NodeJS.ProcessEnv = process.env): string {
   const dedicated = (env.CHG_SESSION_SECRET ?? '').trim();
   if (dedicated) return dedicated;
+  if (env.NODE_ENV === 'production') return '';
   const turnstile = (env.TURNSTILE_SECRET_KEY ?? '').trim();
   if (turnstile) return turnstile;
   return 'dev-chg-session-not-for-prod';
 }
 
 /**
- * Token format: `exp.address.sig` where address is base64url(utf8) so it can
- * contain any Stellar G… / C… character without cookie headaches.
+ * Token format: `v2.exp.address.sig`, address base64url(utf8).
+ *
+ * v2 because every v1 cookie was minted for whatever address the browser
+ * named, with no proof. Rejecting the old shape signs those out.
  */
+const TOKEN_VERSION = 'v2';
+
 export async function mintUserToken(
   address: string,
   secret: string,
   now = Date.now(),
   ttlMs = USER_TTL_MS,
 ): Promise<string> {
+  if (!secret) throw new Error('no session secret');
   const exp = String(now + ttlMs);
   const addr = btoa(address).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-  const payload = `${exp}.${addr}`;
+  const payload = `${TOKEN_VERSION}.${exp}.${addr}`;
   const sig = await hmac(secret, payload);
   return `${payload}.${sig}`;
 }
@@ -91,13 +121,13 @@ export async function verifyUserToken(
   secret: string,
   now = Date.now(),
 ): Promise<{ ok: true; address: string } | { ok: false }> {
-  if (!token) return { ok: false };
+  if (!token || !secret) return { ok: false };
   const parts = token.split('.');
-  if (parts.length !== 3) return { ok: false };
-  const [expStr, addrB64, sig] = parts as [string, string, string];
+  if (parts.length !== 4 || parts[0] !== TOKEN_VERSION) return { ok: false };
+  const [version, expStr, addrB64, sig] = parts as [string, string, string, string];
   const exp = Number(expStr);
   if (!Number.isFinite(exp) || exp < now) return { ok: false };
-  const expected = await hmac(secret, `${expStr}.${addrB64}`);
+  const expected = await hmac(secret, `${version}.${expStr}.${addrB64}`);
   if (expected.length !== sig.length) return { ok: false };
   let diff = 0;
   for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i);
@@ -143,18 +173,36 @@ export function loginRequiredResponse(turnsUsed = FREE_TURNS): Response {
   );
 }
 
+export function limiterUnavailableResponse(): Response {
+  return Response.json(
+    { error: 'limiter_unavailable', message: 'No pudimos verificar tu cupo. Probá de nuevo en un momento.' },
+    { status: 503 },
+  );
+}
+
+export function rateLimitedResponse(message: string): Response {
+  return Response.json({ error: 'rate_limited', message }, { status: 429 });
+}
+
 // ---------------------------------------------------------------- counter store
+
+/** Thrown by a counter that cannot answer. Callers refuse the request. */
+export class CounterUnavailable extends Error {}
 
 export interface TurnCounter {
   get(key: string): Promise<number>;
-  /** Atomically increment and return the new value. */
-  incr(key: string): Promise<number>;
-  readonly kind: 'redis' | 'memory';
+  /**
+   * Atomically increment and return the new value. The window starts on the
+   * first increment and does not slide, so a steady trickle cannot keep a
+   * count alive forever.
+   */
+  incr(key: string, ttlSeconds?: number): Promise<number>;
+  readonly kind: 'redis' | 'memory' | 'unavailable';
 }
 
-function credentials(): { url: string; token: string } | undefined {
-  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+function credentials(env: NodeJS.ProcessEnv): { url: string; token: string } | undefined {
+  const url = env.KV_REST_API_URL || env.UPSTASH_REDIS_REST_URL;
+  const token = env.KV_REST_API_TOKEN || env.UPSTASH_REDIS_REST_TOKEN;
   return url && token ? { url, token } : undefined;
 }
 
@@ -168,33 +216,38 @@ function redisCounter(url: string, token: string): TurnCounter {
         return typeof n === 'number' && Number.isFinite(n) ? n : 0;
       } catch (e) {
         console.error('[login-gate] counter read failed:', e);
-        return 0;
+        throw new CounterUnavailable('counter read failed');
       }
     },
-    async incr(key) {
+    async incr(key, ttlSeconds = TTL_SECONDS) {
       try {
         const n = await redis.incr(key);
-        // Refresh TTL on every touch so active guests keep their window.
-        await redis.expire(key, TTL_SECONDS);
+        if (n === 1) await redis.expire(key, ttlSeconds);
         return typeof n === 'number' ? n : 1;
       } catch (e) {
         console.error('[login-gate] counter incr failed:', e);
-        return 1;
+        throw new CounterUnavailable('counter incr failed');
       }
     },
   };
 }
 
-function memoryCounter(): TurnCounter {
-  const map = new Map<string, { n: number; lastUsed: number }>();
+/** Production with no Redis: nothing shared to count with, so nothing is allowed. */
+function unavailableCounter(): TurnCounter {
+  const refuse = async (): Promise<number> => {
+    throw new CounterUnavailable('no shared counter store');
+  };
+  return { kind: 'unavailable', get: refuse, incr: refuse };
+}
+
+export function memoryCounter(): TurnCounter {
+  const map = new Map<string, { n: number; expires: number }>();
   const MAX = 512;
 
   function prune(now: number) {
-    for (const [k, v] of map) {
-      if (now - v.lastUsed > TTL_SECONDS * 1000) map.delete(k);
-    }
+    for (const [k, v] of map) if (v.expires <= now) map.delete(k);
     while (map.size > MAX) {
-      const oldest = [...map.entries()].reduce((a, b) => (a[1].lastUsed <= b[1].lastUsed ? a : b));
+      const oldest = [...map.entries()].reduce((a, b) => (a[1].expires <= b[1].expires ? a : b));
       map.delete(oldest[0]);
     }
   }
@@ -203,23 +256,18 @@ function memoryCounter(): TurnCounter {
     kind: 'memory',
     async get(key) {
       const hit = map.get(key);
-      if (!hit) return 0;
-      if (Date.now() - hit.lastUsed > TTL_SECONDS * 1000) {
-        map.delete(key);
-        return 0;
-      }
+      if (!hit || hit.expires <= Date.now()) return 0;
       return hit.n;
     },
-    async incr(key) {
+    async incr(key, ttlSeconds = TTL_SECONDS) {
       const now = Date.now();
       prune(now);
       const hit = map.get(key);
-      if (!hit || now - hit.lastUsed > TTL_SECONDS * 1000) {
-        map.set(key, { n: 1, lastUsed: now });
+      if (!hit || hit.expires <= now) {
+        map.set(key, { n: 1, expires: now + ttlSeconds * 1000 });
         return 1;
       }
       hit.n += 1;
-      hit.lastUsed = now;
       return hit.n;
     },
   };
@@ -227,56 +275,88 @@ function memoryCounter(): TurnCounter {
 
 let counter: TurnCounter | undefined;
 
-/** Exposed for tests — swap in a fresh memory counter. */
+/** Exposed for tests — swap in a fresh memory counter, or a failing one. */
 export function __resetTurnCounterForTests(next?: TurnCounter): void {
   counter = next ?? memoryCounter();
 }
 
-export function guestTurnCounter(): TurnCounter {
+export function guestTurnCounter(env: NodeJS.ProcessEnv = process.env): TurnCounter {
   if (!counter) {
-    const creds = credentials();
-    counter = creds ? redisCounter(creds.url, creds.token) : memoryCounter();
-    console.log(
-      counter.kind === 'redis'
-        ? '[login-gate] Redis — guest turn counters survive cold starts.'
-        : '[login-gate] in-memory guest turn counters (lost on restart).',
-    );
+    const creds = credentials(env);
+    if (creds) counter = redisCounter(creds.url, creds.token);
+    else if (env.NODE_ENV === 'production') {
+      console.error('[login-gate] no Redis credentials in production — chat and faucet quotas refuse every request.');
+      counter = unavailableCounter();
+    } else counter = memoryCounter();
+    if (counter.kind === 'memory') console.log('[login-gate] in-memory counters (lost on restart).');
   }
   return counter;
 }
 
+/**
+ * Count one use of `key` against `limit` per `ttlSeconds`.
+ *
+ * `unavailable` means the store could not answer, and the caller must refuse.
+ */
+export async function takeQuota(
+  key: string,
+  limit: number,
+  ttlSeconds: number,
+  store: TurnCounter = guestTurnCounter(),
+): Promise<'ok' | 'limited' | 'unavailable'> {
+  try {
+    if ((await store.get(key)) >= limit) return 'limited';
+    await store.incr(key, ttlSeconds);
+    return 'ok';
+  } catch (e) {
+    if (e instanceof CounterUnavailable) return 'unavailable';
+    throw e;
+  }
+}
+
+/**
+ * The caller's IP, from a header the edge sets rather than the client.
+ *
+ * `cf-connecting-ip` is written by Cloudflare, which fronts app.changuito.me.
+ * `x-real-ip` is Vercel's own, from the TCP peer. The first X-Forwarded-For
+ * value is whatever the client typed, so it is never read.
+ */
 export function clientIp(req: Request): string | null {
-  return (
-    req.headers.get('cf-connecting-ip') ??
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    req.headers.get('x-real-ip') ??
-    null
-  );
+  const cf = req.headers.get('cf-connecting-ip')?.trim();
+  if (cf) return cf;
+  const real = req.headers.get('x-real-ip')?.trim();
+  return real || null;
 }
 
 export interface GateVerdict {
   allow: boolean;
   /** Turns already used *including* this one when allow=true; or the blocked count. */
   turnsUsed: number;
-  reason?: 'login_required' | 'ip_limit';
+  reason?: 'login_required' | 'ip_limit' | 'human_limit';
 }
 
 /**
  * Pure decision given current counts. Exported for unit tests.
- * `sessionCount` / `ipCount` are values *before* this attempt.
+ * Counts are values *before* this attempt.
  */
 export function guestChatVerdict(args: {
   loggedIn: boolean;
   sessionCount: number;
   ipCount?: number;
+  humanCount?: number;
   freeTurns?: number;
   freeTurnsPerIp?: number;
+  freeTurnsPerHuman?: number;
 }): GateVerdict {
   if (args.loggedIn) return { allow: true, turnsUsed: 0 };
   const free = args.freeTurns ?? FREE_TURNS;
   const freeIp = args.freeTurnsPerIp ?? FREE_TURNS_PER_IP;
+  const freeHuman = args.freeTurnsPerHuman ?? FREE_TURNS_PER_HUMAN;
   if (args.sessionCount >= free) {
     return { allow: false, turnsUsed: args.sessionCount, reason: 'login_required' };
+  }
+  if (args.humanCount !== undefined && args.humanCount >= freeHuman) {
+    return { allow: false, turnsUsed: args.sessionCount, reason: 'human_limit' };
   }
   if (args.ipCount !== undefined && args.ipCount >= freeIp) {
     return { allow: false, turnsUsed: args.sessionCount, reason: 'ip_limit' };
@@ -285,28 +365,42 @@ export function guestChatVerdict(args: {
 }
 
 /**
- * Gate /api/chat for guests. Returns a Response to return immediately, or null to proceed.
- * Increments counters only when the request is allowed (attempt that consumes a free turn).
+ * Gate /api/chat. Returns a Response to return immediately, or null to proceed.
+ * Increments counters only when the request is allowed.
  */
 export async function requireLoginOrFreeTurn(
   req: Request,
   sessionId: string,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<Response | null> {
-  const user = await readLoggedInUser(req, env);
-  if (user.ok) return null;
+  const store = guestTurnCounter(env);
 
-  const store = guestTurnCounter();
-  const sessionCount = await store.get(KEY_SESSION(sessionId));
-  const ip = clientIp(req);
-  const ipCount = ip ? await store.get(KEY_IP(ip)) : undefined;
+  try {
+    const user = await readLoggedInUser(req, env);
+    if (user.ok) {
+      const quota = await takeQuota(KEY_USER(user.address), USER_TURNS_PER_HOUR, TTL_SECONDS, store);
+      if (quota === 'unavailable') return limiterUnavailableResponse();
+      if (quota === 'limited') {
+        return rateLimitedResponse('Llegaste al límite de búsquedas por hora. Probá de nuevo en un rato.');
+      }
+      return null;
+    }
 
-  const verdict = guestChatVerdict({ loggedIn: false, sessionCount, ipCount });
-  if (!verdict.allow) {
-    return loginRequiredResponse(verdict.turnsUsed);
+    const sessionCount = await store.get(KEY_SESSION(sessionId));
+    const ip = clientIp(req);
+    const ipCount = ip ? await store.get(KEY_IP(ip)) : undefined;
+    const human = readCookie(req.headers.get('cookie'), HUMAN_COOKIE);
+    const humanCount = human ? await store.get(KEY_HUMAN(human)) : undefined;
+
+    const verdict = guestChatVerdict({ loggedIn: false, sessionCount, ipCount, humanCount });
+    if (!verdict.allow) return loginRequiredResponse(verdict.turnsUsed);
+
+    await store.incr(KEY_SESSION(sessionId), TTL_SECONDS);
+    if (ip) await store.incr(KEY_IP(ip), TTL_SECONDS);
+    if (human) await store.incr(KEY_HUMAN(human), HUMAN_TTL_SECONDS);
+    return null;
+  } catch (e) {
+    if (e instanceof CounterUnavailable) return limiterUnavailableResponse();
+    throw e;
   }
-
-  await store.incr(KEY_SESSION(sessionId));
-  if (ip) await store.incr(KEY_IP(ip));
-  return null;
 }

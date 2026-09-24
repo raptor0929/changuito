@@ -9,7 +9,24 @@ import type { SessionSnapshot } from '@changuito/mcp/session';
  * types — re-describing them here would be a second definition to keep in
  * step with the first.
  */
+/**
+ * Where the server is in a turn. Every stage is emitted at the moment it
+ * becomes true, so the waiting row can say what is happening without
+ * inventing a percentage.
+ *
+ * - `received`: the gates passed and the stream is open. From here on the
+ *   message is the server's, which is what separates "no se envió" from "se
+ *   cortó" when a turn fails with nothing on screen.
+ * - `thinking`: a model hop started. `hop` counts from zero; past the first
+ *   the model is reading tool results, not the user's message.
+ * - `fallback`: the local model failed before saying anything, and the hop is
+ *   being re-run on the hosted one.
+ */
+export type TurnStage = 'received' | 'thinking' | 'fallback';
+
 export type UiEvent =
+  /** Progress without content. Never creates a block in the transcript. */
+  | { t: 'status'; stage: TurnStage; hop?: number }
   /** A fragment of the assistant's reply. */
   | { t: 'text'; delta: string }
   /** Summarized reasoning, for a "thinking" line the user can ignore. */

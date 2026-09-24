@@ -27,11 +27,17 @@ export default function Home() {
               height={583}
             />
             <div className="brand-copy">
+              {/* The name is text, not only an alt: tools that read a
+                  heading's text content (crawlers, some audits) saw an
+                  empty h1. The image is then decorative, so it is not read
+                  twice. */}
               <h1 className="brand-name">
+                <span className="sr-only">Changuito</span>
                 <img
                   className="brand-wordmark"
                   src="/brand/wordmark.png"
-                  alt="Changuito"
+                  alt=""
+                  aria-hidden="true"
                   width={1097}
                   height={249}
                 />

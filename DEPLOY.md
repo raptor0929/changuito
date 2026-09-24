@@ -125,8 +125,34 @@ Preview:
 | `FX_ARS_PER_USD` | optional, e.g. `1500` | server only |
 | `KV_REST_API_URL` | set by the Redis integration | server only |
 | `KV_REST_API_TOKEN` | set by the Redis integration | server only |
+| `FAUCET_ALLOWLIST_ADDRESSES` | tester wallet addresses, e.g. `GABC…XYZ,GDEF…UVW` | server only |
+| `CHG_SESSION_SECRET` | **required**, `openssl rand -base64 32` | server only |
 
 The two `KV_` ones you do not type — see [2.4](#24-conversation-history) below.
+They are **required** in production now: the chat and faucet quotas count in
+Redis and fail closed, so without them (or with Redis down) `/api/chat` and
+`/api/faucet` answer 503 instead of running unlimited turns.
+
+`CHG_SESSION_SECRET` signs the `chg_user` cookie that lifts the guest limits.
+Production reads nothing else for it (no fallback to the Turnstile secret):
+unset, sign-in answers 503 and everyone is a guest. The cookie is issued only
+after the wallet signs a login message (SEP-53), so an address alone is not a
+login. Setting or rotating it signs everyone out, which only costs them a
+signature on their next visit.
+
+`FAUCET_ALLOWLIST_ADDRESSES` decides who sees **Cargar USDC**. The faucet signs
+with the resolver key, so it is closed by default: in production (Previews
+included) an empty value means nobody can mint. List the Pollar wallet address
+of each test account — the `G…` shown under "Tu pago" once that account is
+logged in (click it to copy) — separated by commas. Every other shopper gets
+no button, and `POST /api/faucet` answers 403.
+
+It is an address and not an email because the address is what the server can
+prove: the browser signs a short message with that wallet (SEP-53), and Pollar
+only signs for a logged-in session. Use an email or Google login for test
+accounts; passkey wallets (`C…`) cannot sign that message. Keep real addresses
+in Vercel, not in the repo. Locally, with the variable unset, the faucet stays
+open so a fresh clone can fund a wallet.
 
 `FX_ARS_PER_USD` pins the exchange rate. Set it if you want a demo to quote the
 same number every time; leave it unset and the app uses the live rate.

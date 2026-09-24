@@ -208,6 +208,63 @@ Two things worth knowing before changing any of it:
 because `auto` cannot answer "is the machine actually being used?" — `auto`
 succeeds either way, which is the whole point of it.
 
+### 6. The wait says what it is waiting for
+
+*QA on production: a guest sat on "Buscando…" for ~35s and got "No se
+envió"; a signed-in shopper waited 38–60s with nothing but Parar on screen.*
+
+Two problems with one cause: before the first model output, the browser had
+no evidence the server was doing anything. A local hop can reason for half a
+minute without a text delta, and the first byte of the body was the 15s
+heartbeat. So the UI could not tell a slow turn from a dead one, and when the
+stream did die it blamed the user's message.
+
+Now there is a `status` event, and it never creates a block:
+
+- **`received`** is the first byte of the body, written before the MCP boot
+  and the model. It is also what `failTurn` reads: a turn that failed with
+  nothing on screen *after* `received` is `dropped` ("Se cortó antes de
+  responder"), not `network` ("No se envió"). The retry control is the same
+  — history is still only written on a clean return — but the copy is true.
+- **`thinking`** at the top of every hop, with its index. Hop 0 is reading
+  the user; later hops are reading tool results.
+- **`fallback`** when the local model failed before any text and the hop is
+  being re-run on the hosted one.
+
+`lib/turn-progress.ts` turns that, plus pending tools and the clock, into the
+line under the composer. **Nothing in it is estimated.** Every stage is
+something that happened, and the reassurance copy keys off elapsed time,
+which is also something that happened. Do not add a progress bar: the server
+does not know how many hops a basket will take, so a bar would be a promise
+it cannot keep.
+
+Local reasoning deltas are still not forwarded. Ollama sends them as
+`delta.reasoning`, which `wire.ts` ignores on purpose: it is long, raw and
+English, and the `thinking` stage already says the model is working.
+
+The failure detail (`El servidor respondió 504.`, `Se cortó la conexión…`)
+is now printed under an undelivered bubble. It used to be discarded, which is
+why the QA report could say *that* it failed and not *how*.
+
+### 7. The first question is not a model call
+
+*Same QA pass. Reproduced on production as a guest: the starter chip took
+41.7s to come back with "¿cuál es tu código postal?", and the basket after it
+178s, on the local model.*
+
+The prompt requires a store and a postal code before anything else, so the
+first reply to a starter chip is always the same question — and on a local
+model it cost a full hop of prompt evaluation over twelve tool schemas.
+`agent/early-ask.ts` answers it in-process when **all three** hold: it is the
+first message of the conversation, no location is set, and nothing in the
+text looks like a postal code. The question and the user's message go into
+`turn.messages` like any other exchange, so the next hop reads the original
+request, the question, and the answer in order.
+
+Keep it that narrow. A follow-up ("no sé", "¿qué es un CPA?") deserves a
+model; a false negative on the postal-code regex only means the model gets
+the message, which is what used to happen to every message.
+
 ---
 
 ## Things that are the way they are on purpose

@@ -11,6 +11,7 @@ import { DEPLOYMENTS } from '../lib/deployments.ts';
 import { basketHash, newOrderId, openArgs, toHex, type OpenedOrder } from '../lib/order.ts';
 import { pollarEnabled, shortAddress } from '../lib/pollar.ts';
 import { useBalances } from '../lib/use-balances.ts';
+import { useFaucetAccess } from '../lib/use-faucet-access.ts';
 
 /**
  * Step 4 of the flow: the last screen before money moves.
@@ -39,6 +40,8 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
   const { wallet, isAuthenticated, verified, openLoginModal, runTx } = usePollar();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
   const { data: balance, refresh } = useBalances(address);
+  // Point at "Cargar USDC" only for wallets that actually have the button.
+  const canFund = useFaucetAccess(address)?.allowed === true;
 
   const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -116,6 +119,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
       // the store, then settling — happens on the page, not behind a dialog.
       onOpened({
         orderId: toHex(orderId),
+        buyer: address,
         basketHash: toHex(basket),
         amountUnits: amountUnits.toString(),
         hash: outcome.hash,
@@ -191,11 +195,17 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
         {failure ? <p className="pay-error">{failure}</p> : null}
         {short ? (
           <p className="pay-warn">
-            No te alcanza el saldo. Cargá USDC arriba y volvé a intentar.
+            {canFund
+              ? 'No te alcanza el saldo. Cargá USDC arriba y volvé a intentar.'
+              : 'No te alcanza el saldo para este pago.'}
           </p>
         ) : null}
         {address && balance && !balance.funded ? (
-          <p className="pay-warn">Te falta saldo para la comisión de la red. Usá “Cargar USDC”.</p>
+          <p className="pay-warn">
+            {canFund
+              ? 'Te falta saldo para la comisión de la red. Usá “Cargar USDC”.'
+              : 'Te falta saldo para la comisión de la red.'}
+          </p>
         ) : null}
 
         <p className="pay-note">
