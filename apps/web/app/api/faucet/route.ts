@@ -1,5 +1,5 @@
 /**
- * POST /api/faucet { address }  ->  { xlm, usdc, usdcDisplay, txHash, created }
+ * POST /api/faucet { address, proof }  ->  { xlm, usdc, usdcDisplay, txHash, created }
  *
  * Two steps, in this order, and the order is the point:
  *
@@ -10,8 +10,18 @@
  *   2. mint demo USDC.
  *
  * Doing it the other way round hands someone money they cannot spend.
+ *
+ * Both steps sign with our keys, so neither runs until `authorizeFaucet` says
+ * so: in production only allowlisted testers, proving the wallet with a fresh
+ * SEP-53 signature. See lib/faucet-auth.ts.
+ *
+ * GET /api/faucet?address=…  ->  { mode, allowed }, so the widget can leave
+ * the button out instead of showing one that can only fail.
  */
+import { faucetAccess } from '../../../lib/faucet-auth.ts';
+import { gateFaucet } from '../../../lib/faucet-gate.ts';
 import { faucetVerdict } from '../../../lib/faucet-policy.ts';
+import type { FaucetAccess } from '../../../lib/faucet-proof.ts';
 import { usdcAsAdmin } from '../../../lib/server/resolver.ts';
 import { addressKind, ensureFunded, formatUsdc } from '../../../lib/stellar.ts';
 import { usdcBalance } from '../../../lib/token.ts';
@@ -43,17 +53,22 @@ export interface FaucetResponse {
  */
 const lastGrant = new Map<string, number>();
 
-export async function POST(req: Request): Promise<Response> {
-  let address: string;
-  try {
-    const body = (await req.json()) as { address?: unknown };
-    address = typeof body.address === 'string' ? body.address : '';
-  } catch {
-    return Response.json({ error: 'expected a JSON body' }, { status: 400 });
-  }
+export async function GET(req: Request): Promise<Response> {
+  const gated = await requireHuman(req);
+  if (gated) return gated;
 
-  const kind = addressKind(address);
-  if (!kind) return Response.json({ error: 'not a Stellar address' }, { status: 400 });
+  const address = new URL(req.url).searchParams.get('address') ?? '';
+  const access: FaucetAccess = addressKind(address)
+    ? faucetAccess(address)
+    : { mode: faucetAccess('').mode, allowed: false };
+  return Response.json(access, { headers: { 'cache-control': 'no-store' } });
+}
+
+export async function POST(req: Request): Promise<Response> {
+  // Before friendbot and before the mint: both are signed by us.
+  const gate = await gateFaucet(req);
+  if (gate instanceof Response) return gate;
+  const { address, kind } = gate;
 
   try {
     // 1. XLM first. A contract wallet has no Horizon account to fund.

@@ -125,8 +125,23 @@ Preview:
 | `FX_ARS_PER_USD` | optional, e.g. `1500` | server only |
 | `KV_REST_API_URL` | set by the Redis integration | server only |
 | `KV_REST_API_TOKEN` | set by the Redis integration | server only |
+| `FAUCET_ALLOWLIST_ADDRESSES` | tester wallet addresses, e.g. `GABC…XYZ,GDEF…UVW` | server only |
 
 The two `KV_` ones you do not type — see [2.4](#24-conversation-history) below.
+
+`FAUCET_ALLOWLIST_ADDRESSES` decides who sees **Cargar USDC**. The faucet signs
+with the resolver key, so it is closed by default: in production (Previews
+included) an empty value means nobody can mint. List the Pollar wallet address
+of each test account — the `G…` shown under "Tu pago" once that account is
+logged in (click it to copy) — separated by commas. Every other shopper gets
+no button, and `POST /api/faucet` answers 403.
+
+It is an address and not an email because the address is what the server can
+prove: the browser signs a short message with that wallet (SEP-53), and Pollar
+only signs for a logged-in session. Use an email or Google login for test
+accounts; passkey wallets (`C…`) cannot sign that message. Keep real addresses
+in Vercel, not in the repo. Locally, with the variable unset, the faucet stays
+open so a fresh clone can fund a wallet.
 
 `FX_ARS_PER_USD` pins the exchange rate. Set it if you want a demo to quote the
 same number every time; leave it unset and the app uses the live rate.
