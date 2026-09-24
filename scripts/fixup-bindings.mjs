@@ -13,8 +13,13 @@
  *      `exports` at src/ removes the step entirely.
  *   3. The generated README tells you to run that build, which is now wrong.
  *
- * Run by scripts/deploy-testnet.sh right after generation, so a regenerated
+ * Run by scripts/deploy.sh right after generation, so a regenerated
  * binding is never left in the standalone shape.
+ *
+ * Generated from testnet only. The app uses these as pure ABI — argument
+ * encoding and error codes, identical on every network — and takes contract
+ * ids from apps/web/lib/deployments.ts, so one bundle can talk to two chains.
+ * The `networks` export the CLI bakes in is deliberately never imported.
  */
 import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -63,7 +68,7 @@ deploy overwrites everything here.
 
 To regenerate after a contract change:
 
-    ./scripts/deploy-testnet.sh --force
+    ./scripts/deploy.sh --force
 
 The contract id is baked into \`networks.testnet\` in \`src/index.ts\`, and the same
 id is recorded in \`deployments.json\` at the repo root. They are written by the

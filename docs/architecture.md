@@ -197,6 +197,6 @@ changuito/
 │   ├── mcp/                 the vendored MCP server — 520 tests
 │   ├── escrow-bindings/     generated from the deployed wasm
 │   └── usdc-bindings/       generated from the deployed wasm
-├── scripts/deploy-testnet.sh
+├── scripts/deploy.sh
 └── deployments.json         contract ids and accounts, written by the script
 ```

@@ -3,7 +3,8 @@
 import { PollarProvider } from '@pollar/react';
 import '@pollar/react/styles.css';
 
-import { POLLAR_API_KEY, POLLAR_NETWORK, pollarEnabled } from '../lib/pollar.ts';
+import { DEFAULT_NETWORK } from '../lib/deployments.ts';
+import { pollarApiKey, pollarEnabled, pollarNetwork } from '../lib/pollar.ts';
 import { PollarSpanish } from './PollarSpanish';
 
 /**
@@ -25,7 +26,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   if (!pollarEnabled) return <>{children}</>;
 
   return (
-    <PollarProvider client={{ apiKey: POLLAR_API_KEY, stellarNetwork: POLLAR_NETWORK }}>
+    <PollarProvider client={{ apiKey: pollarApiKey(DEFAULT_NETWORK), stellarNetwork: pollarNetwork(DEFAULT_NETWORK) }}>
       <PollarSpanish />
       {children}
     </PollarProvider>

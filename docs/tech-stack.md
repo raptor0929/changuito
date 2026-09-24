@@ -54,7 +54,7 @@ and [`../DEPLOY.md`](../DEPLOY.md) Part 3 for setting the machine up.
 | **`@stellar/stellar-sdk`** | 17.1.0 | server-side only — it never enters the client bundle |
 | **`@pollar/react` / `@pollar/core`** | 0.11.3 (exact) | login, wallet, and contract signing. Pinned exactly: Pollar self-describes as "V0" |
 | **`soroban-sdk`** | 25.3.2 | pinned to match the local `stellar` CLI at 25.1.0 |
-| **generated bindings** | — | `packages/escrow-bindings`, `packages/usdc-bindings`, produced from the **deployed** wasm by `scripts/deploy-testnet.sh` |
+| **generated bindings** | — | `packages/escrow-bindings`, `packages/usdc-bindings`, produced from the **deployed** wasm by `scripts/deploy.sh` |
 
 Full detail in [stellar.md](stellar.md).
 

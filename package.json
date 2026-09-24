@@ -21,7 +21,8 @@
     "test:e2e:ui": "playwright test --ui",
     "contracts:build": "stellar contract build --manifest-path contracts/Cargo.toml",
     "contracts:test": "cargo test --manifest-path contracts/Cargo.toml",
-    "deploy:testnet": "./scripts/deploy-testnet.sh"
+    "deploy:testnet": "./scripts/deploy.sh testnet",
+    "deploy:mainnet": "./scripts/deploy.sh mainnet"
   },
   "devDependencies": {
     "@playwright/test": "1.55.1"

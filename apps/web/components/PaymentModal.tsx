@@ -7,7 +7,7 @@ import type { Cart } from '@changuito/mcp/types';
 
 import { track, trackLoginStart } from '../lib/analytics';
 import type { QuoteResponse } from '../app/api/quote/route.ts';
-import { DEPLOYMENTS } from '../lib/deployments.ts';
+import { DEFAULT_NETWORK, DEPLOYMENTS } from '../lib/deployments.ts';
 import { basketHash, newOrderId, openArgs, toHex, type OpenedOrder } from '../lib/order.ts';
 import { pollarEnabled, shortAddress } from '../lib/pollar.ts';
 import { useBalances } from '../lib/use-balances.ts';
@@ -97,7 +97,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
       const orderId = newOrderId();
       const basket = await basketHash(cart);
       const outcome = await runTx('invoke_contract', {
-        contractId: DEPLOYMENTS.escrowId,
+        contractId: DEPLOYMENTS[DEFAULT_NETWORK].escrowId,
         method: 'open',
         args: openArgs({ buyer: address, orderId, amountUnits, basketHash: basket }),
       });

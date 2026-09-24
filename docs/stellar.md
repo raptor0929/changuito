@@ -166,7 +166,7 @@ wallet.
 
 ## Bindings, and the version pin
 
-`scripts/deploy-testnet.sh` builds for `wasm32v1-none`, deploys both contracts,
+`scripts/deploy.sh` builds for `wasm32v1-none`, deploys both contracts,
 writes `deployments.json`, then runs `stellar contract bindings typescript`
 against the **deployed** contract ids into `packages/escrow-bindings` and
 `packages/usdc-bindings`. So the TypeScript the app compiles against is

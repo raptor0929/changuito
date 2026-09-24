@@ -141,7 +141,7 @@ packages/mcp/        the supermarket MCP server (vendored, 520 tests)
 packages/*-bindings/ generated TypeScript clients for the two contracts
 contracts/escrow/    open / settle / refund, with events
 contracts/mock_usdc/ SEP-41 token, admin-gated mint
-scripts/             deploy-testnet.sh and its two helpers
+scripts/             deploy.sh and its two helpers
 deployments.json     what is deployed, and where — committed on purpose
 ```
 
@@ -297,7 +297,7 @@ That is the deployed wasm's own spec, not a copy of the source —
 prints it for yourself.
 
 Source lives in `contracts/escrow/` and `contracts/mock_usdc/`. To put up your
-own copy, `scripts/deploy-testnet.sh` rebuilds both, deploys them, and rewrites
+own copy, `scripts/deploy.sh` rebuilds both, deploys them, and rewrites
 `deployments.json` and the bindings in one pass — see **[DEPLOY.md](DEPLOY.md)**.
 
 ---
