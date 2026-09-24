@@ -256,3 +256,12 @@ test('founder trust is one shared line, with the mark, and not a second copyrigh
   assert.match(viewport, /dataset\.keyboard = 'open'/);
   assert.equal(existsSync(join(root, 'components/trust/founder-line.tsx')), false);
 });
+
+test('footer social links are at least a 44×44 tap target', () => {
+  // The X link is one letter; without a min-width it measured about 32×44.
+  const css = readFileSync(new URL('../../components/landing/landing.module.css', import.meta.url), 'utf8');
+  const rule = css.slice(css.indexOf('.socialLink {'));
+  const body = rule.slice(0, rule.indexOf('}'));
+  assert.match(body, /min-width:\s*44px/);
+  assert.match(body, /min-height:\s*44px/);
+});
