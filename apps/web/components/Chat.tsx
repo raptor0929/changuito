@@ -343,7 +343,7 @@ function ChatCore({
         </div>
       ) : null}
 
-      {order ? <OrderPanel order={order} onDismiss={() => setOrder(null)} /> : null}
+      {order ? <OrderPanel order={order} onDismiss={() => setOrder(null)} sign={sign} /> : null}
 
       <form
         className="composer"

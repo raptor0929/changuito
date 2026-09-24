@@ -119,6 +119,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
       // the store, then settling — happens on the page, not behind a dialog.
       onOpened({
         orderId: toHex(orderId),
+        buyer: address,
         basketHash: toHex(basket),
         amountUnits: amountUnits.toString(),
         hash: outcome.hash,

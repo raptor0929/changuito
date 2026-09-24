@@ -5,19 +5,17 @@
  * wallet; `settle` and `refund` are signed here, by the one server key, because
  * the buyer must not be able to move money out of an escrow they funded.
  *
- * Who decides: in a full product the resolver would settle from its own
- * confirmation with the store, never from the browser's word. changuito's
- * read-only MCP path stops at the cart link, so the user tells us whether they
- * completed it. That is fine for a demo where the money is test USDC and the
- * only account that can be hurt is the caller's own; it would not be fine in a
- * real deployment, and the fix is that the resolver checks the store itself.
+ * Who decides: only the order's buyer, proven by a SEP-53 signature over the
+ * action and the order id, and checked against the buyer the contract
+ * recorded. See lib/settle-gate.ts for why the buyer's word is enough here
+ * and what a full product would add (the resolver checking the store).
  */
 import { Status } from '@changuito/escrow-bindings';
 
 import { canonicalReceipt, fromHex, receiptHash, toHex, type SettleAction } from '../../../lib/order.ts';
 import { escrowAsResolver } from '../../../lib/server/resolver.ts';
+import { buyerMayClose, gateSettle, notYourOrderResponse } from '../../../lib/settle-gate.ts';
 import { explorer, formatUsdc } from '../../../lib/stellar.ts';
-import { requireHuman } from '../../../lib/human-gate.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,32 +33,10 @@ export interface SettleResponse {
   receiptHash?: string;
 }
 
-const HEX32 = /^[0-9a-f]{64}$/;
-
 export async function POST(req: Request): Promise<Response> {
-  let body: {
-    orderId?: unknown;
-    basketHash?: unknown;
-    action?: unknown;
-    retailer?: unknown;
-    cartId?: unknown;
-    handoffUrl?: unknown;
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: 'expected a JSON body' }, { status: 400 });
-  }
-
-  const action: SettleAction = body.action === 'refund' ? 'refund' : 'settle';
-  const orderId = typeof body.orderId === 'string' ? body.orderId.toLowerCase() : '';
-  const basketHash = typeof body.basketHash === 'string' ? body.basketHash.toLowerCase() : '';
-  if (!HEX32.test(orderId)) {
-    return Response.json({ error: 'orderId must be 32 bytes of hex' }, { status: 400 });
-  }
-  if (action === 'settle' && !HEX32.test(basketHash)) {
-    return Response.json({ error: 'basketHash must be 32 bytes of hex' }, { status: 400 });
-  }
+  const gate = await gateSettle(req);
+  if (gate instanceof Response) return gate;
+  const { action, orderId, basketHash, address } = gate;
 
   try {
     const escrow = escrowAsResolver();
@@ -73,6 +49,9 @@ export async function POST(req: Request): Promise<Response> {
     if (!found) {
       return Response.json({ error: 'no existe una orden con ese id' }, { status: 404 });
     }
+    // Before anything else is said about the order: a stranger learns
+    // nothing about its state, and nobody but its buyer can move it.
+    if (!buyerMayClose(String(found.buyer), address)) return notYourOrderResponse();
     if (found.status !== Status.Open) {
       return Response.json(
         { error: `la orden ya está ${found.status === Status.Settled ? 'liquidada' : 'reembolsada'}` },
@@ -95,12 +74,14 @@ export async function POST(req: Request): Promise<Response> {
       return Response.json({ ...common, hash, txUrl: explorer.tx(hash) } satisfies SettleResponse);
     }
 
-    const settledAt = new Date().toISOString();
+    // Only what the contract returned and the server chose. Nothing the
+    // browser sent is hashed as if it were evidence.
     const input = {
-      retailer: typeof body.retailer === 'string' ? body.retailer : '',
-      cartId: typeof body.cartId === 'string' ? body.cartId : '',
-      handoffUrl: typeof body.handoffUrl === 'string' ? body.handoffUrl : undefined,
-      settledAt,
+      orderId,
+      buyer: String(found.buyer),
+      basketHash,
+      amountUnits: amount.toString(),
+      settledAt: new Date().toISOString(),
     };
     const receipt = await receiptHash(input);
 
@@ -122,7 +103,8 @@ export async function POST(req: Request): Promise<Response> {
       receiptHash: toHex(receipt),
     } satisfies SettleResponse);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return Response.json({ error: `no pudimos cerrar la orden: ${message}` }, { status: 502 });
+    // The detail (RPC URLs, XDR codes) stays in the log.
+    console.error('[settle] failed:', err);
+    return Response.json({ error: 'No pudimos cerrar la orden. Probá de nuevo en un momento.' }, { status: 502 });
   }
 }

@@ -199,23 +199,31 @@ describe('RULE: the args match the contract they are sent to', () => {
 
 describe('canonicalReceipt', () => {
   const input = {
-    retailer: 'dia',
-    cartId: 'abc-123',
-    handoffUrl: 'https://diaonline.supermercadosdia.com.ar/checkout?orderFormId=abc-123',
+    orderId: '20f8af41e9932bbf0d2d3c00bde344a087d3d0c1c8f9a2c0045f97f9fb736e6e',
+    buyer: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+    basketHash: '09f717841992aabcb6a6925fdae396718d5e9b2c43b6bb35330429523ed89798',
+    amountUnits: '34400000',
     settledAt: '2026-09-20T14:30:00.000Z',
   };
 
   it('is verifiable: the preimage is plain text a person can read', () => {
     // The whole point of returning it from /api/settle. 32 bytes on a block
     // explorer prove nothing unless you can see what was hashed into them.
-    assert.match(canonicalReceipt(input), /^changuito\/receipt\/v1\n/);
+    assert.match(canonicalReceipt(input), /^changuito\/receipt\/v2\n/);
     assert.match(canonicalReceipt(input), /\nsettled\|2026-09-20T14:30:00\.000Z\n/);
   });
 
-  it('survives a missing handoff url without shifting the other fields', () => {
-    const lines = canonicalReceipt({ ...input, handoffUrl: undefined }).split('\n');
-    assert.equal(lines[3], 'handoff|');
-    assert.equal(lines[4], `settled|${input.settledAt}`);
+  it('records only what the contract and the server know, and on whose word', () => {
+    // v1 hashed a retailer, cart id and link that came from the browser.
+    const lines = canonicalReceipt(input).split('\n');
+    assert.deepEqual(lines.slice(1, 6), [
+      `order|${input.orderId}`,
+      `buyer|${input.buyer}`,
+      `basket|${input.basketHash}`,
+      `amount|${input.amountUnits}`,
+      'basis|buyer-confirmed',
+    ]);
+    assert.doesNotMatch(canonicalReceipt(input), /retailer|cart\||handoff/);
   });
 
   it('hashes to 32 bytes, and a different moment is a different receipt', async () => {
