@@ -18,12 +18,19 @@
 # - apps/web/components, apps/landing/components, and the page files
 # - packages/trust — shared footer copy, rendered in the browser
 # - apps/branding, docs, e2e specs
+#
+# This file is in the filter too: it is the only thing that checks itself.
 name: E2E
 
 on:
   push:
     branches: [main]
     paths:
+      # Itself, so a change to this file is checked by running it. Nothing
+      # else validates a workflow, which is how a bad expression here stayed
+      # broken through every run for weeks while reporting a plain red
+      # failure with no job, no log and no annotation to read.
+      - .github/workflows/e2e.yml
       - packages/mcp/**
       - packages/usdc-bindings/**
       - packages/escrow-bindings/**
@@ -84,13 +91,21 @@ jobs:
       cancel-in-progress: true
     strategy:
       fail-fast: false
+      # Which suites run is decided by building this list, not by a job-level
+      # `if`. That `if` is what failed every run of this workflow at startup,
+      # before a single job existed: `jobs.<id>.if` accepts github, needs,
+      # inputs and vars, and naming `matrix` there is an unrecognized value —
+      # so the file never compiled and the 0s "failure" was never a test.
+      #
+      # Building the list is also better than the `if` was: a suite that was
+      # not asked for now provisions no runner at all, rather than starting
+      # one to skip. A push carries no inputs, so it falls through to both.
       matrix:
-        project: [landing, app]
-    # A merge to main runs both. A manual run runs the chosen suite.
-    if: >-
-      github.event_name == 'push' ||
-      inputs.suite == 'both' ||
-      inputs.suite == matrix.project
+        project: >-
+          ${{ fromJSON(
+            github.event.inputs.suite == 'landing' && '["landing"]' ||
+            github.event.inputs.suite == 'app' && '["app"]' ||
+            '["landing","app"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
