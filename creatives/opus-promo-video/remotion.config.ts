@@ -15,4 +15,7 @@ Config.setJpegQuality(95);
 Config.setOverwriteOutput(true);
 Config.setCodec("h264");
 Config.setPixelFormat("yuv420p");
+// Tag and convert as BT.709 limited range; JPEG frames otherwise produce
+// full-range yuvj420p, which some players show washed out.
+Config.setColorSpace("bt709");
 Config.setCrf(18);

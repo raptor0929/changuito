@@ -103,7 +103,7 @@ export const ChanguitoPromo: React.FC = () => {
           interpolate(
             f,
             [0, 6, TOTAL_FRAMES - 20, TOTAL_FRAMES],
-            [0, 0.72, 0.72, 0],
+            [0, 0.7, 0.7, 0],
             CLAMP,
           )
         }

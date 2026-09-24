@@ -219,6 +219,9 @@ export type SfxName =
   | "ding"
   | "success";
 
+// Headroom for the sum of music + effects; at 1.0 the drop clips.
+const SFX_GAIN = 0.8;
+
 /** One-shot sound effect at a scene-relative frame. */
 export const Sfx: React.FC<{ name: SfxName; at: number; volume?: number }> = ({
   name,
@@ -226,6 +229,9 @@ export const Sfx: React.FC<{ name: SfxName; at: number; volume?: number }> = ({
   volume = 0.6,
 }) => (
   <Sequence from={at} layout="none" name={`sfx:${name}`}>
-    <Audio src={staticFile(`audio/sfx/${name}.wav`)} volume={volume} />
+    <Audio
+      src={staticFile(`audio/sfx/${name}.wav`)}
+      volume={volume * SFX_GAIN}
+    />
   </Sequence>
 );
