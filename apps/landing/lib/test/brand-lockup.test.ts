@@ -46,7 +46,12 @@ test('the shopper header uses the idle mascot and the wordmark, not type', () =>
 
   assert.match(shopper, /src="\/brand\/mascot-idle\.png"/);
   assert.match(shopper, /src="\/brand\/wordmark\.png"/);
-  assert.match(shopper, /alt="Changuito"/);
-  assert.equal(shopper.includes('>Changuito<'), false);
   assert.equal(shopper.includes('lockup-stacked'), false);
+
+  // The h1 is named by text a screen reader and a crawler can read, and the
+  // only place that text lives is visually hidden: what shows is the image.
+  const h1 = shopper.slice(shopper.indexOf('<h1'), shopper.indexOf('</h1>'));
+  assert.match(h1, /<span className="sr-only">Changuito<\/span>/);
+  assert.match(h1, /className="brand-wordmark"[\s\S]*alt=""/);
+  assert.equal(shopper.replace('<span className="sr-only">Changuito</span>', '').includes('>Changuito<'), false);
 });
