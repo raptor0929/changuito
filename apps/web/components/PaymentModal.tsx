@@ -7,11 +7,13 @@ import type { Cart } from '@changuito/mcp/types';
 
 import { track, trackLoginStart } from '../lib/analytics';
 import type { QuoteResponse } from '../app/api/quote/route.ts';
-import { DEFAULT_NETWORK, DEPLOYMENTS } from '../lib/deployments.ts';
+import { deployment } from '../lib/deployments.ts';
+import { modeCopy } from '../lib/mode-copy.ts';
 import { basketHash, newOrderId, openArgs, toHex, type OpenedOrder } from '../lib/order.ts';
-import { pollarEnabled, shortAddress } from '../lib/pollar.ts';
+import { pollarEnabledOn, shortAddress } from '../lib/pollar.ts';
 import { useBalances } from '../lib/use-balances.ts';
 import { useFaucetAccess } from '../lib/use-faucet-access.ts';
+import { useNetwork } from './NetworkProvider';
 
 /**
  * Step 4 of the flow: the last screen before money moves.
@@ -22,9 +24,10 @@ import { useFaucetAccess } from '../lib/use-faucet-access.ts';
  * meaningful promise if the user saw the basket it hashes.
  */
 export function PaymentModal(props: Props) {
-  // Same split as WalletWidget: `pollarEnabled` is a build constant, so
+  // Same split as WalletWidget, and the same condition as WalletProvider, so
   // `usePollar()` never runs outside a provider that exists.
-  return pollarEnabled ? <PayWithPollar {...props} /> : null;
+  const { network } = useNetwork();
+  return pollarEnabledOn(network) ? <PayWithPollar {...props} /> : null;
 }
 
 interface Props {
@@ -38,10 +41,12 @@ type Phase = 'review' | 'signing' | 'failed';
 
 function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
   const { wallet, isAuthenticated, verified, openLoginModal, runTx } = usePollar();
+  const { network } = useNetwork();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
-  const { data: balance, refresh } = useBalances(address);
+  const { data: balance, refresh } = useBalances(address, network);
   // Point at "Cargar USDC" only for wallets that actually have the button.
-  const canFund = useFaucetAccess(address)?.allowed === true;
+  const canFund = useFaucetAccess(address, network)?.allowed === true;
+  const mode = modeCopy(network);
 
   const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -97,7 +102,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
       const orderId = newOrderId();
       const basket = await basketHash(cart);
       const outcome = await runTx('invoke_contract', {
-        contractId: DEPLOYMENTS[DEFAULT_NETWORK].escrowId,
+        contractId: deployment(network).escrowId,
         method: 'open',
         args: openArgs({ buyer: address, orderId, amountUnits, basketHash: basket }),
       });
@@ -127,6 +132,10 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
         cartId: cart.cartId,
         totalDisplay: cart.total.display,
         handoffUrl,
+        // Pinned to the order, not read live: an order exists on one chain
+        // for good, and closing it has to name that chain however the toggle
+        // has moved since.
+        network,
       });
       onClose();
     } catch (err) {
@@ -187,7 +196,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
           ) : null}
           <div className="pay-fine">
             <dt>Tu saldo</dt>
-            <dd>{balance ? `${balance.usdcDisplay} USDC` : '-'}</dd>
+            <dd>{balance ? `${balance.usdcDisplay} ${mode.balanceUnit}` : '-'}</dd>
           </div>
         </dl>
 
@@ -209,6 +218,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
         ) : null}
 
         <p className="pay-note">
+          {mode.payNote ? <strong>{mode.payNote} </strong> : null}
           El monto queda reservado hasta que completes la compra en el súper. Si no se concreta,
           vuelve a tu saldo. Pagá con tarjeta o USDC.
         </p>
@@ -230,7 +240,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
                 ? 'Confirmando…'
                 : !verified
                   ? 'Verificando sesión…'
-                  : `Pagar ${quote ? quote.display : ''} USDC`}
+                  : mode.payLabel(quote ? quote.display : '')}
             </button>
           )}
           <button

@@ -48,3 +48,45 @@ test('the placeholder rule uses the token, at full opacity', () => {
 test('the placeholder still reads lighter than typed text', () => {
   assert.ok(ratio(token('placeholder'), '#ffffff') < ratio(token('chg-espresso'), '#ffffff'));
 });
+
+/**
+ * The mode chips. Two brand colours plus neutral, and the trap here is that
+ * sunflower and arcilla both read as "a colour that means something" while
+ * only one of them is safe as a background and neither is safe as text.
+ */
+
+function rule(selector: string): string {
+  const at = css.indexOf(`${selector} {`);
+  assert.ok(at >= 0, `${selector} is not in globals.css`);
+  return css.slice(at, css.indexOf('}', at));
+}
+
+test('the selected modo real chip is espresso on sunflower, and clears 4.5:1', () => {
+  const body = rule(".mode-option[data-mode='mainnet'][aria-checked='true']");
+  assert.match(body, /background:\s*var\(--brand\)/);
+  assert.match(body, /color:\s*var\(--brand-ink\)/);
+  // --brand and --brand-ink are aliases; check what they resolve to.
+  assert.match(css, /--brand:\s*var\(--chg-sunflower\)/);
+  assert.match(css, /--brand-ink:\s*var\(--chg-espresso\)/);
+  const r = ratio(token('chg-espresso'), token('chg-sunflower'));
+  assert.ok(r >= 4.5, `espresso on sunflower: ${r.toFixed(2)}`);
+});
+
+test('sunflower is never the mode chip text colour', () => {
+  for (const sel of ['.mode-option', ".mode-option[aria-checked='true']"]) {
+    assert.doesNotMatch(rule(sel), /color:\s*var\(--brand\)/);
+  }
+});
+
+test('the locked reason uses --warn-ink, which clears 4.5:1 on the wallet card', () => {
+  assert.match(rule('.mode-locked'), /color:\s*var\(--warn-ink\)/);
+  const ink = token('warn-ink');
+  assert.ok(ratio(ink, '#ffffff') >= 4.5, `on --surface: ${ratio(ink, '#ffffff').toFixed(2)}`);
+  assert.ok(ratio(ink, token('chg-offwhite')) >= 4.5, `on --bg: ${ratio(ink, token('chg-offwhite')).toFixed(2)}`);
+});
+
+test('arcilla is still an accent, not a text colour — which is why --warn-ink exists', () => {
+  // If this ever clears 4.5:1 the brand changed, and the two tokens should
+  // be reconsidered together rather than one of them quietly deleted.
+  assert.ok(ratio(token('chg-arcilla'), token('chg-offwhite')) < 4.5);
+});

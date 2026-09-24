@@ -4,24 +4,30 @@ import { usePollar } from '@pollar/react';
 import { useEffect, useRef, useState } from 'react';
 
 import { track, trackLoginStart } from '../lib/analytics';
-import { pollarEnabled, shortAddress } from '../lib/pollar.ts';
+import { modeCopy, modeLockedReason } from '../lib/mode-copy.ts';
+import { pollarEnabledOn, shortAddress } from '../lib/pollar.ts';
 import { ensureUserCookie, forgetUserCookie } from '../lib/session-login.ts';
 import type { FaucetProof } from '../lib/faucet-proof.ts';
 import { useBalances } from '../lib/use-balances.ts';
 import { useFaucetAccess } from '../lib/use-faucet-access.ts';
+import { useNetworkAccess } from '../lib/use-network-access.ts';
 import { useWalletSigner } from '../lib/use-wallet-signer.ts';
 import { signWalletProof } from '../lib/wallet-proof.ts';
 import { FaucetConfirm } from './FaucetConfirm';
+import { ModeSwitch } from './ModeSwitch';
+import { useNetwork } from './NetworkProvider';
 
 /**
  * The balance widget in the masthead.
  *
- * Two components rather than one with a conditional hook: `pollarEnabled` is a
- * build constant, so which of them mounts is decided once, and `usePollar()`
- * only ever runs inside a provider that exists.
+ * Two components rather than one with a conditional hook: the keys are build
+ * constants, so `usePollar()` only ever runs inside a provider that exists.
+ * The condition has to be *the same one* WalletProvider uses, or this mounts
+ * a component that calls `usePollar()` with no provider above it.
  */
 export function WalletWidget() {
-  return pollarEnabled ? <ConnectedWallet /> : <NoWallet />;
+  const { network } = useNetwork();
+  return pollarEnabledOn(network) ? <ConnectedWallet /> : <NoWallet />;
 }
 
 function NoWallet() {
@@ -38,12 +44,30 @@ function NoWallet() {
 
 function ConnectedWallet() {
   const { wallet, isAuthenticated, verified, openLoginModal, logout } = usePollar();
+  const { network, setNetwork } = useNetwork();
   const sign = useWalletSigner();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
-  const { data, loading, error, refresh } = useBalances(address);
+  const { data, loading, error, refresh } = useBalances(address, network);
   // Only testers on the server's allowlist get the faucet. Everyone else never
-  // sees the button: the route would refuse them anyway.
-  const faucet = useFaucetAccess(address);
+  // sees the button: the route would refuse them anyway. On a network with no
+  // friendbot the answer is always no, so the button leaves by itself.
+  const faucet = useFaucetAccess(address, network);
+  // The same shape, for the mode control. Null while it loads, and null reads
+  // as "no" — an option that appears and then vanishes is worse than one that
+  // arrives late.
+  const access = useNetworkAccess(address);
+  const real = access?.mainnet;
+  const mode = modeCopy(network);
+  const lockedReason = real?.usable
+    ? null
+    : modeLockedReason(real && !real.configured ? 'not-ready' : 'not-allowed');
+
+  // If the saved mode turns out not to be theirs, they go back to the safe one
+  // rather than sitting in a mode every request will refuse. Only once the
+  // server has actually answered: `access` is null while it is still loading.
+  useEffect(() => {
+    if (access && network !== 'testnet' && !access[network]?.usable) setNetwork('testnet');
+  }, [access, network, setNetwork]);
 
   const [funding, setFunding] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -99,7 +123,7 @@ function ConnectedWallet() {
       const res = await fetch('/api/faucet', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ address, proof }),
+        body: JSON.stringify({ address, proof, network }),
       });
       const json = await res.json();
       // 429 carries a real answer ("you already have enough"), not a failure.
@@ -148,9 +172,13 @@ function ConnectedWallet() {
 
       <div className="wallet-balance">
         <strong>{data ? data.usdcDisplay : '-'}</strong>
-        <span className="wallet-unit">USDC</span>
+        {/* The qualifier is part of the number, not a footnote somewhere
+            else: this is the line that says whether the money is real. */}
+        <span className="wallet-unit">{mode.balanceUnit}</span>
         {loading && <span className="wallet-muted">actualizando…</span>}
       </div>
+
+      <ModeSwitch network={network} onChange={setNetwork} lockedReason={lockedReason} />
 
       <div className="wallet-sub">
         {/* Warn only when the account cannot pay network fees yet. */}

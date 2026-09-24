@@ -1,5 +1,7 @@
 import type { Cart } from '@changuito/mcp/types';
 
+import type { NetworkId } from './deployments.ts';
+
 /**
  * Turning an approved basket into the five arguments `escrow.open` takes.
  *
@@ -158,6 +160,15 @@ export interface OpenedOrder {
   cartId: string;
   totalDisplay: string;
   handoffUrl?: string;
+  /**
+   * Which chain this order lives on, fixed at `open`.
+   *
+   * On the order rather than read from the mode control, because the two can
+   * disagree: an order id exists in exactly one contract, and somebody who
+   * flips the mode with money still held must not send its settle to the
+   * other chain — where it would come back as "no such order".
+   */
+  network: NetworkId;
 }
 
 /* ------------------------------------------------------------ the receipt */

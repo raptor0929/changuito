@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import type { SettleResponse } from '../app/api/settle/route.ts';
+import { modeCopy } from '../lib/mode-copy.ts';
 import type { OpenedOrder, SettleAction } from '../lib/order.ts';
 import { explorer, formatUsdc } from '../lib/stellar.ts';
 import { signWalletProof, type WalletSigner } from '../lib/wallet-proof.ts';
@@ -32,6 +33,11 @@ export function OrderPanel({
   const [error, setError] = useState<string | null>(null);
 
   const amount = formatUsdc(BigInt(order.amountUnits));
+  // The order's own chain, not whatever the toggle says now. Everything here
+  // — the settle, the refund, both explorer links — has to name the one the
+  // money is actually on.
+  const net = order.network;
+  const mode = modeCopy(net);
 
   async function close(action: SettleAction) {
     setClosing(action);
@@ -47,6 +53,7 @@ export function OrderPanel({
           orderId: order.orderId,
           basketHash: order.basketHash,
           address: order.buyer,
+          network: net,
           proof,
         }),
       });
@@ -74,13 +81,13 @@ export function OrderPanel({
         </header>
         <p className="pay-note">
           {settled
-            ? `${outcome.amountDisplay} USDC quedaron confirmados. Retirá el pedido en el súper.`
-            : `${outcome.amountDisplay} USDC volvieron a tu saldo. No se cobró nada.`}
+            ? `${outcome.amountDisplay} ${mode.balanceUnit} quedaron confirmados. Retirá el pedido en el súper.`
+            : `${outcome.amountDisplay} ${mode.balanceUnit} volvieron a tu saldo. No se cobró nada.`}
         </p>
         <ul className="tx-list">
           <li>
             <span>Reserva</span>
-            <a href={explorer.tx(order.hash)} target="_blank" rel="noopener noreferrer">
+            <a href={explorer.tx(order.hash, net)} target="_blank" rel="noopener noreferrer">
               ver transacción ↗
             </a>
           </li>
@@ -112,12 +119,13 @@ export function OrderPanel({
   return (
     <section className="order-panel" aria-live="polite">
       <header className="order-head">
-        <strong>Pago reservado · {amount} USDC</strong>
-        <a href={explorer.tx(order.hash)} target="_blank" rel="noopener noreferrer">
+        <strong>Pago reservado · {amount} {mode.balanceUnit}</strong>
+        <a href={explorer.tx(order.hash, net)} target="_blank" rel="noopener noreferrer">
           ver transacción ↗
         </a>
       </header>
       <p className="pay-note">
+        {mode.holdNote ? <strong>{mode.holdNote} </strong> : null}
         Tu pago quedó reservado. Completá el carrito de {order.totalDisplay} en el súper y volvé
         acá para confirmarlo, o pedí el reembolso si no se pudo.
       </p>

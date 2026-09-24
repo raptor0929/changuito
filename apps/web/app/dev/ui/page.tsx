@@ -112,4 +112,5 @@ const ORDER = {
   cartId: 'live-check-1',
   totalDisplay: '$5.200,00',
   handoffUrl: 'https://diaonline.supermercadosdia.com.ar/checkout/',
-};
+  network: 'testnet',
+} as const;

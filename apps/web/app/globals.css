@@ -528,6 +528,9 @@ a:hover { color: var(--chg-arcilla); }
   .masthead { flex-direction: column; gap: 8px; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   .wallet { width: 100%; }
+  /* "Prueba" / "Real" once the card is full-width beside three actions. */
+  .mode-long { display: none; }
+  .mode-short { display: inline; }
   .thread {
     padding-block: 12px;
     padding-inline-start: 0;
@@ -576,6 +579,57 @@ a:hover { color: var(--chg-arcilla); }
 .wallet-warn { color: var(--warn); }
 .wallet-muted { color: var(--muted); }
 .wallet-error { margin: 0; font-size: 12px; color: var(--warn); }
+
+/* Modo prueba / modo real.
+   A wrapper div, not a bare <button>, because the phone block at the bottom
+   of this file branches on `.wallet:has(> .btn)` vs `.wallet:not(:has(> .btn))`
+   to tell the logged-out masthead from the connected one. A button added as a
+   direct child of .wallet flips that selector and breaks both branches. */
+.wallet-mode { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.mode-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: rgba(42, 26, 20, 0.04);
+}
+.mode-option {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 7px 11px;
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mode-option:hover { color: var(--text); }
+.mode-option:focus-visible { outline: 2px solid var(--chg-espresso); outline-offset: 2px; }
+/* Selected, modo prueba: neutral. Nothing is happening, so nothing shouts. */
+.mode-option[aria-checked='true'] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(42, 26, 20, 0.12);
+}
+/* Selected, modo real: the only sunflower outside the primary CTA, because
+   it is the only control that starts spending real money. Ink is espresso —
+   sunflower is a background here, never text. */
+.mode-option[data-mode='mainnet'][aria-checked='true'] {
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+/* aria-disabled, not disabled: still reachable, still announced, just does
+   not take the click. The cursor says so before the click does. */
+.mode-option[aria-disabled='true'] { cursor: not-allowed; opacity: 0.55; }
+.mode-option[aria-disabled='true']:hover { color: var(--muted); }
+.mode-locked { margin: 0; font-size: 11px; line-height: 1.25; color: var(--warn-ink); }
+/* One label at two widths. Both spans are aria-hidden and the button carries
+   an explicit aria-label, so hiding either one never costs it its name. */
+.mode-short { display: none; }
 /* One row, including at phone width. Icon controls keep a 44px hit box. */
 .wallet-actions {
   display: flex;
@@ -976,6 +1030,10 @@ a:hover { color: var(--chg-arcilla); }
   .shell:has(.chat.is-empty) .wallet-sub {
     gap: 6px;
     line-height: 1.2;
+  }
+
+  .shell:has(.chat.is-empty) .mode-option {
+    padding: 6px 9px;
   }
 
   .shell:has(.chat.is-empty) .thread {
