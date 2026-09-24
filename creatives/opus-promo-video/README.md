@@ -32,8 +32,9 @@ Other commands:
 | `npm run contrast` | WCAG contrast check of every text/background pair used |
 | `npm run lint` | ESLint + `tsc` |
 
-`out/` is git-ignored. The rendered MP4 is attached to the PR instead of
-committed.
+`out/` is git-ignored. The rendered MP4 (~11 MB) is attached to the PR instead
+of committed; `preview/` holds full-resolution stills of the current render
+(hook, reveal, steps 1–3, CTA) so the look can be reviewed without rendering.
 
 ## Storyboard
 
