@@ -77,6 +77,30 @@ export const Mascot: React.FC<{
   );
 };
 
+export type BrandIcon = "mate" | "pan" | "blob-arcilla" | "blob-espresso";
+
+/**
+ * Faded brand-pattern accent (mate, pan, clay blob, espresso blob).
+ * Background decoration is only these PNGs — never a painted circle or oval.
+ */
+export const BrandAccent: React.FC<{
+  icon: BrandIcon;
+  size: number;
+  style?: React.CSSProperties;
+}> = ({ icon, size, style }) => (
+  <Img
+    src={staticFile(`brand/icons/${icon}.png`)}
+    style={{
+      position: "absolute",
+      width: size,
+      height: size,
+      objectFit: "contain",
+      pointerEvents: "none",
+      ...style,
+    }}
+  />
+);
+
 /** The canonical lettering PNG. The name is never set in a generic font. */
 export const Wordmark: React.FC<{
   width: number;

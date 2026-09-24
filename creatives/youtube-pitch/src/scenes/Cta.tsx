@@ -1,7 +1,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
 import { progress, SMOOTH, SNAPPY, springAt } from "../anim";
-import { Mascot, SceneShell, Sfx, Wordmark } from "../components/ui";
+import { BrandAccent, Mascot, SceneShell, Sfx, Wordmark } from "../components/ui";
 import { COLORS, sceneDuration } from "../theme";
 
 export const Cta: React.FC = () => {
@@ -17,27 +17,25 @@ export const Cta: React.FC = () => {
 
   return (
     <SceneShell background={COLORS.offWhite} durationInFrames={duration} push={0.015}>
-      <div
-        style={{
-          position: "absolute",
-          right: -140,
-          top: -100,
-          width: 560,
-          height: 420,
-          borderRadius: "58% 42% 50% 50%",
-          background: "rgba(224,122,95,0.18)",
-        }}
+      <BrandAccent
+        icon="blob-arcilla"
+        size={520}
+        style={{ right: -140, top: -160, opacity: 0.45, rotate: "16deg" }}
       />
-      <div
-        style={{
-          position: "absolute",
-          left: -120,
-          bottom: 80,
-          width: 420,
-          height: 320,
-          borderRadius: "46% 54% 42% 58%",
-          background: "rgba(244,185,66,0.28)",
-        }}
+      <BrandAccent
+        icon="blob-espresso"
+        size={360}
+        style={{ left: -80, bottom: 40, opacity: 0.12, rotate: "-12deg" }}
+      />
+      <BrandAccent
+        icon="mate"
+        size={200}
+        style={{ left: 90, top: 48, opacity: 0.35, rotate: "-10deg" }}
+      />
+      <BrandAccent
+        icon="pan"
+        size={210}
+        style={{ right: -36, bottom: -40, opacity: 0.34, rotate: "14deg" }}
       />
 
       <div

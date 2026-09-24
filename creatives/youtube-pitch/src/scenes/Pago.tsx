@@ -9,7 +9,7 @@ import {
   SNAPPY,
   springAt,
 } from "../anim";
-import { SceneShell, Sfx } from "../components/ui";
+import { BrandAccent, SceneShell, Sfx } from "../components/ui";
 import { COLORS, sceneDuration } from "../theme";
 
 const OPEN_END = 78;
@@ -163,6 +163,16 @@ export const Pago: React.FC = () => {
 
   return (
     <SceneShell background={COLORS.espresso} durationInFrames={duration} push={0.02}>
+      <BrandAccent
+        icon="blob-arcilla"
+        size={640}
+        style={{ right: -180, bottom: -180, opacity: 0.35, rotate: "24deg" }}
+      />
+      <BrandAccent
+        icon="blob-arcilla"
+        size={280}
+        style={{ left: -60, top: -40, opacity: 0.28, rotate: "-16deg" }}
+      />
       {/* Cold open */}
       <div
         style={{
@@ -180,20 +190,33 @@ export const Pago: React.FC = () => {
           lineHeight: 0.95,
         }}
       >
-        <div style={{ fontSize: 104 }}>STELLAR ADENTRO.</div>
         <div
           style={{
-            marginTop: 18,
             display: "inline-block",
-            padding: "8px 26px 14px",
+            maxWidth: 1500,
+            padding: "8px 28px 16px",
             borderRadius: 18,
             background: COLORS.sunflower,
             color: COLORS.espresso,
-            fontSize: 92,
-            rotate: "-1.4deg",
+            fontSize: 72,
+            lineHeight: 1.05,
+            rotate: "-1.2deg",
           }}
         >
-          TARJETA AFUERA.
+          Pagás con USDC en Stellar.
+        </div>
+        <div
+          style={{
+            marginTop: 28,
+            maxWidth: 1480,
+            fontSize: 46,
+            fontWeight: 800,
+            letterSpacing: "-0.03em",
+            lineHeight: 1.15,
+            color: COLORS.offWhite,
+          }}
+        >
+          Nosotros nos encargamos de que lo acepte el supermercado.
         </div>
       </div>
 

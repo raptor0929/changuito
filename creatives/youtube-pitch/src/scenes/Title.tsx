@@ -1,7 +1,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
 import { progress, SMOOTH, SNAPPY, springAt } from "../anim";
-import { Mascot, SceneShell, Sfx, Wordmark } from "../components/ui";
+import { BrandAccent, Mascot, SceneShell, Sfx, Wordmark } from "../components/ui";
 import { COLORS, sceneDuration } from "../theme";
 
 export const Title: React.FC = () => {
@@ -21,27 +21,20 @@ export const Title: React.FC = () => {
 
   return (
     <SceneShell background={COLORS.offWhite} durationInFrames={duration} push={0.02}>
-      <div
-        style={{
-          position: "absolute",
-          right: -160,
-          top: -80,
-          width: 640,
-          height: 480,
-          borderRadius: "58% 42% 55% 45% / 52% 60% 40% 48%",
-          background: "rgba(244,185,66,0.28)",
-        }}
+      <BrandAccent
+        icon="blob-arcilla"
+        size={620}
+        style={{ right: -160, top: -180, opacity: 0.55, rotate: "-18deg" }}
       />
-      <div
-        style={{
-          position: "absolute",
-          left: -180,
-          bottom: -80,
-          width: 520,
-          height: 380,
-          borderRadius: "45% 55% 40% 60%",
-          background: "rgba(224,122,95,0.16)",
-        }}
+      <BrandAccent
+        icon="pan"
+        size={280}
+        style={{ left: -40, bottom: -30, opacity: 0.28, rotate: "12deg" }}
+      />
+      <BrandAccent
+        icon="mate"
+        size={220}
+        style={{ right: 80, top: 36, opacity: 0.22, rotate: "-8deg" }}
       />
 
       <div

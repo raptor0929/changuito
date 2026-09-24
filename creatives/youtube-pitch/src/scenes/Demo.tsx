@@ -10,6 +10,7 @@ import {
 } from "../anim";
 import {
   Appear,
+  BrandAccent,
   Card,
   Isotipo,
   Mascot,
@@ -223,16 +224,15 @@ export const Demo: React.FC = () => {
 
   return (
     <SceneShell background={COLORS.offWhite} durationInFrames={duration}>
-      <div
-        style={{
-          position: "absolute",
-          right: -180,
-          top: -120,
-          width: 520,
-          height: 420,
-          borderRadius: "58% 42% 55% 45%",
-          background: "rgba(224,122,95,0.16)",
-        }}
+      <BrandAccent
+        icon="blob-arcilla"
+        size={340}
+        style={{ right: -200, top: -160, opacity: 0.45, rotate: "20deg" }}
+      />
+      <BrandAccent
+        icon="pan"
+        size={170}
+        style={{ left: -60, top: -36, opacity: 0.4, rotate: "-8deg" }}
       />
       <Caption {...caption} />
 
