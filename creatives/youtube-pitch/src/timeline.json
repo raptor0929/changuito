@@ -1,0 +1,14 @@
+{
+  "fps": 30,
+  "bpm": 120,
+  "width": 1920,
+  "height": 1080,
+  "scenes": [
+    { "id": "Title", "durationInFrames": 180 },
+    { "id": "Insight", "durationInFrames": 300 },
+    { "id": "Promesa", "durationInFrames": 240 },
+    { "id": "Demo", "durationInFrames": 840 },
+    { "id": "Pago", "durationInFrames": 750 },
+    { "id": "Cta", "durationInFrames": 330 }
+  ]
+}
