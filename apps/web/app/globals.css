@@ -901,6 +901,13 @@ a:hover { color: var(--chg-arcilla); }
   outline-offset: -3px;
 }
 
+/* Pollar's modal fades its version tag to opacity .6 over --pollar-muted,
+   2.3:1 on white (axe color-contrast, serious). Full opacity restores the
+   muted grey Pollar uses for the rest of its footer. Scoped to its overlay. */
+.pollar-overlay .pollar-footer-version {
+  opacity: 1;
+}
+
 /* ------------------------------------------------- empty chat, phone only
    The first screen has to fit a ~390×844 CSS viewport, and a shorter
    ~360×740 one, with the composer on screen and the thread not scrolling.
