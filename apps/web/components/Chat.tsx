@@ -445,7 +445,7 @@ export function UserBubble({
  * The seconds are aria-hidden: announcing a counter every second would drown
  * the stage changes, which are the part worth hearing.
  */
-function TurnProgressLine({ state }: { state: ChatState }) {
+export function TurnProgressLine({ state }: { state: ChatState }) {
   const [startedAt] = useState(() => Date.now());
   const [now, setNow] = useState(startedAt);
   useEffect(() => {
