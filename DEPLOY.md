@@ -128,6 +128,16 @@ Preview:
 | `FAUCET_ALLOWLIST_ADDRESSES` | tester wallet addresses, e.g. `GABC…XYZ,GDEF…UVW` | server only |
 | `CHG_SESSION_SECRET` | **required**, `openssl rand -base64 32` | server only |
 
+And these three only once modo real is deployed — see
+[2.6](#26-modo-real) below. Leave them unset and the app runs exactly as it
+does today, with the real position of the mode control closed.
+
+| Name | Value | Exposed to |
+|---|---|---|
+| `NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` | a *second* Pollar key | the browser, by design |
+| `STELLAR_RESOLVER_SECRET_MAINNET` | the `S…` for `changuito-resolver-mainnet` | server only |
+| `REAL_MODE_ALLOWLIST_ADDRESSES` | who may switch to modo real | server only |
+
 The two `KV_` ones you do not type — see [2.4](#24-conversation-history) below.
 They are **required** in production now: the chat and faucet quotas count in
 Redis and fail closed, so without them (or with Redis down) `/api/chat` and
@@ -220,6 +230,53 @@ never edge.
 Then **Promote to Production**.
 
 ---
+
+### 2.6 Modo real
+
+There is a control beside the balance with two positions, **modo prueba** and
+**modo real**. Everything above configures modo prueba, which is where the app
+starts and where it falls back whenever anything is not understood. Modo real
+needs three more variables and a deploy to a public network, and until it has
+them the position is closed with a reason rather than hidden.
+
+`NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` is a **second** key from the Pollar
+dashboard, not the same one. A dashboard key is network-scoped, so the two
+modes are two clients holding two sessions — which is why flipping the control
+signs you out of the mode you left. That is correct: they are different
+accounts with different money.
+
+`STELLAR_RESOLVER_SECRET_MAINNET` is a **different key from the testnet
+resolver**, generated fresh. The testnet secret has been through a deploy
+script and a shell history; mainnet money must not depend on that. The app
+checks the key against the contracts deployed on that network and refuses at
+the first call if they disagree, so a secret pasted into the wrong slot fails
+loudly instead of signing on a chain nobody meant to touch.
+
+`REAL_MODE_ALLOWLIST_ADDRESSES` decides who may ask for modo real, in the same
+format and with the same deny-by-default rule as `FAUCET_ALLOWLIST_ADDRESSES`:
+empty in production means nobody, Previews included. It is enforced **after**
+the wallet's SEP-53 signature is verified, so it is checked against a proven
+address rather than a claimed one — the closed control in the browser is a
+courtesy, and this is the wall. Passkey wallets (`C…`) cannot sign that
+message, so testers need a custodial `G…` account.
+
+Two things that are **not** variables, and will stop a first real payment dead
+if they are skipped:
+
+1. **The treasury needs a USDC trustline** before the first settle. A classic
+   asset cannot reach an account that has not opted into it, and the app never
+   signs for the treasury. `scripts/deploy.sh` prints the command when it
+   finishes a non-testnet deploy. The *buyer's* trustline the app handles
+   itself, as a one-time step in the payment screen.
+2. **The resolver needs real XLM.** There is no friendbot on a public network,
+   and it signs every settle and every refund.
+
+One thing worth saying plainly before the first run: modo real moves real USDC
+through the escrow to the treasury, and you still pay the supermarket yourself
+at the handoff link. It demonstrates the settlement rail end to end; it does
+not buy the groceries. For a first test that is ideal, because the buyer wallet
+and the treasury are both yours and the USDC round-trips back — the only real
+cost is network fees.
 
 ## Part 3 — a local model, with Sonnet as the fallback (optional)
 
