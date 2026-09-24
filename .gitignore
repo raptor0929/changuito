@@ -19,6 +19,13 @@ target/
 
 .DS_Store
 *.log
+
+# Playwright (local runs). Reports can contain page snapshots; never commit them.
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+e2e/.env
 .vercel
 *.tsbuildinfo
 

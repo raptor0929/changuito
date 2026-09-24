@@ -337,6 +337,14 @@ printf 'changuito/receipt/v1\nretailer|dia\ncart|live-check-1\nhandoff|https://d
   whatever Día actually has.
 - **The commit dates are backdated** to the window the work was planned over.
 
+## Tests
+
+Unit tests stay on `npm test` (mcp, trust, web, landing) and run in CI on
+every pull request. Browser smoke is separate: `npm run test:e2e` hits the
+live sites, and CI runs it only after a backend merge to `main`, or when
+someone starts the E2E workflow by hand. How to run it, and how to add the
+GitHub Actions secrets, is in [docs/e2e.md](docs/e2e.md).
+
 ## License
 
 MIT
