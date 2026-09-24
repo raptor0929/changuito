@@ -7,6 +7,7 @@ import { track, trackLoginStart } from '../lib/analytics';
 import { pollarEnabled, shortAddress } from '../lib/pollar.ts';
 import { ensureUserCookie, forgetUserCookie } from '../lib/session-login.ts';
 import { useBalances } from '../lib/use-balances.ts';
+import { FaucetConfirm } from './FaucetConfirm';
 
 /**
  * The balance widget in the masthead.
@@ -37,7 +38,15 @@ function ConnectedWallet() {
   const { data, loading, error, refresh } = useBalances(address);
 
   const [funding, setFunding] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const fundButton = useRef<HTMLButtonElement>(null);
+
+  const closeConfirm = () => {
+    setConfirming(false);
+    // The dialog took focus from this button; keyboard users land back on it.
+    requestAnimationFrame(() => fundButton.current?.focus());
+  };
 
   // After Pollar login, set httpOnly chg_user so /api/chat skips the guest turn
   // limit. Shared with the chat, which awaits the same promise before it
@@ -136,11 +145,16 @@ function ConnectedWallet() {
 
       <div className="wallet-actions">
         <button
+          ref={fundButton}
           type="button"
           className="btn btn-sm"
           data-testid="wallet-fund"
-          onClick={() => void fund()}
-          disabled={funding}
+          aria-haspopup="dialog"
+          onClick={() => {
+            setNote(null);
+            setConfirming(true);
+          }}
+          disabled={funding || confirming}
         >
           {funding ? 'Cargando…' : 'Cargar USDC'}
         </button>
@@ -169,6 +183,17 @@ function ConnectedWallet() {
           <LogoutIcon />
         </button>
       </div>
+
+      {confirming ? (
+        <FaucetConfirm
+          balanceUnits={data ? BigInt(data.usdc) : null}
+          onClose={closeConfirm}
+          onConfirm={() => {
+            closeConfirm();
+            void fund();
+          }}
+        />
+      ) : null}
     </div>
   );
 }
