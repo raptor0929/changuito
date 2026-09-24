@@ -525,6 +525,11 @@ a:hover { color: var(--chg-arcilla); }
     min-height: 48px;
     max-height: 96px;
   }
+  /* Empty means there is nothing to scroll to. A placeholder that still
+     overflows (large text settings) is clipped instead of wearing a bar. */
+  .composer-input:placeholder-shown {
+    overflow-y: hidden;
+  }
 }
 
 /* --------------------------------------------------------------- wallet */
@@ -1015,6 +1020,10 @@ a:hover { color: var(--chg-arcilla); }
     line-height: 1.3;
     border-radius: 16px;
     overflow-y: auto;
+  }
+
+  .shell:has(.chat.is-empty) .composer-input:placeholder-shown {
+    overflow-y: hidden;
   }
 
   .shell:has(.chat.is-empty) .composer .btn {
