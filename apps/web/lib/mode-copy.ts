@@ -81,3 +81,24 @@ export function modeLockedReason(why: ModeLock): string {
   if (why === 'not-ready') return 'El modo real todavía no está disponible.';
   return 'Tu cuenta no tiene habilitado el modo real.';
 }
+
+/**
+ * The one-time step before the first real payment.
+ *
+ * Nobody asked for this and nobody will understand why it exists, so the copy
+ * does not try to explain the ledger — it says what it costs (nothing), how
+ * often it happens (once) and what happens if they would rather not (modo
+ * prueba is still there). "Habilitar los dólares" rather than anything truer,
+ * because the true word is on the forbidden list and the effect really is
+ * that dollars can now reach the account.
+ */
+export const TRUSTLINE = {
+  title: 'Falta un paso, una sola vez',
+  body: 'Para poder recibir dólares en tu cuenta hay que habilitarlos. Es gratis, tarda unos segundos y no se vuelve a pedir.',
+  action: 'Habilitar los dólares',
+  working: 'Habilitando…',
+  /** Shown when the signature was refused or the network said no. */
+  failed: 'No se pudo habilitar. Podés volver a intentar, o seguir en modo prueba.',
+  /** The way out, so a refusal is not a dead end. */
+  back: 'Seguir en modo prueba',
+} as const;

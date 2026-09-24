@@ -11,8 +11,9 @@
  * needs no allowlist, since looking at a public ledger spends nothing.
  */
 import { networkOrDefault, type NetworkId } from '../../../lib/deployments.ts';
-import { addressKind, formatUsdc, MIN_XLM, nativeBalance } from '../../../lib/stellar.ts';
+import { accountBalances, addressKind, formatUsdc, MIN_XLM } from '../../../lib/stellar.ts';
 import { usdcBalance } from '../../../lib/token.ts';
+import { trustlineState, type TrustlineState } from '../../../lib/trustline.ts';
 import { requireHuman } from '../../../lib/human-gate.ts';
 
 // XDR encoding is Node, not edge.
@@ -30,6 +31,12 @@ export interface BalanceResponse {
   usdcDisplay: string;
   /** True once the address exists on-ledger and can pay a fee. */
   funded: boolean;
+  /**
+   * Whether this account has opted into the network's USDC. Always
+   * `not-needed` in modo prueba, where the token has no issuer — which is why
+   * this field can be read unconditionally instead of behind a mode check.
+   */
+  trustline: TrustlineState;
   /** Echoed so a caller can tell which chain answered. */
   network: NetworkId;
 }
@@ -52,10 +59,15 @@ export async function GET(req: Request): Promise<Response> {
     // Independent reads, so they go together. A token balance for an address
     // that has never held any is 0, not an error — that is the normal case for
     // a wallet that just logged in.
-    const [xlm, usdc] = await Promise.all([
-      kind === 'account' ? nativeBalance(address, network) : Promise.resolve(null),
+    //
+    // The whole Horizon account rather than just its XLM: the fee balance and
+    // the trustline are two facts in one response, and asking twice would be
+    // two round trips for one read.
+    const [balances, usdc] = await Promise.all([
+      kind === 'account' ? accountBalances(address, network) : Promise.resolve(null),
       usdcBalance(address, network),
     ]);
+    const xlm = balances === null ? null : (balances.find((b) => b.asset_type === 'native')?.balance ?? '0');
 
     const body: BalanceResponse = {
       address,
@@ -67,6 +79,10 @@ export async function GET(req: Request): Promise<Response> {
       // this true while the widget showed 0.00 and the warning stayed hidden.
       // A contract wallet pays fees some other way, so it is never unfunded.
       funded: kind === 'contract' || (xlm !== null && Number(xlm) >= MIN_XLM),
+      // A smart wallet holds a SAC asset in contract storage, so there is no
+      // trustline to open and `balances` is null for a reason that is not
+      // "has opted into nothing".
+      trustline: kind === 'contract' ? 'not-needed' : trustlineState(balances, network),
       network,
     };
     return Response.json(body);

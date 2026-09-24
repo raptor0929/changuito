@@ -8,9 +8,10 @@ import type { Cart } from '@changuito/mcp/types';
 import { track, trackLoginStart } from '../lib/analytics';
 import type { QuoteResponse } from '../app/api/quote/route.ts';
 import { deployment } from '../lib/deployments.ts';
-import { modeCopy } from '../lib/mode-copy.ts';
+import { modeCopy, TRUSTLINE } from '../lib/mode-copy.ts';
 import { basketHash, newOrderId, openArgs, toHex, type OpenedOrder } from '../lib/order.ts';
 import { pollarEnabledOn, shortAddress } from '../lib/pollar.ts';
+import { usdcAsset } from '../lib/trustline.ts';
 import { useBalances } from '../lib/use-balances.ts';
 import { useFaucetAccess } from '../lib/use-faucet-access.ts';
 import { useNetwork } from './NetworkProvider';
@@ -40,13 +41,20 @@ interface Props {
 type Phase = 'review' | 'signing' | 'failed';
 
 function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
-  const { wallet, isAuthenticated, verified, openLoginModal, runTx } = usePollar();
-  const { network } = useNetwork();
+  const { wallet, isAuthenticated, verified, openLoginModal, runTx, setTrustline } = usePollar();
+  const { network, setNetwork } = useNetwork();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
   const { data: balance, refresh } = useBalances(address, network);
   // Point at "Cargar USDC" only for wallets that actually have the button.
   const canFund = useFaucetAccess(address, network)?.allowed === true;
   const mode = modeCopy(network);
+
+  // The one-time step before the first real payment. `not-needed` in modo
+  // prueba, always — the demo token has no issuer, so there is nothing to
+  // open. See lib/trustline.ts.
+  const needsTrustline = balance?.trustline === 'needed';
+  const [opening, setOpening] = useState(false);
+  const [trustlineError, setTrustlineError] = useState<string | null>(null);
 
   const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -86,6 +94,32 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
   useEffect(() => {
     confirm.current?.focus();
   }, [quote]);
+
+  /**
+   * Opens the line, once, before the first real payment.
+   *
+   * It happens here rather than at login because it costs a signature and a
+   * reserve, and asking for either before the user has decided to buy
+   * anything is asking them to pay for a maybe. `refresh()` is what clears
+   * the gate: the state comes back from the ledger, not from this call's
+   * return value, so a "success" that did not land cannot unlock the button.
+   */
+  async function openTrustline() {
+    const asset = usdcAsset(network);
+    if (!asset) return;
+    setOpening(true);
+    setTrustlineError(null);
+    try {
+      const outcome = await setTrustline(asset);
+      if (outcome.status === 'error') throw new Error(outcome.details ?? TRUSTLINE.failed);
+      refresh();
+    } catch (err) {
+      track('payment_fail', { flow: 'checkout', code: 'trustline' });
+      setTrustlineError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setOpening(false);
+    }
+  }
 
   const amountUnits = quote ? BigInt(quote.units) : 0n;
   const held = balance ? BigInt(balance.usdc) : 0n;
@@ -209,6 +243,13 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
               : 'No te alcanza el saldo para este pago.'}
           </p>
         ) : null}
+        {needsTrustline ? (
+          <div className="pay-step">
+            <strong>{TRUSTLINE.title}</strong>
+            <p>{TRUSTLINE.body}</p>
+            {trustlineError ? <p className="pay-error">{TRUSTLINE.failed}</p> : null}
+          </div>
+        ) : null}
         {address && balance && !balance.funded ? (
           <p className="pay-warn">
             {canFund
@@ -228,6 +269,17 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
             <button type="button" className="btn" onClick={() => trackLoginStart(openLoginModal)}>
               Empezá a comprar
             </button>
+          ) : needsTrustline ? (
+            <button
+              ref={confirm}
+              type="button"
+              className="btn"
+              data-testid="pay-trustline"
+              onClick={() => void openTrustline()}
+              disabled={opening || !verified}
+            >
+              {opening ? TRUSTLINE.working : TRUSTLINE.action}
+            </button>
           ) : (
             <button
               ref={confirm}
@@ -243,6 +295,13 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
                   : mode.payLabel(quote ? quote.display : '')}
             </button>
           )}
+          {/* A refusal must not be a dead end: the safe mode needs no step
+              and is one click away. */}
+          {needsTrustline ? (
+            <button type="button" className="btn btn-ghost" onClick={() => setNetwork('testnet')}>
+              {TRUSTLINE.back}
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn-ghost"

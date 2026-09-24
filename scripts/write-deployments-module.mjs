@@ -35,6 +35,13 @@ const entry = (name, n) => `  ${name}: {
     treasury: ${q(n.accounts.treasury)},
     escrowId: ${q(n.contracts.escrow.id)},
     usdcId: ${q(n.contracts.usdc.id)},
+    /**
+     * The classic asset the SAC wraps, when it wraps one. \`null\` on testnet,
+     * where contracts/mock_usdc is a pure SEP-41 token with no issuer — which
+     * is exactly why testnet needs no trustline and a public network does.
+     */
+    usdcIssuer: ${q(n.contracts.usdc.issuer)},
+    usdcCode: ${q(n.contracts.usdc.symbol)},
     usdcDecimals: ${n.contracts.usdc.decimals},
   },`;
 

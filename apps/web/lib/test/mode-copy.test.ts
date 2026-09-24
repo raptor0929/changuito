@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { NETWORK_IDS } from '../deployments.ts';
-import { MODES, modeCopy, modeLockedReason } from '../mode-copy.ts';
+import { MODES, modeCopy, modeLockedReason, TRUSTLINE } from '../mode-copy.ts';
 
 /**
  * The chrome obeys the same vocabulary rule as the agent: lib/agent/prompt.ts
@@ -15,6 +15,7 @@ const every = [
   ...MODES.flatMap((m) => [m.label, m.short, m.balanceUnit, m.hint, m.payNote, m.holdNote, m.payLabel('12,34')]),
   modeLockedReason('not-allowed'),
   modeLockedReason('not-ready'),
+  ...Object.values(TRUSTLINE),
 ].filter(Boolean);
 
 describe('mode copy', () => {
@@ -57,6 +58,15 @@ describe('mode copy', () => {
   it('says plainly, in real mode, that it is', () => {
     assert.match(modeCopy('mainnet').hint, /plata real/);
     assert.equal(modeCopy('mainnet').payLabel('12,34'), 'Pagar 12,34 USDC');
+  });
+
+  it('explains the one-time step without naming what it is', () => {
+    // It costs nothing, it happens once, and there is a way out. All three
+    // have to be on screen, because none of them is guessable.
+    assert.match(TRUSTLINE.body, /gratis/);
+    assert.match(TRUSTLINE.body, /no se vuelve a pedir/);
+    assert.match(TRUSTLINE.failed, /modo prueba/);
+    assert.match(TRUSTLINE.back, /modo prueba/);
   });
 
   it('tells "not for you" apart from "not yet for anyone"', () => {

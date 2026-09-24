@@ -16,7 +16,8 @@
         "usdc": {
           "id": "CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF",
           "decimals": 7,
-          "symbol": "USDC"
+          "symbol": "USDC",
+          "issuer": null
         },
         "escrow": {
           "id": "CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557"
@@ -38,7 +39,8 @@
         "usdc": {
           "id": "",
           "decimals": 7,
-          "symbol": "USDC"
+          "symbol": "USDC",
+          "issuer": ""
         },
         "escrow": {
           "id": ""

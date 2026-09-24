@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
+import { DEPLOYMENTS, NETWORK_IDS } from '../deployments.ts';
 import { appContentSecurityPolicy, appSecurityHeaders } from '../security-headers.ts';
 
 const none = { ga: '', meta: '', clarity: '' };
@@ -30,6 +31,20 @@ describe('shopper security headers', () => {
     assert.match(csp, /img-src [^;]*https:\/\/\*\.vtexassets\.com/);
     assert.match(csp, /object-src 'none'/);
     assert.doesNotMatch(csp, /'unsafe-eval'/);
+  });
+
+  it('RULE: every chain host the app can be pointed at is in connect-src', () => {
+    // The failure this catches: a network whose RPC host is in
+    // deployments.json but not here. The browser blocks the call before it
+    // leaves, and the SDK reports it as a network failure — so modo real
+    // would look broken rather than misconfigured.
+    const csp = appContentSecurityPolicy('production', none);
+    const connect = csp.split(';').find((d) => d.trim().startsWith('connect-src')) ?? '';
+    for (const net of NETWORK_IDS) {
+      for (const url of [DEPLOYMENTS[net].horizonUrl, DEPLOYMENTS[net].rpcUrl]) {
+        assert.ok(connect.includes(new URL(url).origin), `${net}: ${url} is not in connect-src`);
+      }
+    }
   });
 
   it('names an analytics vendor only when its id is set', () => {

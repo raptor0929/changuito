@@ -16,9 +16,13 @@
 #   * There is no friendbot. The identities must already hold XLM, and the
 #     script refuses rather than deploying with an account that cannot pay.
 #   * contracts/mock_usdc is NOT deployed. It is admin-mintable play money and
-#     has no business on a public network. You pass the real USDC SAC id in
-#     $USDC_ID instead — derive it, never paste it from memory:
-#         stellar contract id asset --asset USDC:<issuer> --network mainnet
+#     has no business on a public network. You pass the real USDC *issuer* in
+#     $USDC_ISSUER and the script derives the SAC id itself — the id is never
+#     pasted, because a wrong one is a contract that exists, answers, and holds
+#     somebody else's token.
+#   * The issuer is also recorded, because the app needs the classic asset
+#     (code + issuer) to open a trustline for the buyer. The SAC id alone
+#     cannot be turned back into one.
 #   * The escrow is token-agnostic (contracts/escrow: __constructor takes the
 #     token address), so mainnet is a redeploy with different constructor
 #     arguments, not a different contract.
@@ -62,19 +66,23 @@ if [[ "$NETWORK" != testnet ]]; then
   say "Deploying to $NETWORK — this spends real XLM"
   echo "  resolver identity: $RESOLVER"
   echo "  treasury identity: $TREASURY"
-  echo "  USDC contract:     ${USDC_ID:-<unset>}"
-  if [[ -z "${USDC_ID:-}" ]]; then
-    cat >&2 <<'MSG'
+  echo "  USDC issuer:       ${USDC_ISSUER:-<unset>}"
+  if [[ -z "${USDC_ISSUER:-}" ]]; then
+    cat >&2 <<MSG
 
-  USDC_ID is not set. On a public network the token is real USDC, not
-  contracts/mock_usdc, so this script will not invent one. Derive it:
+  USDC_ISSUER is not set. On a public network the token is real USDC, not
+  contracts/mock_usdc, so this script will not invent one. Look up the
+  issuing account for USDC on $NETWORK, then re-run with:
 
-      stellar contract id asset --asset USDC:<issuer> --network mainnet
-
-  then re-run with:  USDC_ID=C... scripts/deploy.sh mainnet
+      USDC_ISSUER=G... scripts/deploy.sh $NETWORK
 MSG
     exit 2
   fi
+  # Derived, not pasted. `stellar contract id asset` is pure arithmetic over
+  # the asset and the passphrase — it reaches no network and cannot be wrong
+  # about an issuer that is right.
+  USDC_ID="$(stellar contract id asset --asset "USDC:$USDC_ISSUER" --network "$NETWORK")"
+  echo "  USDC contract:     $USDC_ID (derived)"
   read -r -p "  Type the network name to continue: " confirm
   [[ "$confirm" == "$NETWORK" ]] || { echo "  aborted"; exit 1; }
 fi
@@ -166,9 +174,9 @@ fi
 
 say "Writing deployments.json"
 NETWORK="$NETWORK" RESOLVER_ADDR="$RESOLVER_ADDR" TREASURY_ADDR="$TREASURY_ADDR" \
-USDC_ID="$USDC_ID" ESCROW_ID="$ESCROW_ID" OUT="$OUT" node -e "
+USDC_ID="$USDC_ID" ESCROW_ID="$ESCROW_ID" USDC_ISSUER="${USDC_ISSUER:-}" OUT="$OUT" node -e "
   const fs = require('node:fs');
-  const { NETWORK, RESOLVER_ADDR, TREASURY_ADDR, USDC_ID, ESCROW_ID, OUT } = process.env;
+  const { NETWORK, RESOLVER_ADDR, TREASURY_ADDR, USDC_ID, ESCROW_ID, USDC_ISSUER, OUT } = process.env;
   const d = JSON.parse(fs.readFileSync(OUT, 'utf8'));
   const n = d.networks[NETWORK];
   if (!n) throw new Error(\`deployments.json has no '\${NETWORK}' entry — add its chain constants first\`);
@@ -178,7 +186,10 @@ USDC_ID="$USDC_ID" ESCROW_ID="$ESCROW_ID" OUT="$OUT" node -e "
     n.deployedAt = new Date().toISOString();
   }
   n.accounts = { resolver: RESOLVER_ADDR, treasury: TREASURY_ADDR };
-  n.contracts = { usdc: { ...n.contracts.usdc, id: USDC_ID }, escrow: { id: ESCROW_ID } };
+  // null, not '', on a network whose token has no issuer: the app reads that
+  // as 'there is no trustline to open here', and '' would read as 'unknown'.
+  const issuer = USDC_ISSUER || null;
+  n.contracts = { usdc: { ...n.contracts.usdc, id: USDC_ID, issuer }, escrow: { id: ESCROW_ID } };
   fs.writeFileSync(OUT, JSON.stringify(d, null, 2) + '\n');
 "
 cat "$OUT"
@@ -231,7 +242,10 @@ if [[ "$NETWORK" != testnet ]]; then
 Still to do by hand on $NETWORK:
   1. Add a USDC trustline to the treasury ($TREASURY_ADDR), or the first
      settle will fail — a classic asset cannot reach an account that has not
-     opted into it.
+     opted into it. The buyer's own trustline the app now handles itself;
+     the treasury's is manual, because the app never signs for it.
+         stellar tx new change-trust --source-account $TREASURY \\
+           --line USDC:$USDC_ISSUER --network $NETWORK
   2. Put the resolver secret in STELLAR_RESOLVER_SECRET_MAINNET:
          stellar keys show $RESOLVER
   3. Add the RPC host in deployments.json to the CSP in

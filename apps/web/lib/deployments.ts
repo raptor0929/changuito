@@ -30,6 +30,13 @@ export const DEPLOYMENTS = {
     treasury: 'GAXUICH5DZMB4ZIZVF6ETTE524RCZYRKHWLGG7EOLY6ECVD4IS6TBNZG',
     escrowId: 'CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557',
     usdcId: 'CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF',
+    /**
+     * The classic asset the SAC wraps, when it wraps one. `null` on testnet,
+     * where contracts/mock_usdc is a pure SEP-41 token with no issuer — which
+     * is exactly why testnet needs no trustline and a public network does.
+     */
+    usdcIssuer: null,
+    usdcCode: 'USDC',
     usdcDecimals: 7,
   },
   mainnet: {
@@ -48,6 +55,13 @@ export const DEPLOYMENTS = {
     treasury: '',
     escrowId: '',
     usdcId: '',
+    /**
+     * The classic asset the SAC wraps, when it wraps one. `null` on testnet,
+     * where contracts/mock_usdc is a pure SEP-41 token with no issuer — which
+     * is exactly why testnet needs no trustline and a public network does.
+     */
+    usdcIssuer: '',
+    usdcCode: 'USDC',
     usdcDecimals: 7,
   },
 } as const;

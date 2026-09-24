@@ -1,4 +1,5 @@
 import { ANALYTICS_IDS, type AnalyticsIds } from './analytics.ts';
+import { DEPLOYMENTS, NETWORK_IDS } from './deployments.ts';
 
 /**
  * Response headers for the shopper, mirroring www's (apps/landing/lib/csp.ts).
@@ -24,7 +25,16 @@ import { ANALYTICS_IDS, type AnalyticsIds } from './analytics.ts';
 export const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
 const POLLAR_API = 'https://sdk.api.pollar.xyz';
 const POLLAR_ASSETS = 'https://pollar.xyz';
-const STELLAR = ['https://horizon-testnet.stellar.org', 'https://horizon.stellar.org', 'https://soroban-testnet.stellar.org'];
+/**
+ * Derived from lib/deployments.ts rather than listed, because the list and the
+ * config drifting is a failure the browser reports as "fetch failed" from
+ * inside the Stellar SDK — which reads like the network is down. Every chain
+ * host the app can be pointed at is in DEPLOYMENTS by construction, so taking
+ * them from there means adding a network cannot forget this file.
+ */
+const STELLAR = [
+  ...new Set(NETWORK_IDS.flatMap((net) => [DEPLOYMENTS[net].horizonUrl, DEPLOYMENTS[net].rpcUrl])),
+].map((url) => new URL(url).origin);
 const PRODUCT_IMAGES = 'https://*.vtexassets.com';
 
 export function analyticsCspSources(ids: AnalyticsIds = ANALYTICS_IDS): { script: string[]; connect: string[]; img: string[] } {
