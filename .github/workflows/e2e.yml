@@ -40,6 +40,9 @@ on:
       - apps/web/lib/login-gate.ts
       - apps/web/lib/human-gate.ts
       - apps/web/lib/faucet-policy.ts
+      - apps/web/lib/faucet-auth.ts
+      - apps/web/lib/faucet-gate.ts
+      - apps/web/lib/faucet-proof.ts
       - apps/web/lib/stellar.ts
       - apps/web/lib/token.ts
       - apps/web/lib/deployments.ts

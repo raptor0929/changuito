@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { emailLoginCode, optionalEnv } from './support/env';
 import { collectPageErrors, expectNoPageErrors } from './support/page-errors';
+import { POLLAR } from './support/pollar-copy';
 
 /**
  * Pollar 0.11 (the widget on app.changuito.me) has no password field.
@@ -28,10 +29,10 @@ test.describe('app auth', () => {
     await page.getByRole('button', { name: 'Empezá a comprar' }).click();
 
     const modal = page.locator('.pollar-modal');
-    await expect(modal.getByText('Log in or sign up')).toBeVisible();
+    await expect(modal.getByText(POLLAR.subtitle)).toBeVisible();
 
     // The card renders "Loading..." before Pollar finishes its config fetch.
-    const emailInput = modal.getByPlaceholder('you@email.com');
+    const emailInput = modal.getByPlaceholder(POLLAR.emailPlaceholder);
     const settled = emailInput
       .or(modal.getByRole('button', { name: 'Google' }))
       .or(modal.getByRole('button', { name: 'Wallet' }));
@@ -47,9 +48,9 @@ test.describe('app auth', () => {
     }
 
     await emailInput.fill(email!);
-    await modal.getByRole('button', { name: 'Submit' }).click();
+    await modal.getByRole('button', { name: POLLAR.submit }).click();
 
-    const codePrompt = modal.getByText(/6-digit code/i);
+    const codePrompt = modal.getByText(POLLAR.codePrompt);
     await expect(codePrompt).toBeVisible({ timeout: 25_000 });
 
     const code = emailLoginCode();
@@ -63,13 +64,29 @@ test.describe('app auth', () => {
       return;
     }
 
+    // Whether this account may use the test faucet is the server's call
+    // (FAUCET_ALLOWLIST_ADDRESSES, #51). Listen before signing in: the widget
+    // asks as soon as the wallet address exists. A build without the GET
+    // (before #51) never answers, and always showed the button.
+    const faucetAccess = page
+      .waitForResponse((r) => r.url().includes('/api/faucet?address='), { timeout: 45_000 })
+      .then(async (r) => (r.ok() ? ((await r.json()) as { allowed?: boolean }) : null))
+      .catch(() => null);
+
     const firstDigit = modal.locator('input.pollar-code-input').first();
     await firstDigit.click();
     await page.keyboard.type(code, { delay: 40 });
 
     await expect(page.getByRole('button', { name: 'Salir' })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText('Tu pago')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Cargar USDC' })).toBeVisible();
+    const fund = page.getByRole('button', { name: 'Cargar USDC' });
+    const access = await faucetAccess;
+    if (access?.allowed === false) {
+      // Not a tester: no button, rather than one the API would refuse.
+      await expect(fund).toHaveCount(0);
+    } else {
+      await expect(fund).toBeVisible();
+    }
     expectNoPageErrors(errors);
   });
 });

@@ -40,15 +40,18 @@ win over that file.
   signup.
 - **App, guest.** The masthead and **Empezá a comprar** render, and the page
   throws no uncaught error. **Empezá a comprar** opens the Pollar modal
-  (`Log in or sign up`, email, Submit, Google, Wallet) and there is no
-  password field. The spec closes the modal and does not submit. Chat is
+  (`Ingresá o creá tu cuenta`, email, Continuar, Google, Wallet) and there is
+  no password field. The matchers also accept Pollar's English originals, for
+  a run that lands before a deploy is live (`e2e/support/pollar-copy.ts`). The spec closes the modal and does not submit. Chat is
   behind Turnstile. If the check passes, the spec clicks the
-  leche-con-proteína chip (or types a short prompt) and stops. If Turnstile
+  leche-con-proteína chip (or types a short prompt), waits for the reply that
+  asks for the postal code, and stops. If Turnstile
   stays up, the verification screen is the pass: CI must not depend on
   Cloudflare letting a bot through. A headless run on 2026-09-24 stayed on
-  that screen. Product search is not asserted. Guests currently fail that
-  search (issue [#51](https://github.com/raptor0929/changuito/issues/51)),
-  and a search can take a minute.
+  that screen. Product search is not asserted: a search can take a minute.
+  The postal-code reply is, because a guest stuck before it was the blocker
+  in issue [#51](https://github.com/raptor0929/changuito/issues/51); the
+  server now answers it without a model hop.
 - **App, auth.** Skipped unless both `CHANGUTO_E2E_EMAIL` and
   `CHANGUTO_E2E_PASSWORD` are non-empty. It opens **Empezá a comprar** and
   uses the email field. Traces and screenshots are off for this spec so a
@@ -57,9 +60,10 @@ win over that file.
 ## Pollar has no password field
 
 `@pollar/react` 0.11.3 (what the shopper mounts) signs in with email by
-sending a **6-digit code**, then Google or a wallet. The modal copy is
-`Log in or sign up`, `Submit`, and `or continue with`. There is no password
-input.
+sending a **6-digit code**, then Google or a wallet. Pollar's own copy is
+English (`Log in or sign up`, `Submit`, `or continue with`); the shopper
+rewrites it to Spanish after render (`Ingresá o creá tu cuenta`, `Continuar`,
+`o seguí con`). There is no password input.
 
 So:
 
@@ -67,7 +71,7 @@ So:
 |---|---|
 | Either missing or blank | Skips |
 | Email + any password, no 6-digit code | Submits the email, expects the code screen, does not claim the wallet chrome |
-| Email + `CHANGUTO_E2E_OTP` (or a password that is exactly 6 digits) | Types the code and expects **Salir**, **Tu pago**, and **Cargar USDC** |
+| Email + `CHANGUTO_E2E_OTP` (or a password that is exactly 6 digits) | Types the code and expects **Salir** and **Tu pago**. **Cargar USDC** is expected only if `GET /api/faucet` says this wallet is on `FAUCET_ALLOWLIST_ADDRESSES`; otherwise the spec checks the button is absent |
 
 A normal password cannot finish login. A code is one-time, so a standing
 GitHub secret will not keep the signed-in assertion green unless Pollar

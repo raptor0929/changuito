@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { collectPageErrors, expectNoPageErrors } from './support/page-errors';
+import { POLLAR } from './support/pollar-copy';
 
 const STARTER = 'Compará precios de leche con proteína';
 
@@ -10,14 +11,17 @@ const STARTER = 'Compará precios de leche con proteína';
  * Chat sits behind Cloudflare Turnstile (`human-gate`). A real browser often
  * passes it; automation often does not. Either settled state is a pass:
  * the verification screen, or the composer. We do not wait for product
- * search — that path is slow and, for guests, currently broken (issue #51).
+ * search — that path is slow. We do wait for the first reply to a starter:
+ * the postal-code question, which is what used to hang for guests (#51).
  */
 test.describe('app guest', () => {
   test('loads guest chrome and either chats or stops on the human check', async ({ page }) => {
     const errors = collectPageErrors(page);
     await page.goto('/');
 
-    await expect(page.getByRole('img', { name: 'Changuito' })).toBeVisible();
+    // The name lives on the h1 either way: as the wordmark's alt before #51,
+    // as visually hidden text after it.
+    await expect(page.getByRole('heading', { level: 1, name: 'Changuito' })).toBeVisible();
     await expect(page.getByText('Contale a Changuito lo que necesitás')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Empezá a comprar' })).toBeVisible();
 
@@ -52,6 +56,10 @@ test.describe('app guest', () => {
         await starter.click();
         const thread = page.getByTestId('chat-thread');
         await expect(thread.getByText(STARTER)).toBeVisible();
+        // A starter names no postal code, so the first reply asks for one.
+        // The server answers it without a model hop; the long timeout only
+        // covers a run that lands before the new build is live.
+        await expect(thread.getByText(/código postal/i).first()).toBeVisible({ timeout: 60_000 });
         const stop = page.getByRole('button', { name: 'Parar respuesta' });
         try {
           await stop.click({ timeout: 3_000 });
@@ -78,14 +86,14 @@ test.describe('app guest', () => {
     await page.getByRole('button', { name: 'Empezá a comprar' }).click();
 
     const modal = page.locator('.pollar-modal');
-    await expect(modal.getByText('Log in or sign up')).toBeVisible();
-    await expect(modal.getByPlaceholder('you@email.com')).toBeVisible({ timeout: 20_000 });
-    await expect(modal.getByRole('button', { name: 'Submit' })).toBeVisible();
+    await expect(modal.getByText(POLLAR.subtitle)).toBeVisible();
+    await expect(modal.getByPlaceholder(POLLAR.emailPlaceholder)).toBeVisible({ timeout: 20_000 });
+    await expect(modal.getByRole('button', { name: POLLAR.submit })).toBeVisible();
     await expect(modal.getByRole('button', { name: 'Google' })).toBeVisible();
     await expect(modal.getByRole('button', { name: 'Wallet' })).toBeVisible();
     await expect(modal.locator('input[type="password"]')).toHaveCount(0);
 
-    await modal.getByRole('button', { name: 'Close' }).click();
+    await modal.getByRole('button', { name: POLLAR.close }).click();
     await expect(modal).toBeHidden();
     expectNoPageErrors(errors);
   });
