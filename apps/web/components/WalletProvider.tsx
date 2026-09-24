@@ -4,6 +4,7 @@ import { PollarProvider } from '@pollar/react';
 import '@pollar/react/styles.css';
 
 import { POLLAR_API_KEY, POLLAR_NETWORK, pollarEnabled } from '../lib/pollar.ts';
+import { PollarSpanish } from './PollarSpanish';
 
 /**
  * Wraps the app in Pollar, or doesn't.
@@ -25,6 +26,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <PollarProvider client={{ apiKey: POLLAR_API_KEY, stellarNetwork: POLLAR_NETWORK }}>
+      <PollarSpanish />
       {children}
     </PollarProvider>
   );
