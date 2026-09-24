@@ -3,6 +3,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { callMcpTool, mcpToolsToAnthropic } from '../mcp/bridge';
 import type { Session } from '../mcp/session';
 import type { UiEvent } from '../protocol';
+import { earlyLocationAsk } from './early-ask';
 import { CHANGUITO_PROMPT, stateBanner } from './prompt';
 import { selectBrains } from './provider';
 import type { HopResult } from './providers/types';
@@ -65,6 +66,21 @@ export async function runTurn(
   emit: (e: UiEvent) => void,
 ): Promise<{ brain: string }> {
   const t0 = Date.now();
+
+  // Before the model and before a local lane is taken: see early-ask.ts.
+  const ask = earlyLocationAsk({
+    hasLocation: Boolean(session.state.getLocation()),
+    firstMessage: turn.messages.length === 0,
+    text: userText,
+  });
+  if (ask) {
+    turn.messages.push(
+      { role: 'user', content: [{ type: 'text', text: userText }, { type: 'text', text: stateBanner({}) }] },
+      { role: 'assistant', content: [{ type: 'text', text: ask }] },
+    );
+    emit({ t: 'text', delta: ask });
+    return { brain: 'early-ask' };
+  }
 
   const brains = await selectBrains();
   let local = brains.local;
