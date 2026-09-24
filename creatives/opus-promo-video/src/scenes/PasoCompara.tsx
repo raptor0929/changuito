@@ -13,7 +13,7 @@ const ROWS = [
 const MAX = Math.max(...ROWS.map((r) => r.price));
 const BEST = ROWS.length - 1;
 const ROW_AT = 16;
-const PICK = 60;
+const PICK = 52;
 const SAVINGS = MAX - ROWS[BEST].price;
 
 export const PasoCompara: React.FC = () => {
@@ -24,7 +24,7 @@ export const PasoCompara: React.FC = () => {
   const cardIn = springAt(frame, fps, 4, { damping: 18, stiffness: 120 });
   const pick = springAt(frame, fps, PICK, SNAPPY);
   const saving = springAt(frame, fps, PICK + 12, SNAPPY);
-  const more = springAt(frame, fps, PICK + 22, SNAPPY);
+  const more = springAt(frame, fps, PICK + 16, SNAPPY);
   const mascot = springAt(frame, fps, PICK + 8, {
     damping: 12,
     stiffness: 120,
@@ -96,7 +96,7 @@ export const PasoCompara: React.FC = () => {
             const s = springAt(frame, fps, at, SNAPPY);
             const fill = interpolate(
               frame,
-              [at + 2, at + 30],
+              [at + 2, at + 22],
               [0, row.price / MAX],
               { ...CLAMP, easing: EASE_OUT },
             );
@@ -255,7 +255,7 @@ export const PasoCompara: React.FC = () => {
       <Sfx name="ding" at={PICK} volume={0.55} />
       <Sfx name="pop" at={PICK + 12} volume={0.4} />
       <Sfx name="whoosh" at={PICK + 6} volume={0.3} />
-      <Sfx name="tick" at={PICK + 22} volume={0.3} />
+      <Sfx name="tick" at={PICK + 16} volume={0.3} />
     </SceneShell>
   );
 };

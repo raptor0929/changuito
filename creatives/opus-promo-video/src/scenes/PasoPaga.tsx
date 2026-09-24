@@ -13,8 +13,8 @@ import {
 import { COLORS, sceneDuration } from "../theme";
 
 const TOTAL = 38390;
-const SELECT_CARD = 24;
-const SELECT_USDC = 40;
+const SELECT_CARD = 20;
+const SELECT_USDC = 36;
 const PAY = 56;
 const SUCCESS = 72;
 const RUN = 80;
@@ -69,7 +69,7 @@ export const PasoPaga: React.FC = () => {
   const cardIn = springAt(frame, fps, 4, { damping: 18, stiffness: 120 });
   // Selection ring glides from "Tarjeta" to "USDC": both work.
   const ringIn = springAt(frame, fps, SELECT_CARD, SNAPPY);
-  const ringX = interpolate(frame, [SELECT_USDC, SELECT_USDC + 8], [0, 1], {
+  const ringX = interpolate(frame, [SELECT_USDC, SELECT_USDC + 12], [0, 1], {
     ...CLAMP,
     easing: EASE_IN_OUT,
   });
@@ -333,7 +333,7 @@ export const PasoPaga: React.FC = () => {
 
       <Sfx name="whoosh" at={4} volume={0.35} />
       <Sfx name="tick" at={SELECT_CARD} volume={0.4} />
-      <Sfx name="tick" at={SELECT_USDC + 4} volume={0.4} />
+      <Sfx name="tick" at={SELECT_USDC + 10} volume={0.4} />
       <Sfx name="tap" at={PAY} volume={0.7} />
       <Sfx name="success" at={SUCCESS} volume={0.6} />
       <Sfx name="whoosh" at={RUN + 2} volume={0.55} />

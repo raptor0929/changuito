@@ -18,6 +18,7 @@ const TYPE_TO = 46;
 const SEND = 49;
 const TYPING_FROM = 56;
 const REPLY = 72;
+const CHIP_STAGGER = 6;
 const CHIPS = [
   "Asado 3 kg",
   "Carbón 4 kg",
@@ -235,7 +236,12 @@ export const PasoPedile: React.FC = () => {
                   }}
                 >
                   {CHIPS.map((chip, i) => {
-                    const s = springAt(frame, fps, REPLY + 8 + i * 4, SNAPPY);
+                    const s = springAt(
+                      frame,
+                      fps,
+                      REPLY + 8 + i * CHIP_STAGGER,
+                      SNAPPY,
+                    );
                     return (
                       <div
                         key={chip}
@@ -342,7 +348,12 @@ export const PasoPedile: React.FC = () => {
       <Sfx name="pop" at={SEND} volume={0.5} />
       <Sfx name="pop" at={REPLY} volume={0.45} />
       {CHIPS.map((c, i) => (
-        <Sfx key={c} name="tick" at={REPLY + 8 + i * 4} volume={0.3} />
+        <Sfx
+          key={c}
+          name="tick"
+          at={REPLY + 8 + i * CHIP_STAGGER}
+          volume={0.3}
+        />
       ))}
     </SceneShell>
   );
