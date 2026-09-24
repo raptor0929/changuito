@@ -14,6 +14,8 @@
   --border: rgba(42, 26, 20, 0.14);
   --text: var(--chg-espresso);
   --muted: #4a332c;
+  /* Espresso lifted toward offWhite: 5.67:1 on --surface, 5.42:1 on --bg. */
+  --placeholder: #76635b;
   --ok: #1a7f4b;
   --warn: var(--chg-arcilla);
   /* Arcilla is an accent, not a text colour: #e07a5f on --bg is about 2.9:1.
@@ -496,8 +498,12 @@ a:hover { color: var(--chg-arcilla); }
   color: var(--muted);
 }
 
+/* Solid, not an alpha of espresso: the old rgba(42,26,20,.45) composited to
+   about #9f9895 on white, 2.8:1. This clears WCAG 1.4.3's 4.5:1 on --surface
+   and on --bg while staying lighter than typed text (--text, 17:1). */
 .composer-input::placeholder {
-  color: rgba(42, 26, 20, 0.45);
+  color: var(--placeholder);
+  opacity: 1;
   white-space: pre-wrap;
 }
 
