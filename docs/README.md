@@ -9,6 +9,7 @@ settles the basket in USDC on Stellar testnet.
 | [flows.md](flows.md) | the five paths that matter, end to end: a chat turn, funding, payment, settlement, refund |
 | [stellar.md](stellar.md) | every Stellar technology used, and what each one is doing here |
 | [tech-stack.md](tech-stack.md) | the dependency list with versions, and why each one is there |
+| [e2e.md](e2e.md) | Playwright smoke against the live sites, and the GitHub Actions secrets |
 
 Elsewhere in the repo:
 
