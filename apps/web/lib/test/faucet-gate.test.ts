@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 
 import { Keypair } from '@stellar/stellar-sdk';
 
+import { DEFAULT_NETWORK } from '../deployments.ts';
 import { FAUCET_GRANTS_PER_HOUR, gateFaucet } from '../faucet-gate.ts';
 import { CounterUnavailable, memoryCounter, type TurnCounter } from '../login-gate.ts';
 import { walletProofMessage } from '../wallet-proof.ts';
@@ -46,7 +47,25 @@ async function refusal(res: unknown): Promise<{ status: number; error: string }>
 describe('POST /api/faucet gate', () => {
   it('lets the allowlisted tester through with a signed session proof', async () => {
     const res = await gateFaucet(await post({ address: tester.publicKey(), proof: signed(tester) }), env, now, memoryCounter());
-    assert.deepEqual(res, { address: tester.publicKey(), kind: 'account' });
+    assert.deepEqual(res, { address: tester.publicKey(), kind: 'account', network: DEFAULT_NETWORK });
+  });
+
+  it('refuses to fund in modo real, and refuses a network it does not know', async () => {
+    const real = await gateFaucet(
+      await post({ address: tester.publicKey(), proof: signed(tester), network: 'mainnet' }),
+      env,
+      now,
+      memoryCounter(),
+    );
+    assert.deepEqual(await refusal(real), { status: 403, error: 'faucet_not_on_network' });
+
+    const typo = await gateFaucet(
+      await post({ address: tester.publicKey(), proof: signed(tester), network: 'main' }),
+      env,
+      now,
+      memoryCounter(),
+    );
+    assert.equal((await refusal(typo)).status, 400);
   });
 
   it('refuses a stranger’s wallet with 403', async () => {

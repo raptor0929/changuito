@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import type { BalanceResponse } from '../app/api/balance/route.ts';
+import { DEFAULT_NETWORK, type NetworkId } from './deployments.ts';
 import { SOLO_HUMANOS } from './human-gate-ui';
 
 export interface Balances {
@@ -16,14 +17,29 @@ export interface Balances {
  * Polls nothing. Balances change when the user does something — funding, or
  * paying — and both of those call `refresh()` themselves. A timer here would
  * spend requests to tell the user the same number forty times.
+ *
+ * Keyed on the network as well as the address, because the same wallet holds
+ * different money on each chain. It is in the dep array, which is the whole
+ * fix: flipping the mode drops the old number and refetches rather than
+ * leaving one chain's balance on screen under the other one's label.
  */
-export function useBalances(address: string | null): Balances {
+export function useBalances(address: string | null, network: NetworkId = DEFAULT_NETWORK): Balances {
   const [data, setData] = useState<BalanceResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
+
+  // Its own effect, before the fetch, so it does *not* run on `refresh()`.
+  // A wallet that just funded should watch its number change, not blink to
+  // empty; a wallet that changed network is showing a number that is now
+  // simply wrong, and the wrong number must go before the request, not when
+  // the answer lands.
+  useEffect(() => {
+    setData(null);
+    setError(null);
+  }, [address, network]);
 
   useEffect(() => {
     if (!address) {
@@ -33,7 +49,7 @@ export function useBalances(address: string | null): Balances {
     }
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/balance?address=${encodeURIComponent(address)}`)
+    fetch(`/api/balance?address=${encodeURIComponent(address)}&network=${encodeURIComponent(network)}`)
       .then(async (res) => {
         const json = await res.json();
         if (cancelled) return;
@@ -61,7 +77,7 @@ export function useBalances(address: string | null): Balances {
     return () => {
       cancelled = true;
     };
-  }, [address, nonce]);
+  }, [address, network, nonce]);
 
   return { data, loading, error, refresh };
 }

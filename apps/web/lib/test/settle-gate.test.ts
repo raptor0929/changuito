@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 
 import { Keypair } from '@stellar/stellar-sdk';
 
+import { DEFAULT_NETWORK, isConfigured } from '../deployments.ts';
 import { HUMAN_COOKIE, mintHumanToken } from '../human-gate.ts';
 import { buyerMayClose, gateSettle } from '../settle-gate.ts';
 import { walletProofMessage, type WalletIntent } from '../wallet-proof.ts';
@@ -21,6 +22,8 @@ const ORDER = 'a'.repeat(64);
 const OTHER = 'b'.repeat(64);
 const BASKET = 'c'.repeat(64);
 const env = { NODE_ENV: 'production', TURNSTILE_SECRET_KEY: SECRET } as NodeJS.ProcessEnv;
+/** The same, plus a tester who is cleared for modo real. */
+const real = { ...env, REAL_MODE_ALLOWLIST_ADDRESSES: buyer.publicKey() } as NodeJS.ProcessEnv;
 
 function signed(kp: Keypair, intent: WalletIntent, ref: string, address = kp.publicKey()) {
   const message = walletProofMessage(intent, address, now, ref);
@@ -82,7 +85,77 @@ describe('POST /api/settle gate', () => {
 
   it('passes the buyer’s own signed request on to the order check', async () => {
     const res = await gateSettle(await post(settle({ proof: signed(buyer, 'settle', ORDER) })), env, now);
-    assert.deepEqual(res, { action: 'settle', orderId: ORDER, basketHash: BASKET, address: buyer.publicKey() });
+    assert.deepEqual(res, {
+      action: 'settle',
+      orderId: ORDER,
+      basketHash: BASKET,
+      address: buyer.publicKey(),
+      network: DEFAULT_NETWORK,
+    });
+  });
+});
+
+/**
+ * Modo real. The client-side toggle is a courtesy; this is the wall, and the
+ * order of the checks is the point — the allowlist is read against an address
+ * that has already proven itself with a signature.
+ */
+describe('POST /api/settle in modo real', () => {
+  const asMainnet = (extra: Record<string, unknown> = {}) => settle({ network: 'mainnet', ...extra });
+
+  it('defaults to the safe network when the body says nothing', async () => {
+    const res = await gateSettle(await post(settle({ proof: signed(buyer, 'settle', ORDER) })), env, now);
+    assert.ok(!(res instanceof Response));
+    assert.equal(res.network, DEFAULT_NETWORK);
+    assert.equal(res.network, 'testnet');
+  });
+
+  it('refuses a network nobody has heard of rather than falling back to one', async () => {
+    const res = await gateSettle(await post(settle({ network: 'mainet', proof: signed(buyer, 'settle', ORDER) })), env, now);
+    assert.equal((await refusal(res)).status, 400);
+  });
+
+  it('RULE: refuses modo real from an address that is not on the list', async () => {
+    const res = await gateSettle(await post(asMainnet({ proof: signed(buyer, 'settle', ORDER) })), env, now);
+    assert.deepEqual(await refusal(res), { status: 403, error: 'network_not_allowed' });
+  });
+
+  it('RULE: checks the list only after the signature — an unsigned request is still a 401', async () => {
+    // If the allowlist were read first, a stranger could learn who is on it by
+    // watching which refusal comes back without signing anything.
+    const res = await gateSettle(await post({ action: 'settle', orderId: ORDER, basketHash: BASKET, network: 'mainnet' }), env, now);
+    assert.deepEqual(await refusal(res), { status: 401, error: 'buyer_proof_required' });
+
+    const forged = await gateSettle(
+      await post(asMainnet({ proof: signed(stranger, 'settle', ORDER, buyer.publicKey()) })),
+      real,
+      now,
+    );
+    assert.deepEqual(await refusal(forged), { status: 401, error: 'buyer_proof_invalid' });
+  });
+
+  it('lets an allowlisted buyer through, once mainnet is actually deployed', async () => {
+    const res = await gateSettle(await post(asMainnet({ proof: signed(buyer, 'settle', ORDER) })), real, now);
+    if (isConfigured('mainnet')) {
+      assert.deepEqual(res, {
+        action: 'settle',
+        orderId: ORDER,
+        basketHash: BASKET,
+        address: buyer.publicKey(),
+        network: 'mainnet',
+      });
+    } else {
+      assert.deepEqual(await refusal(res), { status: 403, error: 'network_not_deployed' });
+    }
+  });
+
+  it('gates a refund exactly like a settle — the escape hatch is not a back door', async () => {
+    const res = await gateSettle(
+      await post({ action: 'refund', orderId: ORDER, address: buyer.publicKey(), network: 'mainnet', proof: signed(buyer, 'refund', ORDER) }),
+      env,
+      now,
+    );
+    assert.deepEqual(await refusal(res), { status: 403, error: 'network_not_allowed' });
   });
 });
 

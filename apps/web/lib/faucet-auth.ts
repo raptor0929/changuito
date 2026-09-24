@@ -1,5 +1,6 @@
 import { StrKey } from '@stellar/stellar-sdk';
 
+import { DEFAULT_NETWORK, DEPLOYMENTS, type NetworkId } from './deployments.ts';
 import type { FaucetAccess, FaucetProof } from './faucet-proof.ts';
 import { verifyWalletProof } from './wallet-proof-verify.ts';
 
@@ -22,6 +23,9 @@ import { verifyWalletProof } from './wallet-proof-verify.ts';
  *
  * Deny by default: in production an empty list disables the faucet for
  * everyone, including Vercel previews, which also run as production.
+ *
+ * And it is per network, because free money is a testnet idea. See
+ * `faucetOnNetwork`.
  */
 
 export type FaucetMode = FaucetAccess['mode'];
@@ -42,7 +46,24 @@ export function faucetMode(env: NodeJS.ProcessEnv = process.env): FaucetMode {
   return env.NODE_ENV === 'production' ? 'disabled' : 'open';
 }
 
-export function faucetAccess(address: string, env: NodeJS.ProcessEnv = process.env): FaucetAccess {
+/**
+ * Whether this network has a faucet at all.
+ *
+ * Read off `friendbotUrl` rather than comparing against 'testnet': the config
+ * already records which chains hand out money, and a check written as data
+ * stays right when a third network appears. On a public network there is no
+ * friendbot and no mock token to mint — the faucet simply does not exist.
+ */
+export function faucetOnNetwork(net: NetworkId): boolean {
+  return DEPLOYMENTS[net].friendbotUrl !== null;
+}
+
+export function faucetAccess(
+  address: string,
+  env: NodeJS.ProcessEnv = process.env,
+  net: NetworkId = DEFAULT_NETWORK,
+): FaucetAccess {
+  if (!faucetOnNetwork(net)) return { mode: 'disabled', allowed: false };
   const mode = faucetMode(env);
   if (mode === 'open') return { mode, allowed: true };
   if (mode === 'disabled') return { mode, allowed: false };
@@ -64,9 +85,18 @@ export function authorizeFaucet(args: {
   proof?: Partial<FaucetProof> | null;
   now: number;
   env?: NodeJS.ProcessEnv;
+  net?: NetworkId;
 }): FaucetAuth {
   const env = args.env ?? process.env;
-  const access = faucetAccess(args.address, env);
+  const net = args.net ?? DEFAULT_NETWORK;
+
+  // Before the allowlist, because this one is not about who is asking. There
+  // is nothing to mint on a public network, so the refusal is flat.
+  if (!faucetOnNetwork(net)) {
+    return deny(403, 'faucet_not_on_network', 'No hay carga de prueba en el modo real.');
+  }
+
+  const access = faucetAccess(args.address, env, net);
 
   if (access.mode === 'open') return { ok: true };
   if (access.mode === 'disabled') {

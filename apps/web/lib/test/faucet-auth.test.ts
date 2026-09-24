@@ -4,7 +4,8 @@ import { describe, it } from 'node:test';
 
 import { Keypair } from '@stellar/stellar-sdk';
 
-import { authorizeFaucet, faucetAccess, faucetAllowlist, faucetMode } from '../faucet-auth.ts';
+import { DEFAULT_NETWORK, NETWORK_IDS } from '../deployments.ts';
+import { authorizeFaucet, faucetAccess, faucetAllowlist, faucetMode, faucetOnNetwork } from '../faucet-auth.ts';
 import { WALLET_PROOF_TTL_MS, walletProofMessage } from '../wallet-proof.ts';
 
 const faucetProofMessage = (address: string, at: number) => walletProofMessage('faucet', address, at);
@@ -53,6 +54,28 @@ describe('faucet mode', () => {
     assert.deepEqual(faucetAccess(tester.publicKey(), prod), { mode: 'allowlist', allowed: true });
     assert.deepEqual(faucetAccess(stranger.publicKey(), prod), { mode: 'allowlist', allowed: false });
     assert.deepEqual(faucetAccess(tester.publicKey(), { NODE_ENV: 'production' } as NodeJS.ProcessEnv), { mode: 'disabled', allowed: false });
+  });
+});
+
+describe('the faucet is a testnet idea', () => {
+  it('RULE: exists only where there is a friendbot', () => {
+    assert.equal(faucetOnNetwork(DEFAULT_NETWORK), true, 'the demo has to be fundable');
+    for (const net of NETWORK_IDS) {
+      if (net === DEFAULT_NETWORK) continue;
+      assert.equal(faucetOnNetwork(net), false, `no free money on ${net}`);
+      // The widget reads this and leaves the button out; no new conditional.
+      assert.deepEqual(faucetAccess(tester.publicKey(), prod, net), { mode: 'disabled', allowed: false });
+    }
+  });
+
+  it('RULE: refuses to mint in modo real even for somebody allowlisted, with a proof', () => {
+    for (const net of NETWORK_IDS) {
+      if (net === DEFAULT_NETWORK) continue;
+      const auth = authorizeFaucet({ address: tester.publicKey(), proof: proofFor(tester), now, env: prod, net });
+      assert.equal(auth.ok, false);
+      assert.equal(auth.ok === false && auth.status, 403);
+      assert.equal(auth.ok === false && auth.error, 'faucet_not_on_network');
+    }
   });
 });
 

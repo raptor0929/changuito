@@ -15,9 +15,12 @@
  * so: in production only allowlisted testers, proving the wallet with a fresh
  * SEP-53 signature. See lib/faucet-auth.ts.
  *
- * GET /api/faucet?address=…  ->  { mode, allowed }, so the widget can leave
- * the button out instead of showing one that can only fail.
+ * GET /api/faucet?address=…&network=…  ->  { mode, allowed }, so the widget can
+ * leave the button out instead of showing one that can only fail. On a network
+ * with no friendbot the answer is always no, which is how the button
+ * disappears in modo real without a new conditional in the widget.
  */
+import { networkOrDefault } from '../../../lib/deployments.ts';
 import { faucetAccess } from '../../../lib/faucet-auth.ts';
 import { gateFaucet } from '../../../lib/faucet-gate.ts';
 import { faucetVerdict } from '../../../lib/faucet-policy.ts';
@@ -46,10 +49,12 @@ export async function GET(req: Request): Promise<Response> {
   const gated = await requireHuman(req);
   if (gated) return gated;
 
-  const address = new URL(req.url).searchParams.get('address') ?? '';
+  const params = new URL(req.url).searchParams;
+  const address = params.get('address') ?? '';
+  const network = networkOrDefault(params.get('network'));
   const access: FaucetAccess = addressKind(address)
-    ? faucetAccess(address)
-    : { mode: faucetAccess('').mode, allowed: false };
+    ? faucetAccess(address, process.env, network)
+    : { mode: faucetAccess('', process.env, network).mode, allowed: false };
   return Response.json(access, { headers: { 'cache-control': 'no-store' } });
 }
 
@@ -57,20 +62,20 @@ export async function POST(req: Request): Promise<Response> {
   // Before friendbot and before the mint: both are signed by us.
   const gate = await gateFaucet(req);
   if (gate instanceof Response) return gate;
-  const { address, kind } = gate;
+  const { address, kind, network } = gate;
 
   try {
     // 1. XLM first. A contract wallet has no Horizon account to fund.
     let xlm: string | null = null;
     let created = false;
     if (kind === 'account') {
-      const funding = await ensureFunded(address);
+      const funding = await ensureFunded(address, network);
       xlm = funding.xlm;
       created = funding.created;
     }
 
     // 2. Then the token, if they need it.
-    const before = await usdcBalance(address);
+    const before = await usdcBalance(address, network);
     const verdict = faucetVerdict({
       balanceUnits: before,
       now: Date.now(),
@@ -91,7 +96,7 @@ export async function POST(req: Request): Promise<Response> {
       return Response.json(body, { status: created ? 200 : 429 });
     }
 
-    const tx = await usdcAsAdmin().mint({ to: address, amount: verdict.amount });
+    const tx = await usdcAsAdmin(network).mint({ to: address, amount: verdict.amount });
     const sent = await tx.signAndSend();
 
     const after = before + verdict.amount;

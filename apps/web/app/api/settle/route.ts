@@ -36,10 +36,10 @@ export interface SettleResponse {
 export async function POST(req: Request): Promise<Response> {
   const gate = await gateSettle(req);
   if (gate instanceof Response) return gate;
-  const { action, orderId, basketHash, address } = gate;
+  const { action, orderId, basketHash, address, network } = gate;
 
   try {
-    const escrow = escrowAsResolver();
+    const escrow = escrowAsResolver(network);
     const idBuf = Buffer.from(fromHex(orderId));
 
     // Read first. The contract rejects all of these itself, but a simulation
@@ -71,7 +71,7 @@ export async function POST(req: Request): Promise<Response> {
       const tx = await escrow.refund({ caller: (await escrow.config()).result.resolver, order_id: idBuf });
       const sent = await tx.signAndSend();
       const hash = sent.sendTransactionResponse?.hash ?? '';
-      return Response.json({ ...common, hash, txUrl: explorer.tx(hash) } satisfies SettleResponse);
+      return Response.json({ ...common, hash, txUrl: explorer.tx(hash, network) } satisfies SettleResponse);
     }
 
     // Only what the contract returned and the server chose. Nothing the
@@ -96,7 +96,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({
       ...common,
       hash,
-      txUrl: explorer.tx(hash),
+      txUrl: explorer.tx(hash, network),
       // Returned so the on-chain hash can be re-derived by anyone, which is
       // the only thing that makes it a receipt rather than 32 opaque bytes.
       receipt: canonicalReceipt(input),

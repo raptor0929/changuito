@@ -1,3 +1,4 @@
+import { asNetwork, DEFAULT_NETWORK, type NetworkId } from './deployments.ts';
 import { authorizeFaucet } from './faucet-auth.ts';
 import type { FaucetProof } from './faucet-proof.ts';
 import { requireHuman } from './human-gate.ts';
@@ -29,24 +30,30 @@ export async function gateFaucet(
   env: NodeJS.ProcessEnv = process.env,
   now: number = Date.now(),
   store: TurnCounter = guestTurnCounter(env),
-): Promise<{ address: string; kind: 'account' | 'contract' } | Response> {
+): Promise<{ address: string; kind: 'account' | 'contract'; network: NetworkId } | Response> {
   const gated = await requireHuman(req, env);
   if (gated) return gated;
 
   let address: string;
   let proof: Partial<FaucetProof> | null = null;
+  let network: NetworkId | null = DEFAULT_NETWORK;
   try {
-    const body = (await req.json()) as { address?: unknown; proof?: unknown };
+    const body = (await req.json()) as { address?: unknown; proof?: unknown; network?: unknown };
     address = typeof body.address === 'string' ? body.address : '';
     if (body.proof && typeof body.proof === 'object') proof = body.proof as Partial<FaucetProof>;
+    // Absent means the default; present-but-unknown is named rather than
+    // quietly coerced, so a typo cannot look like it worked.
+    if (body.network !== undefined) network = asNetwork(body.network);
   } catch {
     return Response.json({ error: 'expected a JSON body' }, { status: 400 });
   }
 
+  if (network === null) return Response.json({ error: 'network no reconocida' }, { status: 400 });
+
   const kind = addressKind(address);
   if (!kind) return Response.json({ error: 'not a Stellar address' }, { status: 400 });
 
-  const auth = authorizeFaucet({ address, proof, now, env });
+  const auth = authorizeFaucet({ address, proof, now, env, net: network });
   if (!auth.ok) return Response.json({ error: auth.error, message: auth.message }, { status: auth.status });
 
   const wait = 'Esperá un momento antes de volver a pedir fondos.';
@@ -61,5 +68,5 @@ export async function gateFaucet(
     return Response.json({ error: 'rate_limited', message: busy, note: busy }, { status: 429 });
   }
 
-  return { address, kind };
+  return { address, kind, network };
 }

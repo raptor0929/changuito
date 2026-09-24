@@ -1,4 +1,6 @@
+import { asNetwork, DEFAULT_NETWORK, type NetworkId } from './deployments.ts';
 import { requireHuman } from './human-gate.ts';
+import { denyNetwork } from './network-access.ts';
 import type { SettleAction } from './order.ts';
 import { proofFromBody, verifyWalletProof } from './wallet-proof-verify.ts';
 
@@ -18,6 +20,10 @@ import { proofFromBody, verifyWalletProof } from './wallet-proof-verify.ts';
  * buyer's own, into the treasury they were paying anyway, on their signature.
  * A third party can no longer settle or cancel someone else's purchase.
  *
+ * The network arrives in the body too, and modo real is refused here for any
+ * address outside the allowlist — *after* the signature, never before, so the
+ * allowlist is read against an address that was proven rather than claimed.
+ *
  * Its own module so the refusals can be tested as a route: the handler
  * imports the contract bindings, which cannot load under strip-types.
  */
@@ -31,6 +37,8 @@ export interface SettleRequest {
   basketHash: string;
   /** The wallet that signed, already verified. Still has to be the buyer. */
   address: string;
+  /** Which chain this order lives on. Absent in the body means the default. */
+  network: NetworkId;
 }
 
 export async function gateSettle(
@@ -57,6 +65,13 @@ export async function gateSettle(
   const basketHash = typeof body.basketHash === 'string' ? body.basketHash.toLowerCase() : '';
   const address = typeof body.address === 'string' ? body.address.trim() : '';
 
+  // Absent is the default; present-but-unknown is a mistake worth naming,
+  // because silently falling back would settle on a chain nobody asked for.
+  const network = body.network === undefined ? DEFAULT_NETWORK : asNetwork(body.network);
+  if (network === null) {
+    return Response.json({ error: 'network no reconocida' }, { status: 400 });
+  }
+
   if (!HEX32.test(orderId)) {
     return Response.json({ error: 'orderId must be 32 bytes of hex' }, { status: 400 });
   }
@@ -81,7 +96,15 @@ export async function gateSettle(
     );
   }
 
-  return { action, orderId, basketHash, address };
+  // Last, and only now: the address above is proven, so the allowlist is being
+  // asked about a wallet that really signed. A client-side toggle is a
+  // courtesy; this is the wall.
+  const denied = denyNetwork(address, network, env);
+  if (denied) {
+    return Response.json({ error: denied.error, message: denied.message }, { status: denied.status });
+  }
+
+  return { action, orderId, basketHash, address, network };
 }
 
 /** The last check, once the order is read: only its buyer may close it. */
