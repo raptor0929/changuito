@@ -1,0 +1,17 @@
+{
+  "fps": 30,
+  "bpm": 120,
+  "width": 1080,
+  "height": 1920,
+  "scenes": [
+    { "id": "Hook", "durationInFrames": 120 },
+    { "id": "Problema", "durationInFrames": 120 },
+    { "id": "Promesa", "durationInFrames": 90 },
+    { "id": "Presentacion", "durationInFrames": 120 },
+    { "id": "PasoPedile", "durationInFrames": 120 },
+    { "id": "PasoCompara", "durationInFrames": 120 },
+    { "id": "PasoConfirma", "durationInFrames": 120 },
+    { "id": "PasoPaga", "durationInFrames": 120 },
+    { "id": "Cta", "durationInFrames": 150 }
+  ]
+}
