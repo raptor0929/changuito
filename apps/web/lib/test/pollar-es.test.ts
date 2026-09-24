@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
 
 import {
+  codeDigitLabel,
   POLLAR_ATTR_ES,
   POLLAR_TEXT_ES,
   translatePollarAttr,
@@ -35,6 +36,11 @@ describe('translatePollarText', () => {
     for (const [name, map] of Object.entries(POLLAR_ATTR_ES)) {
       for (const es of Object.values(map)) assert.equal(translatePollarAttr(name, es), null);
     }
+  });
+
+  it('names each box of the email code for a screen reader', () => {
+    assert.equal(codeDigitLabel(0, 6), 'Dígito 1 de 6 del código');
+    assert.equal(codeDigitLabel(5, 6), 'Dígito 6 de 6 del código');
   });
 
   it('only rewrites attributes it owns', () => {

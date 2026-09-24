@@ -79,8 +79,22 @@ export function translatePollarAttr(name: string, value: string): string | null 
   return POLLAR_ATTR_ES[name]?.[value] ?? null;
 }
 
+/**
+ * The six boxes of the email code have no label at all (axe: `label`,
+ * critical), so a screen reader announces six unnamed text fields. React
+ * does not manage the attribute, so adding it survives re-renders.
+ */
+export function codeDigitLabel(index: number, total: number): string {
+  return `Dígito ${index + 1} de ${total} del código`;
+}
+
 /** Translate every known string under `root`. Idempotent. */
 export function translatePollarTree(root: Element): void {
+  const digits = root.querySelectorAll('input.pollar-code-input');
+  digits.forEach((input, i) => {
+    if (!input.hasAttribute('aria-label')) input.setAttribute('aria-label', codeDigitLabel(i, digits.length));
+  });
+
   const doc = root.ownerDocument;
   const walker = doc.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
