@@ -99,6 +99,37 @@ export function appContentSecurityPolicy(
   ].join('; ');
 }
 
+/** The one path that is allowed to be framed, and only outside production. */
+export const FIXTURE_PATH = '/dev/checkout';
+
+/**
+ * The app's headers with exactly one line relaxed, for the checkout fixture.
+ *
+ * `frame-ancestors 'none'` and `X-Frame-Options: DENY` refuse framing by
+ * *anyone*, and a browser counts us among them: the checkout dialog framing
+ * our own /dev/checkout is blocked by our own header, which is the header
+ * working. The fixture is the stand-in for a store with no sandbox, so it has
+ * to be framable by us and nobody else — `'self'` says precisely that.
+ *
+ * Returns nothing in production, where app/dev/checkout `notFound()`s anyway.
+ * Two independent reasons a real deployment cannot serve a framable page that
+ * says "pagado" and takes no money, because one is a single edit away from
+ * being deleted by someone who does not know why it is there.
+ */
+export function fixtureSecurityHeaders(
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+  ids: AnalyticsIds = ANALYTICS_IDS,
+): { key: string; value: string }[] {
+  if (nodeEnv === 'production') return [];
+  return appSecurityHeaders(nodeEnv, ids).map((h) =>
+    h.key === 'Content-Security-Policy'
+      ? { key: h.key, value: h.value.replace("frame-ancestors 'none'", "frame-ancestors 'self'") }
+      : h.key === 'X-Frame-Options'
+        ? { key: h.key, value: 'SAMEORIGIN' }
+        : h,
+  );
+}
+
 export function appSecurityHeaders(
   nodeEnv: string | undefined = process.env.NODE_ENV,
   ids: AnalyticsIds = ANALYTICS_IDS,

@@ -10,7 +10,6 @@ import { errorCode, track, trackLoginStart } from '../lib/analytics';
 import { canRetry, type Block, type ChatState } from '../lib/chat-state';
 import type { Receipt } from '../lib/chat-store.ts';
 import { FREE_TURNS, LOGIN_CTA, LOGIN_REQUIRED_MESSAGE, loginGateBannerText } from '../lib/login-constants';
-import type { OpenedOrder } from '../lib/order';
 import { pollarEnabled } from '../lib/pollar';
 import { ensureUserCookie } from '../lib/session-login';
 import { progressCopy } from '../lib/turn-progress.ts';
@@ -19,8 +18,7 @@ import { useWalletSigner } from '../lib/use-wallet-signer.ts';
 import type { WalletSigner } from '../lib/wallet-proof.ts';
 import { CartCard } from './CartCard';
 import { RetryIcon } from './icons';
-import { OrderPanel } from './OrderPanel';
-import { PaymentModal } from './PaymentModal';
+import { CheckoutModal } from './CheckoutModal';
 import { ProductGrid } from './ProductGrid';
 import { useShop } from './ShopProvider';
 import { MarkdownText } from './MarkdownText';
@@ -119,9 +117,6 @@ function ChatCore({
   // The basket the payment modal is open over. A cart, not a block id: the
   // user pays for what a card showed, and that object is the record of it.
   const [paying, setPaying] = useState<{ cart: Cart; handoffUrl?: string } | null>(null);
-  // One open order at a time. It outlives the modal: the user leaves to finish
-  // the basket at the store, and has to find this again when they come back.
-  const [order, setOrder] = useState<OpenedOrder | null>(null);
   const thread = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
 
@@ -146,7 +141,6 @@ function ChatCore({
     else resume(request.chat);
     setDraft('');
     setPaying(null);
-    setOrder(null);
     ack();
   }, [request, ack, resume, reset]);
 
@@ -304,14 +298,17 @@ function ChatCore({
                   key={b.id}
                   cart={b.cart}
                   handoffUrl={b.handoffUrl}
-                  // No wallet in this build means no pay button, rather than a
-                  // button that opens a modal with nothing to sign with.
+                  // No longer gated on a wallet. The frame-checkout flow asks
+                  // for an importe and a code, and the shopper pays the súper
+                  // themselves — there is nothing here to sign, so requiring a
+                  // session to sign with would shut the door on the people the
+                  // flow was built for.
                   onPay={
                     // Not just disabled: a paid chat's card is a record of
                     // what was bought, and a Pagar on it invites paying twice.
-                    pollarEnabled && canOrder
+                    canOrder
                       ? (cart) => {
-                          track('payment_start', { flow: 'checkout' });
+                          track('payment_start', { flow: 'frame' });
                           setPaying({ cart, handoffUrl: b.handoffUrl });
                         }
                       : undefined
@@ -389,8 +386,6 @@ function ChatCore({
         </div>
       ) : null}
 
-      {order ? <OrderPanel order={order} onDismiss={() => setOrder(null)} sign={sign} /> : null}
-
       {readOnly ? (
         <div className="composer composer-closed" data-testid="composer-closed" role="status">
           <p className="composer-closed-copy">
@@ -440,11 +435,16 @@ function ChatCore({
       )}
 
       {paying ? (
-        <PaymentModal
+        <CheckoutModal
           cart={paying.cart}
           handoffUrl={paying.handoffUrl}
           onClose={() => setPaying(null)}
-          onOpened={setOrder}
+          // settle() closes the chat as well as filing the receipt: one chat
+          // is one order, and this is the moment that becomes true.
+          onPaid={(receipt) => {
+            setPaying(null);
+            shop?.settle(receipt);
+          }}
         />
       ) : null}
     </div>
