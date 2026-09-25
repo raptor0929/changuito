@@ -196,3 +196,48 @@ export async function heldCard(net: NetworkId, memo: string): Promise<string | u
   const redis = new Redis(creds);
   return (await redis.get<string>(key)) ?? undefined;
 }
+
+/* ---- who opened the deposit -------------------------------------------- */
+
+const localOwners = new Map<string, string>();
+
+const ownerKey = (net: NetworkId, memo: string) => `chg:depositor:${net}:${memo}`;
+
+/**
+ * The wallet that was allowed through `authorizeRealMode` to open this memo.
+ *
+ * Written when the deposit intent is minted, read when a card is asked for.
+ * **It is not authentication of the caller** — `POST /api/card` still takes
+ * nothing but the memo, because a proof lives five minutes and a deposit can
+ * take longer than that to confirm, and refusing a shopper who has already
+ * sent real money is the worst moment available to fail.
+ *
+ * What it is, precisely: evidence that this memo was issued to somebody the
+ * gate let in. It narrows "anyone who knows a memo can mint its card" to
+ * "anyone who knows a memo that an allowed wallet opened", and no further. The
+ * memo's own unguessability is what carries the rest, which is why
+ * `mintMemo` draws from the CSPRNG.
+ *
+ * Separate key and separate map from the claim: one records who may mint, the
+ * other what was minted, and they expire for different reasons. Same 24h, so
+ * a memo cannot outlive its own record and turn into an unowned one.
+ */
+export async function rememberDepositor(net: NetworkId, memo: string, address: string): Promise<void> {
+  const key = ownerKey(net, memo);
+  const creds = credentials();
+  if (!creds) {
+    localOwners.set(key, address);
+    return;
+  }
+  const redis = new Redis(creds);
+  await redis.set(key, address, { ex: CLAIM_TTL_SECONDS });
+}
+
+/** The wallet that opened this deposit, or undefined if nothing remembers. */
+export async function depositorOf(net: NetworkId, memo: string): Promise<string | undefined> {
+  const key = ownerKey(net, memo);
+  const creds = credentials();
+  if (!creds) return localOwners.get(key);
+  const redis = new Redis(creds);
+  return (await redis.get<string>(key)) ?? undefined;
+}

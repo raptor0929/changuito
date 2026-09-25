@@ -11,6 +11,15 @@
  * no outbound path: the server reads Horizon and reports. A refund is a human
  * doing it by hand, which is a worse product and a much smaller blast radius.
  *
+ * ## Who may ask
+ *
+ * On the default network, anybody — it is play money and gating it would only
+ * stop people trying the demo. On a real network this is a door onto somebody's
+ * actual USDC, so `lib/deposit-gate.ts` answers first, with the same allowlist
+ * and the same signature that `lib/settle-gate.ts` puts in front of the escrow.
+ * It runs *before* the operator-address check below, so a stranger is refused
+ * without learning whether there is anything deployed to reach.
+ *
  * Statelessness has one consequence worth naming. This route will confirm the
  * same deposit as many times as it is asked, so it proves the money arrived
  * and *not* that it has not already been spent. Issuing a card against a memo
@@ -19,11 +28,13 @@
  */
 import { arsToUsdCents, getArsPerUsd } from '@changuito/mcp/fx';
 
-import { canIssueCard } from '../../../lib/card.ts';
+import { canIssueCard, rememberDepositor } from '../../../lib/card.ts';
 import { DEFAULT_NETWORK, type NetworkId } from '../../../lib/deployments.ts';
 import { depositAddress, depositAsset, isMemo, mintMemo, type DepositAsset } from '../../../lib/deposit.ts';
+import { authorizeRealMode, realModeNeedsProof } from '../../../lib/deposit-gate.ts';
 import { findDeposit } from '../../../lib/deposit-watch.ts';
 import { requireHuman } from '../../../lib/human-gate.ts';
+import { proofFromBody } from '../../../lib/wallet-proof-verify.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -97,7 +108,7 @@ export async function POST(req: Request): Promise<Response> {
   } catch {
     return Response.json({ error: 'body must be JSON' }, { status: 400 });
   }
-  const input = (body ?? {}) as { centavos?: unknown; network?: unknown };
+  const input = (body ?? {}) as { centavos?: unknown; network?: unknown; address?: unknown };
 
   const centavos = Number(input.centavos);
   if (!Number.isInteger(centavos) || centavos <= 0) {
@@ -105,6 +116,19 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const network = networkFrom(typeof input.network === 'string' ? input.network : null);
+
+  // Before anything that costs, and before the operator address is even looked
+  // up. A wallet that may not use this network is told so and nothing else.
+  const auth = authorizeRealMode({
+    address: typeof input.address === 'string' ? input.address : '',
+    proof: proofFromBody(body),
+    now: Date.now(),
+    net: network,
+  });
+  if (!auth.ok) {
+    return Response.json({ error: auth.error, message: auth.message }, { status: auth.status });
+  }
+
   const address = depositAddress(network);
   if (!address) {
     // Not configured is not the shopper's problem to decode, but it is
@@ -118,11 +142,26 @@ export async function POST(req: Request): Promise<Response> {
     const rate = await getArsPerUsd(Number.isFinite(override) && override > 0 ? { override } : {});
     const usdCents = arsToUsdCents(centavos, rate.arsPerUsd, BUFFER);
 
+    const memo = mintMemo();
+
+    // Only where the signature above actually proved the address. In mode
+    // 'open' nothing was proven, so writing the claimed address down would be
+    // recording a guess and then trusting it later — and `POST /api/card`
+    // skips the check in that mode for the same reason.
+    if (realModeNeedsProof(auth.mode)) {
+      // A failure here is not the shopper's problem *yet* — it becomes one when
+      // they try to mint a card, which will refuse rather than let an unowned
+      // memo through. Loud, because that is a manual refund.
+      await rememberDepositor(network, memo, (input.address as string).trim().toUpperCase()).catch((err) => {
+        console.error('[deposit] could not record the depositor:', err instanceof Error ? err.message : String(err));
+      });
+    }
+
     const intent: DepositIntent = {
       network,
       address,
       asset: depositAsset(network),
-      memo: mintMemo(),
+      memo,
       amount: depositAmount(usdCents),
       centavos,
       usdCents,

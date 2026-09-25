@@ -23,13 +23,37 @@
  * The response carries the PAN and the CVV, because the shopper has to type
  * them into the súper's form and there is no other way for them to arrive.
  * They are `no-store`, they are never logged, and lib/card.ts says the rest.
+ *
+ * ## Why this asks for no signature
+ *
+ * On a gated network `POST /api/deposit` already made the shopper sign, and
+ * this route checks that the memo belongs to the wallet that signed. It does
+ * **not** ask for a second signature, and that is a decision rather than an
+ * omission: a proof lives five minutes (`WALLET_PROOF_TTL_MS`) and a deposit
+ * can take longer than that to confirm, so requiring one here would refuse a
+ * shopper who has already sent real money — the worst available moment to
+ * fail, and one that ends in a refund done by hand.
+ *
+ * So the memo stays the credential at this step, which is exactly why
+ * `mintMemo` draws from the CSPRNG and why lib/card.ts is careful about what
+ * the depositor record does and does not prove.
  */
 import { CARD_MAX_CENTS, CARD_MIN_CENTS, formatUsd } from '@changuito/mcp/pay';
 
-import { canIssueCard, cardClient, claimDeposit, fundingFor, heldCard, refuseFunding } from '../../../lib/card.ts';
+import {
+  canIssueCard,
+  cardClient,
+  claimDeposit,
+  depositorOf,
+  fundingFor,
+  heldCard,
+  refuseFunding,
+} from '../../../lib/card.ts';
 import { depositAddress, isMemo } from '../../../lib/deposit.ts';
+import { realModeFor, realModeNeedsProof } from '../../../lib/deposit-gate.ts';
 import { DEFAULT_NETWORK, type NetworkId } from '../../../lib/deployments.ts';
 import { requireHuman } from '../../../lib/human-gate.ts';
+import { networkAccess } from '../../../lib/network-access.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -83,6 +107,26 @@ export async function POST(req: Request): Promise<Response> {
   const network = networkFrom(input.network);
   const address = depositAddress(network);
   if (!address) return json({ error: 'los pagos no están habilitados en este entorno' }, 503);
+
+  // The deposit was opened by somebody the gate let in — or this is a memo
+  // nothing recognises. Skipped in mode 'open', where nothing was proven at
+  // deposit time either and there is no play money worth binding.
+  const mode = realModeFor(network);
+  if (realModeNeedsProof(mode)) {
+    const owner = await depositorOf(network, memo).catch(() => undefined);
+    if (!owner) {
+      // Either a forged código or a record we lost. Refusing is the recoverable
+      // side of that choice: the shopper can still pay with their own card at
+      // the store, and an importe that was really sent is refunded by hand.
+      console.error(`[card] no depositor recorded for ${network}:${memo}`);
+      return json({ error: 'no pudimos verificar este importe' }, 403);
+    }
+    // Re-read rather than trusted: an allowlist can shrink between the deposit
+    // and the card, and the second question is the one being answered now.
+    if (!networkAccess(owner, network).allowed) {
+      return json({ error: 'Esta cuenta no tiene habilitado el modo real.' }, 403);
+    }
+  }
 
   const client = cardClient();
 

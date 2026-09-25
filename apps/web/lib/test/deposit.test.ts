@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
 
+import { Keypair } from '@stellar/stellar-sdk';
+
+import { POST } from '../../app/api/deposit/route.ts';
+import { depositorOf } from '../card.ts';
 import { DEPLOYMENTS } from '../deployments.ts';
 import {
   canDeposit,
@@ -12,6 +17,7 @@ import {
   mintMemo,
 } from '../deposit.ts';
 import { networkAccess } from '../network-access.ts';
+import { walletProofMessage, type WalletProof } from '../wallet-proof.ts';
 
 const G = 'GBGMPRHU3NW3BCXUNDNC7VSYQKS6FZKWFHSGEHHMR3G3TZOUWEDBHTFK';
 const C = 'CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557';
@@ -136,5 +142,182 @@ describe('the memo', () => {
     const seen = new Set<string>();
     for (let i = 0; i < 2000; i += 1) seen.add(mintMemo());
     assert.ok(seen.size > 1990, `only ${seen.size} distinct`);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * The route itself, which is where the flags actually land.
+ *
+ * `lib/test/deposit-gate.test.ts` proves the decision; this proves the
+ * handler asks for it, asks *before* it looks anything up, and writes down
+ * who asked. The route reads `process.env` at request time — it has no env
+ * parameter and should not grow one for a test — so these set and restore it.
+ * ------------------------------------------------------------------ */
+
+const OPERATOR = 'GDYSKGLYEO2WJSI6TWJNKEMAPLM6J5WCXH5HYRLLPIUNGOI77W22PNGB';
+
+/** Every variable these tests touch, so a case never inherits another's. */
+const TOUCHED = [
+  'REAL_MODE_OPEN_TO_ALL',
+  'REAL_MODE_ALLOWLIST_ADDRESSES',
+  'DEPOSIT_ADDRESS_MAINNET',
+  'DEPOSIT_ADDRESS_TESTNET',
+  'FX_ARS_PER_USD',
+] as const;
+
+async function withEnv<T>(vars: Record<string, string>, fn: () => Promise<T>): Promise<T> {
+  const before = new Map(TOUCHED.map((k) => [k, process.env[k]]));
+  for (const k of TOUCHED) delete process.env[k];
+  // Pinned, so no test in this file reaches a currency API.
+  process.env.FX_ARS_PER_USD = '1450';
+  Object.assign(process.env, vars);
+  try {
+    return await fn();
+  } finally {
+    for (const [k, v] of before) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+}
+
+function sep53(kp: Keypair, message: string): string {
+  const digest = createHash('sha256').update(`Stellar Signed Message:\n${message}`, 'utf8').digest();
+  return Buffer.from(kp.sign(digest)).toString('base64');
+}
+
+function signedDeposit(kp: Keypair): WalletProof {
+  const message = walletProofMessage('deposit', kp.publicKey(), Date.now());
+  return { message, signature: sep53(kp, message) };
+}
+
+const ask = (body: unknown) =>
+  POST(new Request('https://changuito.test/api/deposit', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  }));
+
+describe('POST /api/deposit under the modo real flags', () => {
+  const tester = Keypair.random();
+  const stranger = Keypair.random();
+  const listed = { REAL_MODE_ALLOWLIST_ADDRESSES: tester.publicKey(), DEPOSIT_ADDRESS_MAINNET: OPERATOR };
+
+  it('mints for a wallet on the list that signed', async () => {
+    await withEnv(listed, async () => {
+      const res = await ask({
+        centavos: 500_000,
+        network: 'mainnet',
+        address: tester.publicKey(),
+        proof: signedDeposit(tester),
+      });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.network, 'mainnet');
+      assert.equal(body.address, OPERATOR);
+      assert.ok(isMemo(body.memo));
+    });
+  });
+
+  it('refuses the same wallet when it has not signed', async () => {
+    await withEnv(listed, async () => {
+      const res = await ask({ centavos: 500_000, network: 'mainnet', address: tester.publicKey() });
+      assert.equal(res.status, 401);
+      assert.equal((await res.json()).error, 'real_mode_session_required');
+    });
+  });
+
+  it('refuses a wallet that is not on the list, signature or not', async () => {
+    await withEnv(listed, async () => {
+      const res = await ask({
+        centavos: 500_000,
+        network: 'mainnet',
+        address: stranger.publicKey(),
+        proof: signedDeposit(stranger),
+      });
+      assert.equal(res.status, 403);
+      assert.equal((await res.json()).error, 'network_not_allowed');
+    });
+  });
+
+  it('RULE: REAL_MODE_OPEN_TO_ALL lets that same stranger in, still signed', async () => {
+    // The pair of cases the flag exists for, one env apart.
+    await withEnv({ REAL_MODE_OPEN_TO_ALL: '1', DEPOSIT_ADDRESS_MAINNET: OPERATOR }, async () => {
+      const ok = await ask({
+        centavos: 500_000,
+        network: 'mainnet',
+        address: stranger.publicKey(),
+        proof: signedDeposit(stranger),
+      });
+      assert.equal(ok.status, 200);
+
+      const unsigned = await ask({ centavos: 500_000, network: 'mainnet', address: stranger.publicKey() });
+      assert.equal(unsigned.status, 401);
+      assert.equal((await unsigned.json()).error, 'real_mode_session_required');
+    });
+  });
+
+  it('RULE: refuses a stranger before revealing whether mainnet is set up', async () => {
+    // No DEPOSIT_ADDRESS_MAINNET here. A stranger must get the same 403 they
+    // would get after it is set, or the refusal is a deployment announcement.
+    await withEnv({ REAL_MODE_ALLOWLIST_ADDRESSES: tester.publicKey() }, async () => {
+      const res = await ask({ centavos: 500_000, network: 'mainnet', address: stranger.publicKey() });
+      assert.equal(res.status, 403);
+      assert.equal((await res.json()).error, 'network_not_allowed');
+    });
+  });
+
+  it('tells a wallet that IS allowed that the network is not configured', async () => {
+    // The other half of the ordering: once past the gate, "not set up" is the
+    // honest answer, and the log names the variable for whoever can fix it.
+    await withEnv({ REAL_MODE_ALLOWLIST_ADDRESSES: tester.publicKey() }, async () => {
+      const res = await ask({
+        centavos: 500_000,
+        network: 'mainnet',
+        address: tester.publicKey(),
+        proof: signedDeposit(tester),
+      });
+      assert.equal(res.status, 503);
+    });
+  });
+
+  it('leaves modo prueba open to a guest with no wallet at all', async () => {
+    await withEnv({ DEPOSIT_ADDRESS_TESTNET: OPERATOR }, async () => {
+      const res = await ask({ centavos: 500_000, network: 'testnet' });
+      assert.equal(res.status, 200);
+    });
+  });
+});
+
+describe('who the memo was issued to', () => {
+  const tester = Keypair.random();
+
+  it('is written down in a gated mode, so the card route can re-check it', async () => {
+    await withEnv(
+      { REAL_MODE_ALLOWLIST_ADDRESSES: tester.publicKey(), DEPOSIT_ADDRESS_MAINNET: OPERATOR },
+      async () => {
+        const res = await ask({
+          centavos: 500_000,
+          network: 'mainnet',
+          address: tester.publicKey(),
+          proof: signedDeposit(tester),
+        });
+        const { memo } = await res.json();
+        assert.equal(await depositorOf('mainnet', memo), tester.publicKey());
+      },
+    );
+  });
+
+  it('RULE: is not written down when nothing was proven', async () => {
+    // Mode 'open' asks for no signature, so an address in the body is a claim
+    // and nothing else. Recording it would be writing down a guess and then
+    // trusting it at the card — which is why POST /api/card skips the check in
+    // this mode rather than reading a record it cannot rely on.
+    await withEnv({ DEPOSIT_ADDRESS_MAINNET: OPERATOR }, async () => {
+      const res = await ask({ centavos: 500_000, network: 'mainnet', address: tester.publicKey() });
+      assert.equal(res.status, 200);
+      const { memo } = await res.json();
+      assert.equal(await depositorOf('mainnet', memo), undefined);
+    });
   });
 });
