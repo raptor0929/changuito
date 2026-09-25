@@ -840,6 +840,24 @@ a:hover { color: var(--chg-arcilla); }
    likely having its cookies blocked, and nothing on our side can grant them. */
 .ck-tab-up { border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
 
+/* The optional single-use card. Boxed rather than inline because the numbers
+   in it are the only thing on this screen somebody has to transcribe, and a
+   box is what says "this part, now". */
+.ck-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+.ck-card-live { border-color: var(--ok); }
+.ck-card-title { margin: 0; font-size: 14px; display: flex; align-items: baseline; gap: 8px; }
+.ck-brand { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.ck-otp { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px; }
+/* Tabular so the seconds do not shuffle the sentence sideways once a second. */
+.ck-countdown { font-variant-numeric: tabular-nums; color: var(--fg); }
+
 /* app/dev/checkout — the stand-in framed in the store's place in modo prueba.
    Kept visibly unlike Día on purpose: see that page's header. */
 .dev-checkout { padding: 20px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }

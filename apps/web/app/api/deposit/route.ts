@@ -19,6 +19,7 @@
  */
 import { arsToUsdCents, getArsPerUsd } from '@changuito/mcp/fx';
 
+import { canIssueCard } from '../../../lib/card.ts';
 import { DEFAULT_NETWORK, type NetworkId } from '../../../lib/deployments.ts';
 import { depositAddress, depositAsset, isMemo, mintMemo, type DepositAsset } from '../../../lib/deposit.ts';
 import { findDeposit } from '../../../lib/deposit-watch.ts';
@@ -39,6 +40,13 @@ export interface DepositIntent {
   usdCents: number;
   arsPerUsd: number;
   source: string;
+  /**
+   * Whether this deployment can mint a single-use card at all. Answered here
+   * rather than in a `NEXT_PUBLIC_` flag so the browser learns it from the
+   * same server that would have to honour it — and so a deployment without a
+   * card provider never renders a button that 503s.
+   */
+  cardAvailable: boolean;
 }
 
 export interface DepositStatus {
@@ -120,6 +128,7 @@ export async function POST(req: Request): Promise<Response> {
       usdCents,
       arsPerUsd: rate.arsPerUsd,
       source: rate.source,
+      cardAvailable: canIssueCard(),
     };
     return Response.json(intent);
   } catch (err) {

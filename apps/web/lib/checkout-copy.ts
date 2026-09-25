@@ -40,6 +40,30 @@ export interface CheckoutCopy {
   openTabNote: string;
   paidCta: string;
   checking: string;
+  /** The optional single-use card. Optional in the copy too — the frame already
+   *  takes the shopper's own card, and this must never read as the only way. */
+  cardTitle: string;
+  cardLead: string;
+  cardCta: string;
+  cardMinting: string;
+  /** Under the numbers. Says where they live, which is nowhere. */
+  cardNote: string;
+  cardNumberLabel: string;
+  cardExpiryLabel: string;
+  cardCvvLabel: string;
+  cardFunded: string;
+  /** The default reason, when the server has none worth reading out. */
+  cardError: string;
+  /** Printed under every card failure, whatever the reason: the frame still
+   *  takes the shopper's own card, so no failure here is a dead end. */
+  cardFallback: string;
+  otpTitle: string;
+  /** The field's own label, under the heading that already said it once. */
+  otpLabel: string;
+  otpWaiting: string;
+  /** The code is on screen and running out; the countdown is beside it. */
+  otpLead: string;
+  otpExpired: string;
   /** Shown when the store corroborates. Deliberately not "confirmamos tu pago". */
   verified: string;
   /** Shown when it does not, which is not the same as "you did not pay". */
@@ -70,6 +94,22 @@ const COMMON = {
   verified: 'El súper nos confirma que el changuito se cerró.',
   unverified: 'El súper todavía nos muestra el changuito abierto. Si ya pagaste, seguí igual y revisalo en tu cuenta del súper.',
   unreachable: 'No pudimos chequearlo con el súper en este momento.',
+  cardTitle: 'Tarjeta de un solo uso',
+  cardLead: 'Podés pagar con tu tarjeta de siempre en el formulario del súper. O, si preferís no ponerla, te damos una que sirve una sola vez y nada más que para esta compra.',
+  cardCta: 'Generar una tarjeta',
+  cardMinting: 'Generando…',
+  cardNote: 'Copiala en el formulario del súper. No la guardamos en ningún lado: cuando cerrás esta ventana, la tarjeta se cierra con ella.',
+  cardNumberLabel: 'Número',
+  cardExpiryLabel: 'Vence',
+  cardCvvLabel: 'Código de seguridad',
+  cardFunded: 'Tiene justo el importe de esta compra y no se puede usar para otra cosa.',
+  cardError: 'No pudimos generar la tarjeta.',
+  cardFallback: 'Podés pagar con la tuya en el formulario del súper.',
+  otpTitle: 'Código que te pide el súper',
+  otpLabel: 'Código',
+  otpWaiting: 'Si el súper te pide un código para confirmar, aparece acá.',
+  otpLead: 'Ponelo en el formulario del súper antes de que venza.',
+  otpExpired: 'Ese código venció. Pedí uno nuevo desde el formulario del súper y esperá acá.',
 } as const;
 
 const PRUEBA: CheckoutCopy = {

@@ -10,6 +10,8 @@ import { track } from '../lib/analytics';
 import type { Receipt } from '../lib/chat-store.ts';
 import { checkoutCopy } from '../lib/checkout-copy.ts';
 import { isFramableCheckout, STOREFRONT_HOSTS } from '../lib/storefront.ts';
+import { CardPanel } from './CardPanel';
+import { CopyField } from './CopyField';
 import { useNetwork } from './NetworkProvider';
 
 /**
@@ -42,6 +44,15 @@ import { useNetwork } from './NetworkProvider';
  * lib/order-check.ts explains what that can and cannot establish. It is never
  * treated as proof, and a store that disagrees never becomes an accusation —
  * the shopper is the one who was there.
+ *
+ * ## Why the card is optional
+ *
+ * The frame is the store's real checkout, so a shopper's own card already
+ * works and costs us nothing. The single-use card is for the one who would
+ * rather not put theirs into a page they reached through a chat. It is offered
+ * only where the deployment can actually mint one — `intent.cardAvailable` —
+ * and given back when this dialog closes, because a card left alive is money
+ * sitting somewhere nobody is watching.
  */
 
 interface Props {
@@ -75,7 +86,6 @@ export function CheckoutModal({ cart, handoffUrl, onClose, onPaid }: Props) {
   const [polls, setPolls] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const [verdict, setVerdict] = useState<VerifyResponse | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
 
   // The fixture stands in for the store only where it exists. app/dev/checkout
   // notFound()s in production, and modo prueba is reachable there too — framing
@@ -94,6 +104,37 @@ export function CheckoutModal({ cart, handoffUrl, onClose, onPaid }: Props) {
     : null;
 
   const itemsAtHandoff = cart.lines.filter((l) => l.available).length;
+
+  // A ref because giving the card back is not a render, and because the
+  // pagehide listener below has to read the latest value without being torn
+  // down and rebuilt every time something else in this dialog changes.
+  const cardLive = useRef(false);
+  const release = useCallback(() => {
+    if (!cardLive.current || !intent) return;
+    cardLive.current = false;
+    // `keepalive` so it survives the unload this is sometimes called during.
+    // Nothing waits for the answer: the server logs a card it could not
+    // terminate loudly enough that a person will find it, and there is
+    // nothing useful to tell the shopper about it either way.
+    void fetch('/api/card/terminate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ memo: intent.memo, network }),
+      keepalive: true,
+    }).catch(() => {});
+  }, [intent, network]);
+
+  // The tab closing is the one exit that does not go through a button of ours.
+  useEffect(() => {
+    const go = () => release();
+    window.addEventListener('pagehide', go);
+    return () => window.removeEventListener('pagehide', go);
+  }, [release]);
+
+  const close = useCallback(() => {
+    release();
+    onClose();
+  }, [release, onClose]);
 
   // Mint once. A second mint would hand the shopper a second código for the
   // same basket, and the código is the one thing that has to stay stable — it
@@ -191,6 +232,9 @@ export function CheckoutModal({ cart, handoffUrl, onClose, onPaid }: Props) {
 
   const settle = useCallback(() => {
     if (!intent) return;
+    // Before the receipt, not after: the order is over, and the residual goes
+    // back to the wallet the moment the card dies.
+    release();
     onPaid({
       // The código is the order's name everywhere: it is what tied the importe
       // to this basket on the ledger, so it is what a person chasing it later
@@ -204,7 +248,7 @@ export function CheckoutModal({ cart, handoffUrl, onClose, onPaid }: Props) {
         .map((l) => ({ name: l.name, quantity: l.quantity, lineTotal: l.lineTotal.display })),
       total: cart.total.display,
     });
-  }, [intent, cart, onPaid]);
+  }, [intent, cart, onPaid, release]);
 
   async function confirmPaid() {
     if (verifying) return;
@@ -228,17 +272,6 @@ export function CheckoutModal({ cart, handoffUrl, onClose, onPaid }: Props) {
     }
   }
 
-  async function copyText(field: string, value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(field);
-      setTimeout(() => setCopied((c) => (c === field ? null : c)), 1_500);
-    } catch {
-      // Clipboard needs a permission some browsers withhold. The value is on
-      // screen and selectable, so there is nothing to recover from.
-    }
-  }
-
   const confirmed = deposit?.status === 'confirmed';
   // The store has had four chances to say it knows this shopper and has not.
   // Most likely the frame's cookies are being blocked, which we cannot fix
@@ -247,7 +280,7 @@ export function CheckoutModal({ cart, handoffUrl, onClose, onPaid }: Props) {
   const blocked = step === 'checkout' && !identified && polls >= IDENTIFY_PATIENCE;
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={close}>
       <section
         className="modal modal-wide"
         role="dialog"
@@ -258,7 +291,7 @@ export function CheckoutModal({ cart, handoffUrl, onClose, onPaid }: Props) {
       >
         <header className="modal-head">
           <h2>{copy.title}</h2>
-          <button type="button" className="modal-x" onClick={onClose} aria-label="Cerrar">
+          <button type="button" className="modal-x" onClick={close} aria-label="Cerrar">
             ×
           </button>
         </header>
@@ -277,29 +310,19 @@ export function CheckoutModal({ cart, handoffUrl, onClose, onPaid }: Props) {
             ) : (
               <>
                 <dl className="ck-fields">
-                  <Field
+                  <CopyField
                     label={copy.amountLabel}
                     value={`${intent.amount} ${intent.asset.code}`}
+                    copyValue={intent.amount}
                     testid="checkout-amount"
-                    copied={copied === 'amount'}
-                    onCopy={() => void copyText('amount', intent.amount)}
                   />
-                  <Field
+                  <CopyField
                     label={copy.addressLabel}
                     value={intent.address}
                     testid="checkout-address"
                     mono
-                    copied={copied === 'address'}
-                    onCopy={() => void copyText('address', intent.address)}
                   />
-                  <Field
-                    label={copy.memoLabel}
-                    value={intent.memo}
-                    testid="checkout-memo"
-                    mono
-                    copied={copied === 'memo'}
-                    onCopy={() => void copyText('memo', intent.memo)}
-                  />
+                  <CopyField label={copy.memoLabel} value={intent.memo} testid="checkout-memo" mono />
                 </dl>
                 <p className="ck-note">{copy.memoNote}</p>
                 <p className="ck-note">{copy.refundNote}</p>
@@ -323,7 +346,7 @@ export function CheckoutModal({ cart, handoffUrl, onClose, onPaid }: Props) {
               >
                 Seguir
               </button>
-              <button type="button" className="btn btn-ghost" onClick={onClose}>
+              <button type="button" className="btn btn-ghost" onClick={close}>
                 Cancelar
               </button>
             </div>
@@ -362,6 +385,17 @@ export function CheckoutModal({ cart, handoffUrl, onClose, onPaid }: Props) {
                 </p>
               ) : null}
             </div>
+
+            {intent?.cardAvailable ? (
+              <CardPanel
+                memo={intent.memo}
+                network={network}
+                copy={copy}
+                onIssued={() => {
+                  cardLive.current = true;
+                }}
+              />
+            ) : null}
 
             {frameSrc ? (
               <iframe
@@ -426,48 +460,13 @@ export function CheckoutModal({ cart, handoffUrl, onClose, onPaid }: Props) {
                   Seguir igual
                 </button>
               ) : null}
-              <button type="button" className="btn btn-ghost" onClick={onClose}>
+              <button type="button" className="btn btn-ghost" onClick={close}>
                 Cerrar
               </button>
             </div>
           </div>
         )}
       </section>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  testid,
-  mono,
-  copied,
-  onCopy,
-}: {
-  label: string;
-  value: string;
-  testid: string;
-  mono?: boolean;
-  copied: boolean;
-  onCopy: () => void;
-}) {
-  return (
-    <div className="ck-field">
-      <dt>{label}</dt>
-      <dd>
-        <span className={mono ? 'ck-value ck-mono' : 'ck-value'} data-testid={testid}>
-          {value}
-        </span>
-        <button
-          type="button"
-          className="ck-copy"
-          onClick={onCopy}
-          aria-label={`Copiar ${label.toLowerCase()}`}
-        >
-          {copied ? 'Copiado' : 'Copiar'}
-        </button>
-      </dd>
     </div>
   );
 }

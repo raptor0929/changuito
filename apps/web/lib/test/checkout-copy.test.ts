@@ -59,3 +59,24 @@ describe('checkout copy', () => {
     for (const m of CHECKOUT_MODES) assert.match(m.memoNote, /sí o sí/);
   });
 });
+
+describe('the single-use card', () => {
+  it('RULE: is offered as an alternative, never as the only way to pay', () => {
+    // The frame is the store's own checkout and takes the shopper's own card
+    // for free. A deployment without a card provider still works, so the copy
+    // has to read the same way the code behaves.
+    for (const m of CHECKOUT_MODES) {
+      assert.match(m.cardLead, /tu tarjeta de siempre/);
+      // The reason line changes with the failure; this one never does, which
+      // is what stops a card failure reading as a dead end.
+      assert.match(m.cardFallback, /Podés pagar con la tuya/);
+    }
+  });
+
+  it('RULE: says the numbers are not kept', () => {
+    // They live in React state for the length of the dialog and nowhere else.
+    // If that ever changes, this sentence becomes a lie and this test is where
+    // it gets caught.
+    for (const m of CHECKOUT_MODES) assert.match(m.cardNote, /No la guardamos/);
+  });
+});
