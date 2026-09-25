@@ -40,6 +40,13 @@ import { collectPageErrors, expectNoPageErrors } from './support/page-errors';
  *   against a live Vyrion sandbox account** — there is no such account on this
  *   project yet, and that gap is real.
  *
+ * **Not the gate in front of any of it.** `installCheckoutMocks` answers
+ * `/api/deposit` in the browser, so the modo real allowlist and the signature
+ * it asks for (`lib/deposit-gate.ts`) are never reached here — this spec runs
+ * on the default network, where by design there is nothing to reach. Both
+ * settings of both flags are covered in `lib/test/deposit-gate.test.ts`, and
+ * the handler's own ordering in `lib/test/deposit.test.ts`.
+ *
  * Which is the testnet answer the ask wanted: two of the three legs have a
  * test mode and use it, and the third — the supermarket — has none, which is
  * why this file exists in the shape it does.

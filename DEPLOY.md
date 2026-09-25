@@ -137,8 +137,24 @@ does today, with the real position of the mode control closed.
 |---|---|---|
 | `NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` | a *second* Pollar key | the browser, by design |
 | `STELLAR_RESOLVER_SECRET_MAINNET` | the `S…` for `changuito-resolver-mainnet` | server only |
-| `REAL_MODE_ALLOWLIST_ADDRESSES` | who may switch to modo real | server only |
+| `REAL_MODE_ALLOWLIST_ADDRESSES` | who may switch to modo real, **and who may pay** | server only |
 | `REAL_MODE_OPEN_TO_ALL` | optional, `1` to drop that list entirely — read [2.6](#26-modo-real) first | server only |
+
+The checkout rail — pay by deposit, get a single-use card — has three of its
+own, and unlike the block above it works on testnet too:
+
+| Name | Value | Exposed to |
+|---|---|---|
+| `DEPOSIT_ADDRESS_TESTNET` | a `G…` account you control, to rehearse against | server only |
+| `DEPOSIT_ADDRESS_MAINNET` | the `G…` operator account real deposits are paid into | server only |
+| `VYRION_API_KEY` | `sk_test_…` from Vyrion → Settings → API Keys | server only |
+
+An address here is **public by nature** — it is printed on screen for the
+shopper to pay — and its secret is deliberately nowhere near this deployment.
+Nothing in the app can move money out; a refund is done by hand. Unset, the
+deposit screen answers 503 and says so; without `VYRION_API_KEY` the card
+button is never rendered rather than rendered and broken. See
+[2.6](#26-modo-real) for who is allowed to reach any of it.
 
 The two `KV_` ones you do not type — see [2.4](#24-conversation-history) below.
 They are **required** in production now: the chat and faucet quotas count in
@@ -275,6 +291,32 @@ address rather than a claimed one — the closed control in the browser is a
 courtesy, and this is the wall. Passkey wallets (`C…`) cannot sign that
 message, so testers need a custodial `G…` account.
 
+**It now guards both rails.** It started as the escrow's door
+(`lib/settle-gate.ts`) and the checkout rail arrived without one, held shut
+only by `DEPOSIT_ADDRESS_MAINNET` being unset — configuration, not a gate, and
+configuration that is three rows above on this very checklist. `POST
+/api/deposit` goes through `lib/deposit-gate.ts` first, and `POST /api/card`
+re-checks that the código it is handed belongs to a wallet that got through.
+
+What that means at the checkout, in each of the four states this pair of
+variables can be in:
+
+| State | How you get it | At the checkout |
+|---|---|---|
+| **open** | not production, no list | pays with no signature — what keeps `next dev` painless |
+| **allowlist** | the list is non-empty | on the list, and signs once before the deposit screen |
+| **public** | `REAL_MODE_OPEN_TO_ALL` set | anybody, and **still signs once** |
+| **disabled** | production, empty list | refused, before an amount or an address is quoted |
+
+Testnet is none of these: it is the default network, it cannot spend anything,
+and gating it would only stop people trying the demo. Modo prueba checkout
+needs no wallet at all and is unchanged.
+
+One signature, taken before any money moves, and not asked for again at the
+card. A proof lives five minutes and a deposit can take longer than that to
+confirm, so a second one would refuse a shopper who has already sent real USDC
+— the worst available moment to fail, and one that ends in a manual refund.
+
 `REAL_MODE_OPEN_TO_ALL=1` drops that list and lets any wallet into modo real.
 Same yes-words as the faucet's switch, and deliberately a separate variable,
 because the two waive very different things — one hands out play money, this
@@ -287,6 +329,13 @@ the store, which does not exist yet. The allowlist is what makes the hole
 acceptable; this flag accepts it for everybody, and no wording makes it
 smaller. It also deploys nothing: with mainnet unconfigured the mode stays
 closed for all, the flag just stops being the reason why.
+
+**It drops the list, not the signature.** "Anybody may pay" and "nobody has to
+prove who they are" are different sentences, and only the first one is on
+offer: with this set, a wallet still signs `pagar la compra` before
+`/api/deposit` will quote anything. That costs a logged-in shopper one tap and
+costs a script the whole exercise. It is also what lets the card route bind a
+código to the wallet that opened it — see the table above.
 
 Two things that are **not** variables, and will stop a first real payment dead
 if they are skipped:
