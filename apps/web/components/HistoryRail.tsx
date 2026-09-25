@@ -114,6 +114,7 @@ function HistoryRow({
       <button
         type="button"
         className={active ? 'rail-history-row is-active' : 'rail-history-row'}
+        data-testid="chat-row"
         onClick={onOpen}
         aria-current={active ? 'true' : undefined}
       >

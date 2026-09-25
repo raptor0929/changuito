@@ -107,6 +107,23 @@ export function ShopProvider({ children }: { children: ReactNode }) {
 
   const publish = useCallback(
     ({ state, sessionId }: PublishInput) => {
+      // Nothing is written while a switch is in flight.
+      //
+      // `newChat()` clears this provider's idea of the order — id, state,
+      // receipt — in one commit, and the chat component only swaps its
+      // transcript an effect later. In between, the transcript on screen is
+      // the old chat's and the metadata beside it is the new chat's, and
+      // `activeChatId` is already null so the id would fall through to the
+      // agent's session id: the record of the chat that was just paid,
+      // rewritten as unpaid with no receipt. Found by
+      // e2e/app-frame-checkout.spec.ts, which starts a new chat and then goes
+      // back to look at the old one.
+      //
+      // Skipping is safe because the swap ends in `ack()`, which changes this
+      // callback's identity and makes the chat publish again — with both
+      // halves from the same chat.
+      if (request) return;
+
       const next = state.cart?.cart ?? null;
       setCart(next);
       // An absent url does not erase one we already have. The agent renders the
@@ -126,7 +143,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       if (activeChatId !== id) setActiveChatId(id);
       setChats(listChats());
     },
-    [activeChatId, createdAt, orderState, receipt],
+    [request, activeChatId, createdAt, orderState, receipt],
   );
 
   const newChat = useCallback(() => {

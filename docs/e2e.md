@@ -1,20 +1,32 @@
-# End-to-end smoke
+# End-to-end
 
-Playwright checks the live sites. Unit tests stay on `npm test` and do not
-open a browser.
+Playwright, in three projects. Unit tests stay on `npm test` and do not open a
+browser.
 
-| Surface | URL |
+| Project | Target |
 |---|---|
-| Landing | `LANDING_BASE_URL`, default `https://www.changuito.me` |
-| Shopper | `APP_BASE_URL`, default `https://app.changuito.me` |
+| `landing` | `LANDING_BASE_URL`, default `https://www.changuito.me` |
+| `app` | `APP_BASE_URL`, default `https://app.changuito.me` |
+| `checkout` | `CHECKOUT_BASE_URL`, default a `next dev` Playwright starts on 3124 |
 
-Production is the target on purpose. A local preview needs Pollar, Turnstile,
-and the model keys the app already has on Vercel. CI does not have those, and
-a preview would not be what visitors hit. The workflow does not build or
-start Next.
+The first two are smokes, and production is their target on purpose. A local
+preview needs Pollar, Turnstile, and the model keys the app already has on
+Vercel; CI does not have those, and a preview would not be what visitors hit.
+Neither smoke pays, opens a store checkout, or clicks **Cargar USDC**.
 
-The smoke does not pay, does not open a store checkout, and does not click
-**Cargar USDC**.
+`checkout` is the odd one and has to be. It runs the whole frame-checkout flow
+— basket, importe, framed store, single-use card, receipt — and it cannot run
+against a deployment, because the fixture it frames in the store's place
+(`app/dev/checkout`) `notFound()`s in production. So it gets its own base URL
+and its own server. Playwright starts that server only when the run includes
+this project; `--project=app` still builds nothing and starts nothing.
+
+**What it does not prove:** that a purchase happened. There is no sandbox
+supermarket — Día has no test store — so past "Ya lo pagué" it asserts what the
+app does when the store *says* paid, and nothing about Día. The agent, Horizon
+and the card issuer are scripted too (`e2e/support/checkout-fixtures.ts` says
+why). The deposit leg has been run for real against testnet Horizon by hand;
+the card mint has not yet run against a live Vyrion sandbox account.
 
 ## Run locally
 
@@ -52,6 +64,17 @@ win over that file.
   The postal-code reply is, because a guest stuck before it was the blocker
   in issue [#51](https://github.com/raptor0929/changuito/issues/51); the
   server now answers it without a model hop.
+- **Checkout.** One test, the whole flow: a scripted turn draws a basket, the
+  importe is quoted with its código and confirmed on the second poll, the
+  fixture store renders inside the frame, a single-use card is issued and its
+  3DS code counts down, **Ya lo pagué** is corroborated before the receipt is
+  written, and the card is given back in the same breath. Then: the chat is
+  read-only, a second order in it is refused, and the receipt survives a
+  reload and reopens from the history rail. Two assertions are guardrails
+  rather than features — that the PAN, the CVV and the one-time code never
+  reach `localStorage` or `sessionStorage`, and that traces, video and
+  screenshots are off, because this repo is public and those numbers are on
+  screen for most of the run.
 - **App, auth.** Skipped unless both `CHANGUTO_E2E_EMAIL` and
   `CHANGUTO_E2E_PASSWORD` are non-empty. It opens **Empezá a comprar** and
   uses the email field. Traces and screenshots are off for this spec so a
@@ -92,16 +115,18 @@ Two workflows. They do not share a trigger.
 E2E does not run on pull requests, and it does not run on a push that only
 touches the UI, docs, or the specs themselves. There is no schedule.
 
-A backend merge runs **both** Playwright projects (`landing` and `app`).
-A manual run asks which suite to execute: `landing`, `app`, or `both`
-(the default). Each project is its own job, so one failure does not cancel
-the other.
+A backend merge runs the two smokes (`landing` and `app`). A manual run asks
+which suite: `landing`, `app`, `both` (the default), or `checkout`. `checkout`
+is never part of an automatic run — it starts a `next dev` on the runner and
+touches nothing live, so there is no reason to spend it on every merge, and
+asking for it by name keeps that obvious. Each project is its own job, so one
+failure does not cancel the other.
 
 The E2E job installs Node from `.nvmrc`, runs `npm ci`, installs Chromium,
-then `npm run test:e2e -- --project=<landing|app>`. It does not repeat
+then `npm run test:e2e -- --project=<landing|app|checkout>`. It does not repeat
 `npm test`. On failure it uploads `playwright-report` and `test-results`
-for 7 days, one artifact per project. The auth spec writes neither
-screenshots nor traces.
+for 7 days, one artifact per project. The auth and checkout specs write
+neither screenshots nor traces.
 
 ### What counts as backend
 
