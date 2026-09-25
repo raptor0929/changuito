@@ -21,6 +21,7 @@ import { RetryIcon } from './icons';
 import { OrderPanel } from './OrderPanel';
 import { PaymentModal } from './PaymentModal';
 import { ProductGrid } from './ProductGrid';
+import { useShop } from './ShopProvider';
 import { MarkdownText } from './MarkdownText';
 import { ReportBug } from './ReportBug';
 import { ToolTrail } from './ToolTrail';
@@ -121,6 +122,26 @@ function ChatCore({
   const [order, setOrder] = useState<OpenedOrder | null>(null);
   const thread = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
+
+  // The cart rail is a sibling in the layout, not a child, so the basket has
+  // to be handed up. The last cart block is the current basket: chat-state
+  // replaces a cart in place within a turn and appends across turns, so the
+  // last one is always the most recent thing the store told us.
+  const shop = useShop();
+  const publishCart = shop?.publishCart;
+  useEffect(() => {
+    if (!publishCart) return;
+    for (let i = state.blocks.length - 1; i >= 0; i -= 1) {
+      const b = state.blocks[i];
+      // ES2022: no findLast. See CLAUDE.md — target is ES2022 and
+      // chat-state.ts hand-rolls the same walk for the same reason.
+      if (b?.kind === 'cart') {
+        publishCart(b.cart, b.handoffUrl);
+        return;
+      }
+    }
+    publishCart(null);
+  }, [state.blocks, publishCart]);
 
   useEffect(() => {
     const el = thread.current;
