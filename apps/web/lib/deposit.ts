@@ -95,7 +95,28 @@ export function canDeposit(net: NetworkId, env: NodeJS.ProcessEnv = process.env)
 export const MEMO_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const MEMO_LENGTH = 8;
 
-export function mintMemo(random: () => number = Math.random): string {
+/**
+ * A uniform float in [0, 1), from the CSPRNG rather than from `Math.random`.
+ *
+ * The memo is not only a label. `GET /api/card/3ds` and `POST /api/card/terminate`
+ * take it as a bearer token — they have to, since a shopper polling for a
+ * one-time code every three seconds cannot sign for each poll — so guessing a
+ * live memo is guessing a live card's 3DS feed. `Math.random` is a fast PRNG
+ * whose internal state is recoverable from a handful of outputs, and this
+ * function hands out outputs eight at a time to anyone who opens a checkout.
+ *
+ * Drawn as a 32-bit word rather than a byte with rejection sampling: 2^32 does
+ * not divide 31 either, but the residual bias is about one part in 10^8 rather
+ * than the 3% a byte modulo would cost, and there is no retry loop to get
+ * subtly wrong. 31^8 is ~2^39.6 of keyspace, and now all of it is real.
+ */
+function cryptoRandom(): number {
+  const word = new Uint32Array(1);
+  crypto.getRandomValues(word);
+  return word[0]! / 2 ** 32;
+}
+
+export function mintMemo(random: () => number = cryptoRandom): string {
   let out = '';
   for (let i = 0; i < MEMO_LENGTH; i += 1) {
     out += MEMO_ALPHABET[Math.floor(random() * MEMO_ALPHABET.length)];
