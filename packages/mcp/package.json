@@ -58,6 +58,14 @@
     "./fx": {
       "types": "./dist/pay/fx.d.ts",
       "import": "./dist/pay/fx.js"
+    },
+    "./pay": {
+      "types": "./dist/pay/vyrion.d.ts",
+      "import": "./dist/pay/vyrion.js"
+    },
+    "./card": {
+      "types": "./dist/pay/ephemeral-card.d.ts",
+      "import": "./dist/pay/ephemeral-card.js"
     }
   },
   "files": [

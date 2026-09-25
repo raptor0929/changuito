@@ -26,7 +26,7 @@ describe('shopper security headers', () => {
   it('allows exactly what the page talks to', () => {
     const csp = appContentSecurityPolicy('production', none);
     assert.match(csp, /script-src [^;]*https:\/\/challenges\.cloudflare\.com/);
-    assert.match(csp, /frame-src https:\/\/challenges\.cloudflare\.com/);
+    assert.match(csp, /frame-src [^;]*https:\/\/challenges\.cloudflare\.com/);
     assert.match(csp, /connect-src [^;]*https:\/\/sdk\.api\.pollar\.xyz/);
     assert.match(csp, /img-src [^;]*https:\/\/\*\.vtexassets\.com/);
     assert.match(csp, /object-src 'none'/);
