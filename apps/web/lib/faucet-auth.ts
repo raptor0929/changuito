@@ -1,6 +1,7 @@
 import { StrKey } from '@stellar/stellar-sdk';
 
 import { DEFAULT_NETWORK, DEPLOYMENTS, type NetworkId } from './deployments.ts';
+import { envFlag } from './env-flag.ts';
 import type { FaucetAccess, FaucetProof } from './faucet-proof.ts';
 import { verifyWalletProof } from './wallet-proof-verify.ts';
 
@@ -24,6 +25,16 @@ import { verifyWalletProof } from './wallet-proof-verify.ts';
  * Deny by default: in production an empty list disables the faucet for
  * everyone, including Vercel previews, which also run as production.
  *
+ * FAUCET_OPEN_TO_ALL is the way out of that when the point is a demo anyone
+ * can try: set it and the allowlist stops being consulted at all, whatever it
+ * contains. What it does *not* waive is the signature — "anybody may ask" and
+ * "nobody has to prove anything" are different sentences, and only the first
+ * one was asked for. The wallet still signs, which costs a logged-in visitor
+ * nothing (Pollar signs for a live session) and costs a script the whole
+ * exercise. That matters here more than it looks: the grants share one hourly
+ * ceiling, so an unauthenticated faucet is a way to spend everyone else's
+ * twenty before a tester arrives.
+ *
  * And it is per network, because free money is a testnet idea. See
  * `faucetOnNetwork`.
  */
@@ -42,6 +53,9 @@ export function faucetAllowlist(env: NodeJS.ProcessEnv = process.env): Set<strin
 }
 
 export function faucetMode(env: NodeJS.ProcessEnv = process.env): FaucetMode {
+  // First, so it is an override and not a tie-break: a list left behind from
+  // an earlier tester round must not quietly keep everyone else out.
+  if (envFlag('FAUCET_OPEN_TO_ALL', env)) return 'public';
   if (faucetAllowlist(env).size > 0) return 'allowlist';
   return env.NODE_ENV === 'production' ? 'disabled' : 'open';
 }
@@ -65,7 +79,7 @@ export function faucetAccess(
 ): FaucetAccess {
   if (!faucetOnNetwork(net)) return { mode: 'disabled', allowed: false };
   const mode = faucetMode(env);
-  if (mode === 'open') return { mode, allowed: true };
+  if (mode === 'open' || mode === 'public') return { mode, allowed: true };
   if (mode === 'disabled') return { mode, allowed: false };
   return { mode, allowed: faucetAllowlist(env).has(address) };
 }
@@ -98,6 +112,9 @@ export function authorizeFaucet(args: {
 
   const access = faucetAccess(args.address, env, net);
 
+  // 'open' is the local-development mode and the only one that skips the
+  // signature: there is no allowlist, no deploy and nothing to farm. 'public'
+  // falls through to the proof below with everybody else.
   if (access.mode === 'open') return { ok: true };
   if (access.mode === 'disabled') {
     return deny(403, 'faucet_disabled', 'La carga de USDC de prueba no está habilitada.');

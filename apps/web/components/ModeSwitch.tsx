@@ -1,9 +1,9 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 
 import type { NetworkId } from '../lib/deployments.ts';
-import { MODES } from '../lib/mode-copy.ts';
+import type { ModeCopy } from '../lib/mode-copy.ts';
 
 /**
  * Modo prueba / modo real, two lines above the number it governs.
@@ -16,52 +16,42 @@ import { MODES } from '../lib/mode-copy.ts';
  * which is what the radiogroup pattern requires and what a pair of plain
  * buttons would get wrong.
  *
- * A position that is closed carries `aria-disabled` rather than `disabled`:
- * disabled removes it from the accessibility tree, and somebody who cannot
- * use modo real should still be able to find out that it exists and why it
- * will not take their click. The reason appears when they try, not before —
- * most visitors will never be on the list, and a permanent apology in the
- * masthead is clutter that explains nothing they asked about.
+ * Every option rendered here is one the caller has already decided this
+ * visitor can use — see `modesFor`. There is no closed position, no
+ * `aria-disabled` and no apology, because the alternative was a control that
+ * was half dead for nearly everyone who saw it. With one mode left there is
+ * nothing to choose, so the whole thing leaves rather than sitting in the
+ * masthead as a button that cannot do anything. The balance keeps its
+ * qualifier either way, which is the part that had to survive.
  */
 export function ModeSwitch({
   network,
+  modes,
   onChange,
-  lockedReason,
 }: {
   network: NetworkId;
+  /** The options to offer, in order. Fewer than two renders nothing. */
+  modes: readonly ModeCopy[];
   onChange: (net: NetworkId) => void;
-  /** Why the real option is closed, or null when it is open. */
-  lockedReason: string | null;
 }) {
   const group = useRef<HTMLDivElement>(null);
-  const [bumped, setBumped] = useState(false);
-
-  const open = (net: NetworkId) => net === 'testnet' || lockedReason === null;
-
-  function pick(net: NetworkId) {
-    if (!open(net)) {
-      setBumped(true);
-      return;
-    }
-    if (net === network) return;
-    setBumped(false);
-    onChange(net);
-  }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'];
     if (!keys.includes(e.key)) return;
     e.preventDefault();
     const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1;
-    const at = MODES.findIndex((m) => m.network === network);
-    const next = MODES[(at + step + MODES.length) % MODES.length];
-    if (!next) return;
-    pick(next.network);
+    const at = modes.findIndex((m) => m.network === network);
+    const next = modes[(at + step + modes.length) % modes.length];
+    if (!next || next.network === network) return;
+    onChange(next.network);
     // The roving tabindex moved with the selection; focus has to follow it.
     requestAnimationFrame(() => {
       group.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
     });
   }
+
+  if (modes.length < 2) return null;
 
   return (
     <div className="wallet-mode">
@@ -73,23 +63,22 @@ export function ModeSwitch({
         onKeyDown={onKeyDown}
         data-testid="mode-switch"
       >
-        {MODES.map((mode) => {
+        {modes.map((mode) => {
           const checked = mode.network === network;
-          const closed = !open(mode.network);
           return (
             <button
               key={mode.network}
               type="button"
               role="radio"
               aria-checked={checked}
-              aria-disabled={closed || undefined}
               // Roving tabindex: one stop for the group, not one per option.
               tabIndex={checked ? 0 : -1}
               className="mode-option"
               data-mode={mode.network}
               data-testid={`mode-${mode.network}`}
-              title={closed ? (lockedReason ?? undefined) : undefined}
-              onClick={() => pick(mode.network)}
+              onClick={() => {
+                if (!checked) onChange(mode.network);
+              }}
               // The two spans are one label at two widths, and CSS hides one
               // of them — which would leave the button nameless if the name
               // came from its contents.
@@ -105,11 +94,6 @@ export function ModeSwitch({
           );
         })}
       </div>
-      {bumped && lockedReason ? (
-        <p className="mode-locked" role="status">
-          {lockedReason}
-        </p>
-      ) : null}
     </div>
   );
 }

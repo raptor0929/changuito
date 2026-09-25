@@ -70,42 +70,31 @@ export function modeCopy(net: NetworkId = DEFAULT_NETWORK): ModeCopy {
 export const MODES: readonly ModeCopy[] = [PRUEBA, REAL];
 
 /**
- * Why the real option will not take a click. Two different reasons, because
- * "not for you" and "not yet for anyone" are different facts, and a control
- * that is dead for two reasons and says one thing is a control people ask
- * about instead of using.
- */
-export type ModeLock = 'not-allowed' | 'not-ready';
-
-export function modeLockedReason(why: ModeLock): string {
-  if (why === 'not-ready') return 'El modo real todavía no está disponible.';
-  return 'Tu cuenta no tiene habilitado el modo real.';
-}
-
-/**
- * Which of those two to say, given what the server answered — or did not.
+ * Which modes to put in the control, given what the server answered.
  *
- * The rule that matters is the first line: **an answer we do not have is not
- * a fact about the account.** This used to fall through to 'not-allowed'
- * whenever `access` was null, and null is also what a request in flight looks
- * like, and what a 403 from the human gate looks like. So a network hiccup
- * told somebody their account was refused — a definite claim about them,
- * made with no information about them. It is the same failure the balance
- * qualifier fixed: saying something confident that nothing checked.
+ * A mode nobody can use is not shown. The earlier version rendered modo real
+ * always and greyed it out with a reason, which sounds more helpful and is
+ * not: almost every visitor is in the greyed case, so the common experience
+ * of the control was a dead half and an apology for a feature nobody had
+ * asked about. Worse, the reason had to be *chosen*, and "not for you" and
+ * "not yet for anyone" are answers about different subjects — which is how
+ * a request still in flight ended up telling people their account was
+ * refused. An option that is absent says none of that. Nothing is claimed
+ * about the account, so nothing can be claimed wrongly.
  *
- * After that, "there is nothing deployed yet" outranks "you are not on the
- * list", because while it holds it is true of everybody, and it points at
- * the thing that actually has to happen. lib/network-access.ts orders its
- * *server* refusal the other way round on purpose — a stranger there learns
- * only that they may not, never whether there is anything to reach.
+ * `usable` and not `allowed`: being on the list is no use while there is
+ * nothing deployed to be on the list *for*.
+ *
+ * DEFAULT_NETWORK is always in the list, unconditionally — it is the safe
+ * mode and the fallback, and a control with nothing in it is a bug in two
+ * directions at once. ModeSwitch then hides itself when that is the only
+ * one, because a radiogroup with a single option is a label wearing a
+ * button's clothes.
  */
-export function modeLockFor(
-  access: { allowed: boolean; configured: boolean } | null | undefined,
-): ModeLock | null {
-  if (!access) return 'not-ready';
-  if (!access.configured) return 'not-ready';
-  if (!access.allowed) return 'not-allowed';
-  return null;
+export function modesFor(
+  access: Partial<Record<NetworkId, { usable: boolean } | null>> | null | undefined,
+): readonly ModeCopy[] {
+  return MODES.filter((m) => m.network === DEFAULT_NETWORK || access?.[m.network]?.usable === true);
 }
 
 /**

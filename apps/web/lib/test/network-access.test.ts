@@ -36,6 +36,37 @@ describe('real mode allowlist', () => {
     );
   });
 
+  it('RULE: REAL_MODE_OPEN_TO_ALL overrides the list, it does not lose to it', () => {
+    const open = { NODE_ENV: 'production', REAL_MODE_OPEN_TO_ALL: '1' } as NodeJS.ProcessEnv;
+    assert.equal(realModeMode(open), 'public');
+    assert.equal(realModeMode({ ...prod, REAL_MODE_OPEN_TO_ALL: 'true' } as NodeJS.ProcessEnv), 'public');
+    assert.equal(networkAccess(stranger.publicKey(), 'mainnet', open).allowed, true);
+    assert.equal(denyNetwork(stranger.publicKey(), 'mainnet', open)?.error, isConfigured('mainnet') ? undefined : 'network_not_deployed');
+  });
+
+  it('is not opened by a flag set to a no-word', () => {
+    for (const off of ['', 'false', '0', 'off']) {
+      assert.equal(realModeMode({ NODE_ENV: 'production', REAL_MODE_OPEN_TO_ALL: off } as NodeJS.ProcessEnv), 'disabled');
+    }
+  });
+
+  it('RULE: opening modo real to everyone does not deploy anything', () => {
+    // The flag answers "may this wallet", never "is there anything there".
+    // With nothing on mainnet it opens a door onto a wall, and `usable` — the
+    // conjunction the toggle reads — stays false for everybody.
+    const open = { NODE_ENV: 'production', REAL_MODE_OPEN_TO_ALL: 'yes' } as NodeJS.ProcessEnv;
+    const access = networkAccess(stranger.publicKey(), 'mainnet', open);
+    assert.equal(access.configured, isConfigured('mainnet'));
+    assert.equal(access.usable, access.allowed && access.configured);
+  });
+
+  it('is its own switch, not the faucet\'s', () => {
+    // Play money and a stranger opening an escrow with real USDC are not the
+    // same decision, so one variable must never turn on the other.
+    const faucetOnly = { NODE_ENV: 'production', FAUCET_OPEN_TO_ALL: '1' } as NodeJS.ProcessEnv;
+    assert.equal(realModeMode(faucetOnly), 'disabled');
+  });
+
   it('reads commas, spaces and newlines, and drops what is not a G… address', () => {
     const list = realModeAllowlist({
       NODE_ENV: 'production',

@@ -42,6 +42,40 @@ describe('faucet mode', () => {
     assert.equal(faucetMode({ NODE_ENV: 'development', FAUCET_ALLOWLIST_ADDRESSES: tester.publicKey() } as NodeJS.ProcessEnv), 'allowlist');
   });
 
+  it('RULE: FAUCET_OPEN_TO_ALL overrides the list, it does not lose to it', () => {
+    // A list left over from an earlier tester round must not quietly keep
+    // everybody else out after somebody has said "open it up".
+    const open = { NODE_ENV: 'production', FAUCET_OPEN_TO_ALL: '1' } as NodeJS.ProcessEnv;
+    assert.equal(faucetMode(open), 'public');
+    assert.equal(faucetMode({ ...prod, FAUCET_OPEN_TO_ALL: 'true' } as NodeJS.ProcessEnv), 'public');
+    assert.equal(faucetAccess(stranger.publicKey(), open, 'testnet').allowed, true);
+  });
+
+  it('is not opened by a flag set to a no-word', () => {
+    for (const off of ['', 'false', '0', 'off']) {
+      assert.equal(faucetMode({ NODE_ENV: 'production', FAUCET_OPEN_TO_ALL: off } as NodeJS.ProcessEnv), 'disabled');
+    }
+  });
+
+  it('RULE: opening the faucet to everyone still does not waive the signature', () => {
+    // "Anybody may ask" and "nobody has to prove anything" are different
+    // sentences and only the first one was asked for. The grants share one
+    // hourly ceiling, so an unauthenticated faucet is a way for one script to
+    // spend every tester's twenty before a tester arrives.
+    const open = { NODE_ENV: 'production', FAUCET_OPEN_TO_ALL: 'yes' } as NodeJS.ProcessEnv;
+    const address = stranger.publicKey();
+    const bare = authorizeFaucet({ address, now, env: open, net: 'testnet' });
+    assert.equal(bare.ok, false);
+    assert.equal(bare.ok === false && bare.status, 401);
+
+    const signed = authorizeFaucet({ address, proof: proofFor(stranger), now, env: open, net: 'testnet' });
+    assert.equal(signed.ok, true);
+
+    // And it is still that wallet's signature, not any signature.
+    const forged = authorizeFaucet({ address, proof: proofFor(tester, address), now, env: open, net: 'testnet' });
+    assert.equal(forged.ok, false);
+  });
+
   it('reads commas, spaces and newlines, and drops what is not a G… address', () => {
     const list = faucetAllowlist({
       NODE_ENV: 'production',

@@ -622,11 +622,6 @@ a:hover { color: var(--chg-arcilla); }
   background: var(--brand);
   color: var(--brand-ink);
 }
-/* aria-disabled, not disabled: still reachable, still announced, just does
-   not take the click. The cursor says so before the click does. */
-.mode-option[aria-disabled='true'] { cursor: not-allowed; opacity: 0.55; }
-.mode-option[aria-disabled='true']:hover { color: var(--muted); }
-.mode-locked { margin: 0; font-size: 11px; line-height: 1.25; color: var(--warn-ink); }
 /* One label at two widths. Both spans are aria-hidden and the button carries
    an explicit aria-label, so hiding either one never costs it its name. */
 .mode-short { display: none; }

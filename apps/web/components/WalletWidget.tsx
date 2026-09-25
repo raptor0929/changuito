@@ -4,7 +4,7 @@ import { usePollar } from '@pollar/react';
 import { useEffect, useRef, useState } from 'react';
 
 import { track, trackLoginStart } from '../lib/analytics';
-import { modeCopy, modeLockedReason, modeLockFor } from '../lib/mode-copy.ts';
+import { modeCopy, modesFor } from '../lib/mode-copy.ts';
 import { pollarEnabledOn, shortAddress } from '../lib/pollar.ts';
 import { ensureUserCookie, forgetUserCookie } from '../lib/session-login.ts';
 import type { FaucetProof } from '../lib/faucet-proof.ts';
@@ -54,11 +54,11 @@ function ConnectedWallet() {
   const faucet = useFaucetAccess(address, network);
   // The same shape, for the mode control. Null while it loads, and null reads
   // as "no" — an option that appears and then vanishes is worse than one that
-  // arrives late.
+  // arrives late. With nothing usable but the safe mode there is no choice to
+  // offer, and ModeSwitch renders nothing at all.
   const access = useNetworkAccess(address);
   const mode = modeCopy(network);
-  const lock = modeLockFor(access?.mainnet);
-  const lockedReason = lock && modeLockedReason(lock);
+  const modes = modesFor(access);
 
   // If the saved mode turns out not to be theirs, they go back to the safe one
   // rather than sitting in a mode every request will refuse. Only once the
@@ -110,10 +110,11 @@ function ConnectedWallet() {
     setFunding(true);
     setNote(null);
     try {
-      // The address is only a claim. The allowlist wants the wallet to sign
-      // for it (SEP-53), which Pollar does only for a live session.
+      // The address is only a claim. Both gated modes want the wallet to sign
+      // for it (SEP-53), which Pollar does only for a live session. 'public'
+      // waived the allowlist, not the signature — see lib/faucet-auth.ts.
       let proof: FaucetProof | undefined;
-      if (faucet?.mode === 'allowlist') {
+      if (faucet?.mode === 'allowlist' || faucet?.mode === 'public') {
         const signed = await signWalletProof(sign, 'faucet', address);
         if (!signed) throw new Error('No pudimos confirmar tu sesión para cargar USDC. Probá de nuevo.');
         proof = signed;
@@ -176,7 +177,7 @@ function ConnectedWallet() {
         {loading && <span className="wallet-muted">actualizando…</span>}
       </div>
 
-      <ModeSwitch network={network} onChange={setNetwork} lockedReason={lockedReason} />
+      <ModeSwitch network={network} modes={modes} onChange={setNetwork} />
 
       <div className="wallet-sub">
         {/* Warn only when the account cannot pay network fees yet. */}

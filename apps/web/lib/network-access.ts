@@ -1,6 +1,7 @@
 import { StrKey } from '@stellar/stellar-sdk';
 
 import { DEFAULT_NETWORK, isConfigured, type NetworkId } from './deployments.ts';
+import { envFlag } from './env-flag.ts';
 
 /**
  * Who may switch the app into modo real. Server-only.
@@ -20,9 +21,22 @@ import { DEFAULT_NETWORK, isConfigured, type NetworkId } from './deployments.ts'
  * Deny by default: in production an empty list means nobody, which also covers
  * Vercel previews, since those run as production too. Testnet is never gated;
  * it is the default and it cannot spend anything.
+ *
+ * REAL_MODE_OPEN_TO_ALL drops the allowlist entirely and lets any wallet into
+ * modo real. It is deliberately a second, differently-named switch from the
+ * faucet's, because the two waive very different things: one hands out play
+ * money, and this one lets a stranger open an escrow with real USDC — and
+ * settle-gate.ts:15-19 still says out loud that "I completed the basket" is
+ * the buyer's word, so anyone who can reach modo real can complete a purchase
+ * and then refund themselves. The allowlist is what makes that hole
+ * acceptable. Setting this accepts it for everybody; there is no wording that
+ * makes it smaller, so there is no wording here pretending otherwise.
+ *
+ * It does not deploy anything. `configured` is untouched, so with nothing on
+ * mainnet the flag opens a door onto a wall.
  */
 
-export type RealModeMode = 'allowlist' | 'disabled' | 'open';
+export type RealModeMode = 'allowlist' | 'disabled' | 'open' | 'public';
 
 export interface NetworkAccess {
   mode: RealModeMode;
@@ -52,6 +66,11 @@ export function realModeAllowlist(env: NodeJS.ProcessEnv = process.env): Set<str
 }
 
 export function realModeMode(env: NodeJS.ProcessEnv = process.env): RealModeMode {
+  // First, so it overrides the list rather than losing to it. 'public' rather
+  // than 'open' so the answer still says *why* it is open — a flag somebody
+  // set, not a laptop — which is the difference worth seeing in a response
+  // from production.
+  if (envFlag('REAL_MODE_OPEN_TO_ALL', env)) return 'public';
   if (realModeAllowlist(env).size > 0) return 'allowlist';
   return env.NODE_ENV === 'production' ? 'disabled' : 'open';
 }
@@ -75,7 +94,7 @@ export function networkAccess(
   if (net === DEFAULT_NETWORK) return yes('open', true);
 
   const mode = realModeMode(env);
-  if (mode === 'open') return yes(mode, true);
+  if (mode === 'open' || mode === 'public') return yes(mode, true);
   if (mode === 'disabled') return yes(mode, false);
   return yes(mode, realModeAllowlist(env).has(address.trim().toUpperCase()));
 }

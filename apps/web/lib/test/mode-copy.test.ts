@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { NETWORK_IDS } from '../deployments.ts';
-import { MODES, modeCopy, modeLockedReason, modeLockFor, TRUSTLINE } from '../mode-copy.ts';
+import { MODES, modeCopy, modesFor, TRUSTLINE } from '../mode-copy.ts';
 
 /**
  * The chrome obeys the same vocabulary rule as the agent: lib/agent/prompt.ts
@@ -13,8 +13,6 @@ const FORBIDDEN =
 
 const every = [
   ...MODES.flatMap((m) => [m.label, m.short, m.balanceUnit, m.hint, m.payNote, m.holdNote, m.payLabel('12,34')]),
-  modeLockedReason('not-allowed'),
-  modeLockedReason('not-ready'),
   ...Object.values(TRUSTLINE),
 ].filter(Boolean);
 
@@ -69,32 +67,35 @@ describe('mode copy', () => {
     assert.match(TRUSTLINE.back, /modo prueba/);
   });
 
-  it('RULE: an answer we do not have is never reported as "not for you"', () => {
-    // The bug: `access` is null while the request is in flight AND when it
-    // fails — a 403 from the human gate looks exactly like a slow one. The
-    // old fallback picked 'not-allowed', so a network hiccup told somebody
-    // their account was refused, which nothing had checked.
+  it('RULE: an answer we do not have never offers the mode that spends money', () => {
+    // `access` is null while the request is in flight AND when it fails — a
+    // 403 from the human gate looks exactly like a slow one. Whatever the
+    // reason, an unanswered question is not permission.
     for (const unknown of [null, undefined]) {
-      assert.equal(modeLockFor(unknown), 'not-ready');
-      assert.doesNotMatch(modeLockedReason(modeLockFor(unknown)!), /cuenta/);
+      assert.deepEqual(modesFor(unknown).map((m) => m.network), ['testnet']);
     }
   });
 
-  it('RULE: "nothing is deployed" outranks "you are not on the list"', () => {
-    // While it holds it is true of everybody, and it names the thing that
-    // actually has to happen. Both flags are false today, on every network.
-    assert.equal(modeLockFor({ allowed: false, configured: false }), 'not-ready');
-    assert.equal(modeLockFor({ allowed: true, configured: false }), 'not-ready');
+  it('RULE: the safe mode is offered no matter what the server says', () => {
+    // Including if it says no. There has to be something to fall back to, and
+    // a control with nothing in it is two bugs at once.
+    assert.deepEqual(
+      modesFor({ testnet: { usable: false }, mainnet: { usable: false } }).map((m) => m.network),
+      ['testnet'],
+    );
   });
 
-  it('blames the account only when the server actually said so', () => {
-    assert.equal(modeLockFor({ allowed: false, configured: true }), 'not-allowed');
-    assert.equal(modeLockFor({ allowed: true, configured: true }), null);
+  it('offers modo real only when it is both allowed and deployed', () => {
+    // `usable` is the conjunction. Being on the list is no use while there is
+    // nothing deployed to be on the list for, and vice versa — which is the
+    // state the app is in today.
+    assert.deepEqual(modesFor({ mainnet: { usable: true } }).map((m) => m.network), ['testnet', 'mainnet']);
+    assert.deepEqual(modesFor({ mainnet: { usable: false } }).map((m) => m.network), ['testnet']);
+    assert.deepEqual(modesFor({ mainnet: null }).map((m) => m.network), ['testnet']);
+    assert.deepEqual(modesFor({}).map((m) => m.network), ['testnet']);
   });
 
-  it('tells "not for you" apart from "not yet for anyone"', () => {
-    const reasons = (['not-allowed', 'not-ready'] as const).map(modeLockedReason);
-    assert.equal(new Set(reasons).size, 2);
-    for (const r of reasons) assert.match(r, /modo real/);
+  it('keeps the safe mode first when both are offered', () => {
+    assert.equal(modesFor({ mainnet: { usable: true } })[0]?.network, 'testnet');
   });
 });

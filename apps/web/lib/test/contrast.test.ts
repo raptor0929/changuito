@@ -78,8 +78,15 @@ test('sunflower is never the mode chip text colour', () => {
   }
 });
 
-test('the locked reason uses --warn-ink, which clears 4.5:1 on the wallet card', () => {
-  assert.match(rule('.mode-locked'), /color:\s*var\(--warn-ink\)/);
+test('RULE: the mode control has no closed position to style', () => {
+  // Unusable modes are not rendered greyed out, they are not rendered. If a
+  // disabled style comes back, so has a control that is dead for most of the
+  // people who see it — and so has the question of which excuse to print.
+  assert.doesNotMatch(css, /\.mode-option\[aria-disabled/);
+  assert.doesNotMatch(css, /\.mode-locked\b/);
+});
+
+test('--warn-ink still clears 4.5:1 on both surfaces it is used on', () => {
   const ink = token('warn-ink');
   assert.ok(ratio(ink, '#ffffff') >= 4.5, `on --surface: ${ratio(ink, '#ffffff').toFixed(2)}`);
   assert.ok(ratio(ink, token('chg-offwhite')) >= 4.5, `on --bg: ${ratio(ink, token('chg-offwhite')).toFixed(2)}`);

@@ -126,6 +126,7 @@ Preview:
 | `KV_REST_API_URL` | set by the Redis integration | server only |
 | `KV_REST_API_TOKEN` | set by the Redis integration | server only |
 | `FAUCET_ALLOWLIST_ADDRESSES` | tester wallet addresses, e.g. `GABC…XYZ,GDEF…UVW` | server only |
+| `FAUCET_OPEN_TO_ALL` | optional, `1` to drop that list entirely | server only |
 | `CHG_SESSION_SECRET` | **required**, `openssl rand -base64 32` | server only |
 
 And these three only once modo real is deployed — see
@@ -137,6 +138,7 @@ does today, with the real position of the mode control closed.
 | `NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` | a *second* Pollar key | the browser, by design |
 | `STELLAR_RESOLVER_SECRET_MAINNET` | the `S…` for `changuito-resolver-mainnet` | server only |
 | `REAL_MODE_ALLOWLIST_ADDRESSES` | who may switch to modo real | server only |
+| `REAL_MODE_OPEN_TO_ALL` | optional, `1` to drop that list entirely — read [2.6](#26-modo-real) first | server only |
 
 The two `KV_` ones you do not type — see [2.4](#24-conversation-history) below.
 They are **required** in production now: the chat and faucet quotas count in
@@ -163,6 +165,16 @@ only signs for a logged-in session. Use an email or Google login for test
 accounts; passkey wallets (`C…`) cannot sign that message. Keep real addresses
 in Vercel, not in the repo. Locally, with the variable unset, the faucet stays
 open so a fresh clone can fund a wallet.
+
+`FAUCET_OPEN_TO_ALL=1` is the way out of the list when the point is a demo
+anyone should be able to try: set it and the allowlist is not consulted at all,
+whatever it contains. It does **not** waive the signature — the wallet still
+signs, which costs a logged-in visitor nothing and costs a script the whole
+exercise. That part is load-bearing: the grants share one hourly ceiling
+(`FAUCET_GRANTS_PER_HOUR`, 20), so an unauthenticated faucet is a way for one
+bot to spend every tester's twenty before a tester arrives. Only `1`, `true`,
+`yes` or `on` turn it on; `false` and `0` leave it off, which is what somebody
+means when they type them into a dashboard that has no checkbox.
 
 `FX_ARS_PER_USD` pins the exchange rate. Set it if you want a demo to quote the
 same number every time; leave it unset and the app uses the live rate.
@@ -237,7 +249,10 @@ There is a control beside the balance with two positions, **modo prueba** and
 **modo real**. Everything above configures modo prueba, which is where the app
 starts and where it falls back whenever anything is not understood. Modo real
 needs three more variables and a deploy to a public network, and until it has
-them the position is closed with a reason rather than hidden.
+them the control shows a single position — the modo real option is not
+rendered at all, and with nothing to choose between, the control hides itself.
+The balance keeps its "de prueba" qualifier either way, so nothing about what
+the money is depends on the switch being on screen.
 
 `NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` is a **second** key from the Pollar
 dashboard, not the same one. A dashboard key is network-scoped, so the two
@@ -259,6 +274,19 @@ the wallet's SEP-53 signature is verified, so it is checked against a proven
 address rather than a claimed one — the closed control in the browser is a
 courtesy, and this is the wall. Passkey wallets (`C…`) cannot sign that
 message, so testers need a custodial `G…` account.
+
+`REAL_MODE_OPEN_TO_ALL=1` drops that list and lets any wallet into modo real.
+Same yes-words as the faucet's switch, and deliberately a separate variable,
+because the two waive very different things — one hands out play money, this
+one lets a stranger open an escrow with real USDC. Before setting it, know what
+the allowlist was holding shut: **"ya lo completé" is still the buyer's word.**
+Anyone who can reach modo real can complete the purchase at the super, press
+"No se pudo", and get their USDC back — groceries and money both, with the
+treasury eating it. Closing that needs the resolver to verify the order against
+the store, which does not exist yet. The allowlist is what makes the hole
+acceptable; this flag accepts it for everybody, and no wording makes it
+smaller. It also deploys nothing: with mainnet unconfigured the mode stays
+closed for all, the flag just stops being the reason why.
 
 Two things that are **not** variables, and will stop a first real payment dead
 if they are skipped:
