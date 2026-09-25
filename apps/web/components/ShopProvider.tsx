@@ -1,32 +1,61 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import type { Cart } from '@changuito/mcp/types';
 
+import type { ChatState } from '../lib/chat-state.ts';
+import {
+  deleteChat,
+  isResumable,
+  listChats,
+  loadChat,
+  saveChat,
+  type ChatSummary,
+  type OrderState,
+  type Receipt,
+  type StoredChat,
+} from '../lib/chat-store.ts';
+
 /**
- * What the two rails know, and what the chat publishes into them.
+ * What the two rails know, what the chat publishes into them, and where a
+ * conversation goes when the tab closes.
  *
  * The chat owns the conversation; it always has. But the cart panel on the
  * right and the history list on the left are siblings of the chat in the
  * layout, not children, so the state they read has to live above all three.
- * This is that, and nothing else — no fetching, no persistence. Phase two
- * gives it a localStorage backing; keeping the seam here means that change
- * touches one file instead of three.
  *
- * One chat is one order. The rule is enforced where the user would break it
- * (the composer, and the deposit route), not here — this only records which
- * chat is open and what state its order is in, so the list can say so.
+ * ## One chat is one order
+ *
+ * Enforced in two places for two different reasons. Here, so the composer can
+ * refuse before the shopper types a second basket into a chat whose order is
+ * already placed — `canOrder` is that question. And again at the deposit
+ * route, because a browser is not where a rule about money gets to live.
+ *
+ * ## Restoring
+ *
+ * A chat comes back only if the store says it is still resumable: open, and
+ * younger than the agent's one hour history TTL. Anything else opens as a
+ * receipt the shopper can read but not continue. The decision is the store's
+ * (`isResumable`), the consequence is here: a non-resumable chat is handed to
+ * the chat component with `sessionId: null`, which is what makes the composer
+ * go away.
  */
 
-export type OrderState = 'none' | 'open' | 'paid';
+export type { OrderState, Receipt };
+export type { ChatSummary };
 
-export interface ChatSummary {
-  id: string;
-  /** The shopper's first message, trimmed. Falls back to a date. */
-  title: string;
-  createdAt: number;
-  orderState: OrderState;
+/**
+ * What the provider is asking the chat component to do, picked up by an
+ * effect there and acknowledged. A request rather than a call because the
+ * transcript lives in `useChat`, below this, and React state does not flow
+ * upward.
+ */
+export type ChatRequest = { kind: 'new'; token: number } | { kind: 'open'; token: number; chat: StoredChat };
+
+export interface PublishInput {
+  state: Pick<ChatState, 'blocks' | 'snapshot' | 'cart'>;
+  sessionId: string | null;
 }
 
 interface ShopValue {
@@ -36,17 +65,21 @@ interface ShopValue {
   cart: Cart | null;
   handoffUrl: string | null;
   orderState: OrderState;
-  publishCart: (cart: Cart | null, handoffUrl?: string) => void;
+  /** The order this chat already placed, once it is paid. */
+  receipt: Receipt | null;
+  /** False once this chat's order is placed. The composer reads it. */
+  canOrder: boolean;
+  /** True when the open chat is a record: paid, or older than the agent remembers. */
+  readOnly: boolean;
+  /** Everything the chat knows, on every change. Saved, debounced by React's own batching. */
+  publish: (input: PublishInput) => void;
   openChat: (id: string) => void;
   newChat: () => void;
-  /**
-   * Whether the history drawer is open. Only meaningful below the wide
-   * breakpoint, where the rail is off-canvas; above it the rail is a column
-   * and this is ignored. It lives here rather than in Deck because the
-   * control that sets it sits in the masthead, inside the chat shell, and
-   * the rail it opens is the shell's sibling — so the two have no common
-   * ancestor below this one.
-   */
+  forgetChat: (id: string) => void;
+  /** Mark the open chat paid and file its receipt. Phase four calls this. */
+  settle: (receipt: Receipt) => void;
+  request: ChatRequest | null;
+  ack: () => void;
   historyOpen: boolean;
   setHistoryOpen: (open: boolean) => void;
 }
@@ -56,43 +89,125 @@ const ShopContext = createContext<ShopValue | null>(null);
 export function ShopProvider({ children }: { children: ReactNode }) {
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [createdAt, setCreatedAt] = useState<number>(() => Date.now());
   const [cart, setCart] = useState<Cart | null>(null);
   const [handoffUrl, setHandoffUrl] = useState<string | null>(null);
+  const [orderState, setOrderState] = useState<OrderState>('none');
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [readOnly, setReadOnly] = useState(false);
+  const [request, setRequest] = useState<ChatRequest | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const publishCart = useCallback((next: Cart | null, url?: string) => {
-    setCart(next);
-    // An absent url does not erase one we already have. The agent renders the
-    // cart before it has the link and again after, and the second render is
-    // the one that carries it — dropping it on the first would blank the
-    // button between the two. chat-state.ts holds the same rule for blocks.
-    setHandoffUrl((prev) => url ?? prev);
+  // After hydration, never during render: reading storage while rendering
+  // makes the server's HTML and the browser's first paint disagree, and React
+  // throws the whole tree away to fix it. NetworkProvider.tsx does the same.
+  useEffect(() => {
+    setChats(listChats());
   }, []);
 
-  const openChat = useCallback((id: string) => setActiveChatId(id), []);
+  const publish = useCallback(
+    ({ state, sessionId }: PublishInput) => {
+      const next = state.cart?.cart ?? null;
+      setCart(next);
+      // An absent url does not erase one we already have. The agent renders the
+      // cart before it has the link and again after, and the second render is
+      // the one that carries it — dropping it on the first would blank the
+      // button between the two. chat-state.ts holds the same rule for blocks.
+      setHandoffUrl((prev) => state.cart?.handoffUrl ?? prev);
+
+      // A chat with nothing in it is not a chat yet; saveChat says so too.
+      if (state.blocks.length === 0) return;
+      // The id of a conversation is the id the agent gave it, so the record
+      // and the server's history are filed under the same name.
+      const id = activeChatId ?? sessionId;
+      if (!id) return;
+      const saved = saveChat({ id, createdAt, sessionId, state, orderState, receipt });
+      if (!saved) return;
+      if (activeChatId !== id) setActiveChatId(id);
+      setChats(listChats());
+    },
+    [activeChatId, createdAt, orderState, receipt],
+  );
+
   const newChat = useCallback(() => {
     setActiveChatId(null);
+    setCreatedAt(Date.now());
     setCart(null);
     setHandoffUrl(null);
+    setOrderState('none');
+    setReceipt(null);
+    setReadOnly(false);
+    setHistoryOpen(false);
+    setRequest({ kind: 'new', token: Date.now() });
   }, []);
 
-  const orderState = useMemo<OrderState>(
-    () => chats.find((c) => c.id === activeChatId)?.orderState ?? 'none',
-    [chats, activeChatId],
+  const openChat = useCallback((id: string) => {
+    const chat = loadChat(id);
+    if (!chat) {
+      // The index knew about it and the record is gone — a hand-edited
+      // storage, or a write that failed after the index one succeeded. Drop
+      // the row rather than leaving a button that does nothing.
+      deleteChat(id);
+      setChats(listChats());
+      return;
+    }
+    const live = isResumable(chat);
+    setActiveChatId(chat.id);
+    setCreatedAt(chat.createdAt);
+    setCart(chat.cart);
+    setHandoffUrl(chat.handoffUrl);
+    setOrderState(chat.orderState);
+    setReceipt(chat.receipt);
+    setReadOnly(!live);
+    setHistoryOpen(false);
+    // `sessionId: null` when it is not resumable, so the chat component cannot
+    // accidentally send into a session the server has forgotten. The store
+    // decides; this only carries the decision.
+    setRequest({ kind: 'open', token: Date.now(), chat: live ? chat : { ...chat, sessionId: null } });
+  }, []);
+
+  const forgetChat = useCallback(
+    (id: string) => {
+      deleteChat(id);
+      setChats(listChats());
+      if (id === activeChatId) newChat();
+    },
+    [activeChatId, newChat],
   );
+
+  const settle = useCallback((paid: Receipt) => {
+    setOrderState('paid');
+    setReceipt(paid);
+    setReadOnly(true);
+  }, []);
+
+  const ack = useCallback(() => setRequest(null), []);
 
   const value = useMemo<ShopValue>(
     () => ({
-      chats, activeChatId, cart, handoffUrl, orderState,
-      publishCart, openChat, newChat, historyOpen, setHistoryOpen,
+      chats,
+      activeChatId,
+      cart,
+      handoffUrl,
+      orderState,
+      receipt,
+      canOrder: orderState !== 'paid' && !readOnly,
+      readOnly,
+      publish,
+      openChat,
+      newChat,
+      forgetChat,
+      settle,
+      request,
+      ack,
+      historyOpen,
+      setHistoryOpen,
     }),
-    [chats, activeChatId, cart, handoffUrl, orderState, publishCart, openChat, newChat, historyOpen],
+    [
+      chats, activeChatId, cart, handoffUrl, orderState, receipt, readOnly,
+      publish, openChat, newChat, forgetChat, settle, request, ack, historyOpen,
+    ],
   );
-
-  // setChats is unused until phase two adds persistence. Referencing it here
-  // rather than dropping it keeps the shape of the provider honest about what
-  // it will hold.
-  void setChats;
 
   return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;
 }

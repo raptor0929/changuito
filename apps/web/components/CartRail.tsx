@@ -2,6 +2,7 @@
 
 import type { Cart } from '@changuito/mcp/types';
 
+import type { Receipt } from '../lib/chat-store.ts';
 import { RETAILER_NAMES } from '../lib/retailers.ts';
 import { useShop } from './ShopProvider';
 
@@ -21,9 +22,11 @@ import { useShop } from './ShopProvider';
 export function CartRail() {
   const shop = useShop();
   const cart = shop?.cart ?? null;
+  const receipt = shop?.receipt ?? null;
+  const store = receipt?.retailer ?? cart?.retailer ?? null;
   return (
-    <aside className="rail rail-cart" aria-label="Tu changuito">
-      <div className="rail-cart-panel">
+    <aside className="rail rail-cart" aria-label={receipt ? 'Tu compra' : 'Tu changuito'}>
+      <div className={receipt ? 'rail-cart-panel is-paid' : 'rail-cart-panel'}>
         <img
           className="rail-mascot"
           src="/brand/mascota-lleno.png"
@@ -33,13 +36,68 @@ export function CartRail() {
           height={609}
         />
         <header className="rail-cart-head">
-          <span className="rail-cart-title">Tu changuito</span>
-          {cart ? <span className="rail-cart-store">{RETAILER_NAMES[cart.retailer] ?? cart.retailer}</span> : null}
+          <span className="rail-cart-title">{receipt ? 'Tu compra' : 'Tu changuito'}</span>
+          {store ? <span className="rail-cart-store">{RETAILER_NAMES[store] ?? store}</span> : null}
         </header>
-        {cart && cart.lines.length > 0 ? <RailLines cart={cart} /> : <EmptyRail />}
+        {receipt ? (
+          <RailReceipt receipt={receipt} />
+        ) : cart && cart.lines.length > 0 ? (
+          <RailLines cart={cart} />
+        ) : (
+          <EmptyRail />
+        )}
       </div>
     </aside>
   );
+}
+
+/**
+ * What was bought, after it was bought — the thing the shopper comes back to
+ * look at. It replaces the basket rather than sitting under it: once the order
+ * is paid the live cart is a draft of something that already happened, and
+ * showing both invites reading the wrong one.
+ *
+ * The amounts are the strings that were on screen at the time, not numbers
+ * re-formatted now. A receipt that quietly re-prices itself is not a receipt.
+ */
+function RailReceipt({ receipt }: { receipt: Receipt }) {
+  return (
+    <>
+      <p className="rail-cart-paid" data-testid="receipt-paid">
+        <span className="rail-chip rail-chip-paid">Pagado</span>
+        <time dateTime={new Date(receipt.paidAt).toISOString()}>{paidOn(receipt.paidAt)}</time>
+      </p>
+      <ul className="rail-cart-lines">
+        {receipt.lines.map((l, i) => (
+          // No stable id on a line of a finished order: it is frozen, so the
+          // index cannot shift under React the way a live basket's would.
+          <li key={i} className="rail-cart-line">
+            <span className="rail-cart-qty">{l.quantity}×</span>
+            <span className="rail-cart-name">{l.name}</span>
+            <span className="rail-cart-amount">{l.lineTotal}</span>
+          </li>
+        ))}
+      </ul>
+      <footer className="rail-cart-foot">
+        <div className="rail-cart-total">
+          <span>Total</span>
+          <strong>{receipt.total}</strong>
+        </div>
+        <p className="rail-cart-ref">
+          Pagaste {receipt.paidDisplay} · pedido {receipt.orderId}
+        </p>
+      </footer>
+    </>
+  );
+}
+
+function paidOn(at: number): string {
+  try {
+    return new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+      .format(new Date(at));
+  } catch {
+    return '';
+  }
 }
 
 function EmptyRail() {

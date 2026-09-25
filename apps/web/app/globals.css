@@ -481,6 +481,82 @@ a:hover { color: var(--chg-arcilla); }
   border-top: 1px solid var(--border);
   background: var(--bg);
 }
+/* The paid order, in the thread. Not a .bubble: it is not something anyone
+   said, it is the record of what happened, so it reads as a document. The
+   cart rail shows the same thing on a wide window; this is the copy that
+   exists at 390px, where there is no rail. */
+.receipt {
+  padding: 12px 14px;
+  gap: 8px;
+}
+.receipt-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+}
+.receipt-head time { font-size: 12px; color: var(--muted); }
+.receipt-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.receipt-lines li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.receipt-qty { color: var(--muted); font-variant-numeric: tabular-nums; }
+.receipt-name { min-width: 0; overflow-wrap: anywhere; }
+.receipt-amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.receipt-foot {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.receipt-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 14px;
+}
+.receipt-total strong { font-size: 17px; font-variant-numeric: tabular-nums; }
+.receipt-ref {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* Where the composer would be, in a chat whose order is already placed.
+   Same box as .composer — sticky, same border and padding — so the thread
+   above it keeps the same height and nothing shifts when a chat is opened
+   from history. One chat is one order; this is what that looks like. */
+.composer-closed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.composer-closed-copy {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.composer-closed .btn { flex-shrink: 0; }
+
 .composer-input {
   border: 1px solid var(--border);
   border-radius: 22px;
@@ -1460,4 +1536,23 @@ a:hover { color: var(--chg-arcilla); }
   }
 
   .rail-cart-total strong { font-size: 17px; font-variant-numeric: tabular-nums; }
+
+  /* A paid order. The chip and the date sit on one line above the lines it
+     paid for, so the panel reads as a receipt from its first row rather than
+     as a basket with a badge on it. */
+  .rail-cart-paid {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .rail-cart-ref {
+    margin: 6px 0 0;
+    font-size: 11px;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
 }

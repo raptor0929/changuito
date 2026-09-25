@@ -71,6 +71,29 @@ export function resetIds(): void {
   seq = 0;
 }
 
+/**
+ * Move the counter past ids that already exist.
+ *
+ * Restoring a transcript from storage brings back blocks named `b1`…`b9`
+ * while this counter is still at zero, so the next block minted would be `b1`
+ * again. React keys off `id`: a duplicate key does not throw, it silently
+ * reuses the wrong node, and the symptom is a new message painting itself
+ * into an old bubble. Call this with the highest restored number.
+ *
+ * It only ever moves forward. A lower number is ignored rather than honoured,
+ * because two restores in one page life must not walk the counter backwards
+ * into ids the first one already handed out.
+ */
+export function seedIds(highest: number): void {
+  if (Number.isFinite(highest) && highest > seq) seq = Math.floor(highest);
+}
+
+/** The number in a `b12` id, or 0 for anything else. */
+export function idNumber(id: string): number {
+  const m = /^b(\d+)$/.exec(id);
+  return m ? Number(m[1]) : 0;
+}
+
 /** The state with no turn in progress. Removes the key rather than setting it undefined. */
 function settled(state: ChatState): ChatState {
   if (!('progress' in state)) return state;

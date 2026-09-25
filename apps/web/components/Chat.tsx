@@ -8,6 +8,7 @@ import type { Cart } from '@changuito/mcp/types';
 import { STARTERS } from '../lib/agent/prompt';
 import { errorCode, track, trackLoginStart } from '../lib/analytics';
 import { canRetry, type Block, type ChatState } from '../lib/chat-state';
+import type { Receipt } from '../lib/chat-store.ts';
 import { FREE_TURNS, LOGIN_CTA, LOGIN_REQUIRED_MESSAGE, loginGateBannerText } from '../lib/login-constants';
 import type { OpenedOrder } from '../lib/order';
 import { pollarEnabled } from '../lib/pollar';
@@ -111,7 +112,8 @@ function ChatCore({
   /** The wallet's SEP-53 signer. Absent in a build without Pollar. */
   sign?: WalletSigner;
 }) {
-  const { state, send, retry, stop, loginRequired, clearLoginRequired } = useChat({ isAuthenticated, address, sign });
+  const { state, send, retry, stop, loginRequired, clearLoginRequired, resume, reset, currentSessionId } =
+    useChat({ isAuthenticated, address, sign });
   const [draft, setDraft] = useState('');
   const placeholder = useComposerPlaceholder();
   // The basket the payment modal is open over. A cart, not a block id: the
@@ -123,25 +125,45 @@ function ChatCore({
   const thread = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
 
-  // The cart rail is a sibling in the layout, not a child, so the basket has
-  // to be handed up. The last cart block is the current basket: chat-state
-  // replaces a cart in place within a turn and appends across turns, so the
-  // last one is always the most recent thing the store told us.
+  // The rails are siblings in the layout, not children, so everything they
+  // draw has to be handed up — and the same hand-up is what gets written to
+  // storage. Published after each turn rather than on every delta: a save per
+  // token would be one JSON.stringify of the whole transcript per character.
   const shop = useShop();
-  const publishCart = shop?.publishCart;
+  const publish = shop?.publish;
   useEffect(() => {
-    if (!publishCart) return;
-    for (let i = state.blocks.length - 1; i >= 0; i -= 1) {
-      const b = state.blocks[i];
-      // ES2022: no findLast. See CLAUDE.md — target is ES2022 and
-      // chat-state.ts hand-rolls the same walk for the same reason.
-      if (b?.kind === 'cart') {
-        publishCart(b.cart, b.handoffUrl);
-        return;
-      }
-    }
-    publishCart(null);
-  }, [state.blocks, publishCart]);
+    if (!publish || state.streaming) return;
+    publish({ state, sessionId: currentSessionId() });
+  }, [publish, state, currentSessionId]);
+
+  // The provider asks, this answers. Both halves of a restore land together —
+  // transcript and session id — which is the whole point of CLAUDE.md §4.
+  const request = shop?.request;
+  const ack = shop?.ack;
+  useEffect(() => {
+    if (!request || !ack) return;
+    if (request.kind === 'new') reset();
+    else resume(request.chat);
+    setDraft('');
+    setPaying(null);
+    setOrder(null);
+    ack();
+  }, [request, ack, resume, reset]);
+
+  // One chat is one order. Re-checked at /api/deposit, because a rule about
+  // money does not get to live in a browser — but refusing here is what stops
+  // the shopper writing a second basket nobody will let them pay for.
+  const readOnly = shop?.readOnly ?? false;
+  const newChat = shop?.newChat;
+  // Defaults to true with no provider at all — app/dev/ui renders the chat
+  // bare, and a fixture page with a dead pay button would be worse than one
+  // whose button opens a modal.
+  const canOrder = shop?.canOrder ?? true;
+  // The rail shows this too, on a wide window. Two views of one order rather
+  // than two orders — same relationship the basket already has with CartCard.
+  // It is in the thread because the thread is the only one of the two that
+  // exists at 390px, and a receipt you cannot open on a phone is not one.
+  const receipt = shop?.receipt ?? null;
 
   useEffect(() => {
     const el = thread.current;
@@ -201,8 +223,8 @@ function ChatCore({
   // message, silently goes nowhere. Shopping is a conversation; the cursor
   // should be waiting where the next sentence goes.
   useEffect(() => {
-    if (!state.streaming && !gated) composer.current?.focus();
-  }, [state.streaming, gated]);
+    if (!state.streaming && !gated && !readOnly) composer.current?.focus();
+  }, [state.streaming, gated, readOnly]);
 
   const last = state.blocks.at(-1);
   const undelivered = !state.streaming && last?.kind === 'user' && last.failed ? last : null;
@@ -220,7 +242,7 @@ function ChatCore({
   }, [sessionReady, undelivered, retry]);
 
   const submit = (text: string) => {
-    if (state.streaming || gated || !text.trim()) return;
+    if (state.streaming || gated || readOnly || !text.trim()) return;
     setDraft('');
     track('search_submit');
     void send(text);
@@ -285,7 +307,9 @@ function ChatCore({
                   // No wallet in this build means no pay button, rather than a
                   // button that opens a modal with nothing to sign with.
                   onPay={
-                    pollarEnabled
+                    // Not just disabled: a paid chat's card is a record of
+                    // what was bought, and a Pagar on it invites paying twice.
+                    pollarEnabled && canOrder
                       ? (cart) => {
                           track('payment_start', { flow: 'checkout' });
                           setPaying({ cart, handoffUrl: b.handoffUrl });
@@ -330,6 +354,7 @@ function ChatCore({
             />
           </p>
         ) : null}
+        {receipt ? <ReceiptCard receipt={receipt} /> : null}
         <ReportBug />
       </div>
 
@@ -366,6 +391,16 @@ function ChatCore({
 
       {order ? <OrderPanel order={order} onDismiss={() => setOrder(null)} sign={sign} /> : null}
 
+      {readOnly ? (
+        <div className="composer composer-closed" data-testid="composer-closed" role="status">
+          <p className="composer-closed-copy">
+            Esta compra ya está cerrada. Empezá un chat nuevo para pedir otra cosa.
+          </p>
+          <button type="button" className="btn" data-testid="composer-new-chat" onClick={() => newChat?.()}>
+            Nueva compra
+          </button>
+        </div>
+      ) : (
       <form
         className="composer"
         data-testid="composer"
@@ -402,6 +437,7 @@ function ChatCore({
         )}
         {state.streaming ? <TurnProgressLine state={state} /> : null}
       </form>
+      )}
 
       {paying ? (
         <PaymentModal
@@ -413,6 +449,58 @@ function ChatCore({
       ) : null}
     </div>
   );
+}
+
+/**
+ * What the shopper paid, at the end of the chat that paid it.
+ *
+ * Every amount is the string that was on screen when the order was placed,
+ * carried through storage untouched. Nothing here is recomputed from a number
+ * now: a receipt that re-prices itself when a rate moves is not a receipt.
+ */
+function ReceiptCard({ receipt }: { receipt: Receipt }) {
+  return (
+    <section className="card receipt" data-testid="receipt" aria-label="Tu compra">
+      <header className="receipt-head">
+        <strong>Compra pagada</strong>
+        <time dateTime={new Date(receipt.paidAt).toISOString()}>{paidOn(receipt.paidAt)}</time>
+      </header>
+      <ul className="receipt-lines">
+        {receipt.lines.map((l, i) => (
+          // Frozen list: no line can move under React, so the index is stable
+          // here in a way it would not be in a basket still being edited.
+          <li key={i}>
+            <span className="receipt-qty">{l.quantity}×</span>
+            <span className="receipt-name">{l.name}</span>
+            <span className="receipt-amount">{l.lineTotal}</span>
+          </li>
+        ))}
+      </ul>
+      <footer className="receipt-foot">
+        <div className="receipt-total">
+          <span>Total</span>
+          <strong>{receipt.total}</strong>
+        </div>
+        <p className="receipt-ref">
+          Pagaste {receipt.paidDisplay} · pedido {receipt.orderId}
+        </p>
+      </footer>
+    </section>
+  );
+}
+
+/** The date, in the reader's own words. Empty rather than throwing where Intl is odd. */
+function paidOn(at: number): string {
+  try {
+    return new Intl.DateTimeFormat('es-AR', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(at));
+  } catch {
+    return '';
+  }
 }
 
 /**
