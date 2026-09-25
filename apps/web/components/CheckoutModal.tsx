@@ -1,5 +1,6 @@
 'use client';
 
+import { usePollar } from '@pollar/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Cart } from '@changuito/mcp/types';
@@ -9,7 +10,13 @@ import type { VerifyResponse } from '../app/api/order/verify/route.ts';
 import { track } from '../lib/analytics';
 import type { Receipt } from '../lib/chat-store.ts';
 import { checkoutCopy } from '../lib/checkout-copy.ts';
+import { DEFAULT_NETWORK } from '../lib/deployments.ts';
+import { pollarEnabledOn } from '../lib/pollar.ts';
+import { realModeNeedsProof } from '../lib/real-mode.ts';
 import { isFramableCheckout, STOREFRONT_HOSTS } from '../lib/storefront.ts';
+import { useNetworkAccess } from '../lib/use-network-access.ts';
+import { useWalletSigner } from '../lib/use-wallet-signer.ts';
+import { signWalletProof, type WalletProof, type WalletSigner } from '../lib/wallet-proof.ts';
 import { CardPanel } from './CardPanel';
 import { CopyField } from './CopyField';
 import { useNetwork } from './NetworkProvider';
@@ -53,6 +60,15 @@ import { useNetwork } from './NetworkProvider';
  * only where the deployment can actually mint one — `intent.cardAvailable` —
  * and given back when this dialog closes, because a card left alive is money
  * sitting somewhere nobody is watching.
+ *
+ * ## Why it signs in modo real
+ *
+ * On a real network `POST /api/deposit` is a door onto actual USDC, so
+ * `lib/deposit-gate.ts` asks the wallet to prove itself before it will hand out
+ * an address to pay into. The dialog asks for that signature up front rather
+ * than letting the server refuse: `realModeNeedsProof` is shared with the gate
+ * so the two cannot disagree about when one is wanted. In modo prueba nothing
+ * signs and a guest with no wallet at all shops exactly as before.
  */
 
 interface Props {
@@ -60,6 +76,35 @@ interface Props {
   handoffUrl?: string;
   onClose: () => void;
   onPaid: (receipt: Receipt) => void;
+}
+
+/**
+ * `usePollar()` throws outside a provider, and there are two places without
+ * one: a deployment with no Pollar key, and app/dev/ui, which renders this
+ * dialog on its own. The same split WalletWidget and PaymentModal make — but
+ * ending in the dialog either way rather than in `null`, because checkout in
+ * modo prueba has never needed a wallet and must not start now.
+ */
+export function CheckoutModal(props: Props) {
+  const { network } = useNetwork();
+  return pollarEnabledOn(network) ? (
+    <CheckoutWithWallet {...props} />
+  ) : (
+    <CheckoutDialog {...props} address={null} sign={null} />
+  );
+}
+
+function CheckoutWithWallet(props: Props) {
+  const { wallet, isAuthenticated } = usePollar();
+  const sign = useWalletSigner();
+  const address = isAuthenticated ? (wallet?.address ?? null) : null;
+  return <CheckoutDialog {...props} address={address} sign={sign} />;
+}
+
+interface DialogProps extends Props {
+  /** The logged-in wallet, or null when there is none to sign with. */
+  address: string | null;
+  sign: WalletSigner | null;
 }
 
 type Step = 'deposit' | 'checkout';
@@ -73,9 +118,13 @@ const IDENTIFY_PATIENCE = 4;
 /** Stop asking eventually; the manual button is always there. */
 const IDENTIFY_MAX = 12;
 
-export function CheckoutModal({ cart, handoffUrl, onClose, onPaid }: Props) {
+function CheckoutDialog({ cart, handoffUrl, onClose, onPaid, address, sign }: DialogProps) {
   const { network } = useNetwork();
   const copy = checkoutCopy(network);
+
+  // Null until the server answers, and null forever for a guest with no
+  // address — which is right, because a guest cannot be in a gated mode.
+  const mode = useNetworkAccess(address)?.[network].mode ?? null;
 
   const [step, setStep] = useState<Step>('deposit');
   const [intent, setIntent] = useState<DepositIntent | null>(null);
@@ -149,17 +198,48 @@ export function CheckoutModal({ cart, handoffUrl, onClose, onPaid }: Props) {
   const minted = useRef(false);
   useEffect(() => {
     if (minted.current) return;
+
+    // A gated network waits for the server's answer about this wallet. `null`
+    // is "not yet", not "no" — minting now would ask without a signature and
+    // spend the one mint on a refusal.
+    const gated = network !== DEFAULT_NETWORK;
+    if (gated && mode === null) return;
+    const needsProof = gated && mode !== null && realModeNeedsProof(mode);
+
+    // Deliberately before `minted.current`: the shopper may still log in, and
+    // when they do this effect runs again with an address and mints properly.
+    // The ref is what makes that safe — one mint, however many times we get here.
+    if (needsProof && (!address || !sign)) {
+      setMintError('Iniciá sesión con tu cuenta para pagar.');
+      return;
+    }
+
     minted.current = true;
+    setMintError(null);
     (async () => {
       try {
+        let proof: WalletProof | undefined;
+        if (needsProof) {
+          const signed = await signWalletProof(sign!, 'deposit', address!);
+          if (!signed) {
+            // A passkey smart wallet (C…) lands here: it cannot sign SEP-53 at
+            // all, so this is the end of the road rather than a retry.
+            setMintError('No pudimos confirmar tu sesión. Probá de nuevo.');
+            return;
+          }
+          proof = signed;
+        }
         const res = await fetch('/api/deposit', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ centavos: cart.total.centavos, network }),
+          body: JSON.stringify({ centavos: cart.total.centavos, network, address, proof }),
         });
         const body = await res.json();
         if (!res.ok) {
-          setMintError(typeof body?.error === 'string' ? body.error : 'No pudimos preparar el pago.');
+          // `message` first: the gate's `error` is a code for the logs, and
+          // its `message` is the sentence written for the shopper.
+          const said = typeof body?.message === 'string' ? body.message : body?.error;
+          setMintError(typeof said === 'string' ? said : 'No pudimos preparar el pago.');
           return;
         }
         setIntent(body as DepositIntent);
@@ -167,7 +247,7 @@ export function CheckoutModal({ cart, handoffUrl, onClose, onPaid }: Props) {
         setMintError('No pudimos preparar el pago. Revisá la conexión y volvé a intentar.');
       }
     })();
-  }, [cart.total.centavos, network]);
+  }, [cart.total.centavos, network, mode, address, sign]);
 
   // Poll until it lands. A 502 is the network being unreadable, not a missing
   // importe, so it leaves the screen saying "esperando" rather than "no llegó".
