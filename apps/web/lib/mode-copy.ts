@@ -83,6 +83,32 @@ export function modeLockedReason(why: ModeLock): string {
 }
 
 /**
+ * Which of those two to say, given what the server answered — or did not.
+ *
+ * The rule that matters is the first line: **an answer we do not have is not
+ * a fact about the account.** This used to fall through to 'not-allowed'
+ * whenever `access` was null, and null is also what a request in flight looks
+ * like, and what a 403 from the human gate looks like. So a network hiccup
+ * told somebody their account was refused — a definite claim about them,
+ * made with no information about them. It is the same failure the balance
+ * qualifier fixed: saying something confident that nothing checked.
+ *
+ * After that, "there is nothing deployed yet" outranks "you are not on the
+ * list", because while it holds it is true of everybody, and it points at
+ * the thing that actually has to happen. lib/network-access.ts orders its
+ * *server* refusal the other way round on purpose — a stranger there learns
+ * only that they may not, never whether there is anything to reach.
+ */
+export function modeLockFor(
+  access: { allowed: boolean; configured: boolean } | null | undefined,
+): ModeLock | null {
+  if (!access) return 'not-ready';
+  if (!access.configured) return 'not-ready';
+  if (!access.allowed) return 'not-allowed';
+  return null;
+}
+
+/**
  * The one-time step before the first real payment.
  *
  * Nobody asked for this and nobody will understand why it exists, so the copy

@@ -4,7 +4,7 @@ import { usePollar } from '@pollar/react';
 import { useEffect, useRef, useState } from 'react';
 
 import { track, trackLoginStart } from '../lib/analytics';
-import { modeCopy, modeLockedReason } from '../lib/mode-copy.ts';
+import { modeCopy, modeLockedReason, modeLockFor } from '../lib/mode-copy.ts';
 import { pollarEnabledOn, shortAddress } from '../lib/pollar.ts';
 import { ensureUserCookie, forgetUserCookie } from '../lib/session-login.ts';
 import type { FaucetProof } from '../lib/faucet-proof.ts';
@@ -56,11 +56,9 @@ function ConnectedWallet() {
   // as "no" — an option that appears and then vanishes is worse than one that
   // arrives late.
   const access = useNetworkAccess(address);
-  const real = access?.mainnet;
   const mode = modeCopy(network);
-  const lockedReason = real?.usable
-    ? null
-    : modeLockedReason(real && !real.configured ? 'not-ready' : 'not-allowed');
+  const lock = modeLockFor(access?.mainnet);
+  const lockedReason = lock && modeLockedReason(lock);
 
   // If the saved mode turns out not to be theirs, they go back to the safe one
   // rather than sitting in a mode every request will refuse. Only once the

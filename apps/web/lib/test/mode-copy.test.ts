@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { NETWORK_IDS } from '../deployments.ts';
-import { MODES, modeCopy, modeLockedReason, TRUSTLINE } from '../mode-copy.ts';
+import { MODES, modeCopy, modeLockedReason, modeLockFor, TRUSTLINE } from '../mode-copy.ts';
 
 /**
  * The chrome obeys the same vocabulary rule as the agent: lib/agent/prompt.ts
@@ -67,6 +67,29 @@ describe('mode copy', () => {
     assert.match(TRUSTLINE.body, /no se vuelve a pedir/);
     assert.match(TRUSTLINE.failed, /modo prueba/);
     assert.match(TRUSTLINE.back, /modo prueba/);
+  });
+
+  it('RULE: an answer we do not have is never reported as "not for you"', () => {
+    // The bug: `access` is null while the request is in flight AND when it
+    // fails — a 403 from the human gate looks exactly like a slow one. The
+    // old fallback picked 'not-allowed', so a network hiccup told somebody
+    // their account was refused, which nothing had checked.
+    for (const unknown of [null, undefined]) {
+      assert.equal(modeLockFor(unknown), 'not-ready');
+      assert.doesNotMatch(modeLockedReason(modeLockFor(unknown)!), /cuenta/);
+    }
+  });
+
+  it('RULE: "nothing is deployed" outranks "you are not on the list"', () => {
+    // While it holds it is true of everybody, and it names the thing that
+    // actually has to happen. Both flags are false today, on every network.
+    assert.equal(modeLockFor({ allowed: false, configured: false }), 'not-ready');
+    assert.equal(modeLockFor({ allowed: true, configured: false }), 'not-ready');
+  });
+
+  it('blames the account only when the server actually said so', () => {
+    assert.equal(modeLockFor({ allowed: false, configured: true }), 'not-allowed');
+    assert.equal(modeLockFor({ allowed: true, configured: true }), null);
   });
 
   it('tells "not for you" apart from "not yet for anyone"', () => {

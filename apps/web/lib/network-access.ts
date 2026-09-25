@@ -28,7 +28,13 @@ export interface NetworkAccess {
   mode: RealModeMode;
   /** Whether this wallet may ask for this network. Says nothing about uptime. */
   allowed: boolean;
-  /** Whether the contracts exist yet. Only told to somebody already allowed. */
+  /**
+   * Whether the contracts exist yet. A fact about us, not the caller, and
+   * told to everybody who asks — contract ids are public the moment they
+   * are deployed. `denyNetwork` still answers allowlist-first, so a
+   * refusal never reveals it; this field is what lets the toggle say
+   * "not yet" instead of "not you" while nothing is deployed.
+   */
   configured: boolean;
   /** Both of the above. What the toggle actually needs. */
   usable: boolean;
