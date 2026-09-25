@@ -22,17 +22,26 @@ export const WALLET_PROOF_TTL_MS = 5 * 60_000;
 /** Clocks disagree a little; a proof from slightly in the future is fine. */
 export const WALLET_PROOF_SKEW_MS = 60_000;
 
-export type WalletIntent = 'login' | 'faucet' | 'settle' | 'refund';
+export type WalletIntent = 'login' | 'faucet' | 'deposit' | 'settle' | 'refund';
 
 const INTENT_TEXT: Record<WalletIntent, string> = {
   login: 'iniciar sesión',
   faucet: 'cargar USDC de prueba',
+  deposit: 'pagar la compra',
   settle: 'confirmar la orden',
   refund: 'reembolsar la orden',
 };
 
 /** Intents that are about one order, and so carry its id. */
-const NEEDS_REF: Record<WalletIntent, boolean> = { login: false, faucet: false, settle: true, refund: true };
+const NEEDS_REF: Record<WalletIntent, boolean> = {
+  login: false,
+  faucet: false,
+  // The código does not exist yet when this is signed — the deposit route
+  // mints it *after* deciding whether the shopper may have one at all.
+  deposit: false,
+  settle: true,
+  refund: true,
+};
 
 export interface WalletProof {
   message: string;
@@ -56,7 +65,7 @@ export interface ParsedWalletProof {
 }
 
 const PATTERN =
-  /^Changuito: (iniciar sesión|cargar USDC de prueba|confirmar la orden|reembolsar la orden)(?: ([0-9a-f]{64}))? con ([A-Z0-9]{56}) \((\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)\)$/;
+  /^Changuito: (iniciar sesión|cargar USDC de prueba|pagar la compra|confirmar la orden|reembolsar la orden)(?: ([0-9a-f]{64}))? con ([A-Z0-9]{56}) \((\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)\)$/;
 
 export function parseWalletProofMessage(message: string): ParsedWalletProof | null {
   const m = PATTERN.exec(message);
