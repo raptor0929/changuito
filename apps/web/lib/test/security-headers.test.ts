@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import { DEPLOYMENTS, NETWORK_IDS } from '../deployments.ts';
-import { appContentSecurityPolicy, appSecurityHeaders } from '../security-headers.ts';
+import { appContentSecurityPolicy, appSecurityHeaders, fixtureSecurityHeaders } from '../security-headers.ts';
 
 const none = { ga: '', meta: '', clarity: '' };
 const header = (name: string, env = 'production') =>
@@ -26,7 +26,7 @@ describe('shopper security headers', () => {
   it('allows exactly what the page talks to', () => {
     const csp = appContentSecurityPolicy('production', none);
     assert.match(csp, /script-src [^;]*https:\/\/challenges\.cloudflare\.com/);
-    assert.match(csp, /frame-src https:\/\/challenges\.cloudflare\.com/);
+    assert.match(csp, /frame-src [^;]*https:\/\/challenges\.cloudflare\.com/);
     assert.match(csp, /connect-src [^;]*https:\/\/sdk\.api\.pollar\.xyz/);
     assert.match(csp, /img-src [^;]*https:\/\/\*\.vtexassets\.com/);
     assert.match(csp, /object-src 'none'/);
@@ -56,5 +56,43 @@ describe('shopper security headers', () => {
     const config = readFileSync(new URL('../../next.config.ts', import.meta.url), 'utf8');
     assert.match(config, /poweredByHeader:\s*false/);
     assert.match(config, /appSecurityHeaders\(\)/);
+  });
+});
+
+describe('the checkout fixture exception', () => {
+  const fixture = (env: string | undefined, name: string) =>
+    fixtureSecurityHeaders(env, none).find((h) => h.key === name)?.value;
+
+  it('RULE: production gets no exception at all', () => {
+    assert.deepEqual(fixtureSecurityHeaders('production', none), []);
+  });
+
+  it('lets us, and only us, frame it in development', () => {
+    assert.match(fixture('development', 'Content-Security-Policy')!, /frame-ancestors 'self'/);
+    assert.equal(fixture('development', 'X-Frame-Options'), 'SAMEORIGIN');
+  });
+
+  it('RULE: relaxing the fixture never relaxes the app', () => {
+    // The exception is a path rule layered over the app's own headers. If it
+    // ever became the app's headers, this is what would notice.
+    assert.match(appContentSecurityPolicy('development', none), /frame-ancestors 'none'/);
+    assert.equal(header('X-Frame-Options', 'development'), 'DENY');
+  });
+
+  it('changes nothing else', () => {
+    const base = appSecurityHeaders('development', none);
+    const relaxed = fixtureSecurityHeaders('development', none);
+    assert.equal(relaxed.length, base.length);
+    const differing = relaxed.filter((h, i) => h.value !== base[i].value).map((h) => h.key);
+    assert.deepEqual(differing, ['Content-Security-Policy', 'X-Frame-Options']);
+  });
+
+  it('is wired into next.config, second so it wins', () => {
+    const config = readFileSync(new URL('../../next.config.ts', import.meta.url), 'utf8');
+    assert.match(config, /fixtureSecurityHeaders\(\)/);
+    assert.ok(
+      config.indexOf('appSecurityHeaders()') < config.indexOf('source: FIXTURE_PATH'),
+      'the fixture rule must come after the app-wide one',
+    );
   });
 });

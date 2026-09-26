@@ -1,8 +1,11 @@
 import { Chat } from '../components/Chat';
+import { Deck } from '../components/Deck';
+import { HistoryToggle } from '../components/HistoryToggle';
 import { FooterSocial } from '../components/FooterSocial';
 import { FounderTrust } from '../components/FounderTrust';
 import { HumanGate } from '../components/HumanGate';
 import { NetworkProvider } from '../components/NetworkProvider';
+import { ShopProvider } from '../components/ShopProvider';
 import { WalletProvider } from '../components/WalletProvider';
 import { WalletWidget } from '../components/WalletWidget';
 import { turnstileSiteKey } from '../lib/human-gate';
@@ -19,48 +22,56 @@ export default function Home() {
     // key that provider is built with, so it has to be decided above it.
     <NetworkProvider>
       <WalletProvider>
-        <main className="shell">
-          <header className="masthead">
-            <div className="brand">
-              <img
-                className="brand-mark"
-                src="/brand/mascot-idle.png"
-                alt=""
-                aria-hidden="true"
-                width={397}
-                height={583}
-              />
-              <div className="brand-copy">
-                {/* The name is text, not only an alt: tools that read a
-                    heading's text content (crawlers, some audits) saw an
-                    empty h1. The image is then decorative, so it is not read
-                    twice. */}
-                <h1 className="brand-name">
-                  <span className="sr-only">Changuito</span>
+        <ShopProvider>
+          <Deck>
+            <main className="shell">
+              <header className="masthead">
+                <div className="brand">
+                  {/* Before the mark, so a keyboard lands on the way into the
+                      history before the way into the chat. Renders nothing at
+                      the wide breakpoint, where the rail is already a column. */}
+                  <HistoryToggle />
                   <img
-                    className="brand-wordmark"
-                    src="/brand/wordmark.png"
+                    className="brand-mark"
+                    src="/brand/mascot-idle.png"
                     alt=""
                     aria-hidden="true"
-                    width={1097}
-                    height={249}
+                    width={397}
+                    height={583}
                   />
-                </h1>
-                <p className="tagline">
-                  Contale a Changuito lo que necesitás y dejá que se encargue de planear todo.
-                </p>
-              </div>
-            </div>
-            <WalletWidget />
-          </header>
-          <HumanGate siteKey={siteKey}>
-            <Chat />
-          </HumanGate>
-          <footer className="app-footer">
-            <FounderTrust />
-            <FooterSocial />
-          </footer>
-        </main>
+                  <div className="brand-copy">
+                    {/* The name is text, not only an alt: tools that read a
+                        heading's text content (crawlers, some audits) saw an
+                        empty h1. The image is then decorative, so it is not read
+                        twice. */}
+                    <h1 className="brand-name">
+                      <span className="sr-only">Changuito</span>
+                      <img
+                        className="brand-wordmark"
+                        src="/brand/wordmark.png"
+                        alt=""
+                        aria-hidden="true"
+                        width={1097}
+                        height={249}
+                      />
+                    </h1>
+                    <p className="tagline">
+                      Contale a Changuito lo que necesitás y dejá que se encargue de planear todo.
+                    </p>
+                  </div>
+                </div>
+                <WalletWidget />
+              </header>
+              <HumanGate siteKey={siteKey}>
+                <Chat />
+              </HumanGate>
+              <footer className="app-footer">
+                <FounderTrust />
+                <FooterSocial />
+              </footer>
+            </main>
+          </Deck>
+        </ShopProvider>
       </WalletProvider>
     </NetworkProvider>
   );

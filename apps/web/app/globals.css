@@ -481,6 +481,82 @@ a:hover { color: var(--chg-arcilla); }
   border-top: 1px solid var(--border);
   background: var(--bg);
 }
+/* The paid order, in the thread. Not a .bubble: it is not something anyone
+   said, it is the record of what happened, so it reads as a document. The
+   cart rail shows the same thing on a wide window; this is the copy that
+   exists at 390px, where there is no rail. */
+.receipt {
+  padding: 12px 14px;
+  gap: 8px;
+}
+.receipt-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+}
+.receipt-head time { font-size: 12px; color: var(--muted); }
+.receipt-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.receipt-lines li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.receipt-qty { color: var(--muted); font-variant-numeric: tabular-nums; }
+.receipt-name { min-width: 0; overflow-wrap: anywhere; }
+.receipt-amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.receipt-foot {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.receipt-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 14px;
+}
+.receipt-total strong { font-size: 17px; font-variant-numeric: tabular-nums; }
+.receipt-ref {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* Where the composer would be, in a chat whose order is already placed.
+   Same box as .composer — sticky, same border and padding — so the thread
+   above it keeps the same height and nothing shifts when a chat is opened
+   from history. One chat is one order; this is what that looks like. */
+.composer-closed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.composer-closed-copy {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.composer-closed .btn { flex-shrink: 0; }
+
 .composer-input {
   border: 1px solid var(--border);
   border-radius: 22px;
@@ -698,6 +774,104 @@ a:hover { color: var(--chg-arcilla); }
 .modal-x:disabled { opacity: 0.3; cursor: not-allowed; }
 .modal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .modal-actions .btn { flex: 1 1 auto; min-width: 128px; text-align: center; }
+
+/* The checkout dialog. Wider than the payment one because it holds a frame,
+   and the frame is a page someone else laid out: below ~700px tall it starts
+   scrolling inside a box that is itself scrolling, which is why the height is
+   a viewport fraction rather than a fixed number. */
+.modal-wide { max-width: 760px; }
+.ck-step { display: flex; flex-direction: column; gap: 14px; }
+.ck-title { margin: 0; font-size: 16px; }
+.ck-lead { margin: 0; font-size: 14px; line-height: 1.5; }
+.ck-note { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+
+.ck-fields { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.ck-field { display: flex; flex-direction: column; gap: 3px; }
+.ck-field dt { font-size: 12px; color: var(--muted); }
+.ck-field dd { margin: 0; display: flex; align-items: center; gap: 8px; }
+.ck-value { flex: 1 1 auto; min-width: 0; font-size: 14px; }
+/* An address and a código get read character by character off the screen when
+   the clipboard is unavailable, so they need the font that tells 0 from O. */
+.ck-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; overflow-wrap: anywhere; }
+.ck-copy {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  border-radius: 8px;
+  font-size: 12px;
+  padding: 6px 10px;
+  cursor: pointer;
+  min-height: 32px;
+}
+.ck-copy:hover { color: var(--fg); }
+
+.ck-waiting { margin: 0; font-size: 13px; color: var(--muted); }
+.ck-ok { margin: 0; font-size: 13px; color: var(--ok); }
+
+.ck-login { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px; }
+.ck-login-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ck-login-actions .btn { flex: 1 1 auto; min-width: 140px; text-align: center; }
+
+.ck-frame {
+  width: 100%;
+  /* Short enough that "Ya lo pagué" is on screen with it. A frame that fills
+     the dialog buries the only control that ends the flow, and the shopper
+     coming back from the súper has to hunt for it. */
+  height: min(42dvh, 380px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+/* And on a phone, where the dialog is the whole screen, the button follows
+   the scroll rather than waiting at the bottom of a page inside a page. */
+.ck-step .modal-actions {
+  position: sticky;
+  bottom: -18px;
+  background: var(--surface);
+  padding: 10px 0 18px;
+  margin-bottom: -18px;
+}
+
+.ck-tab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ck-tab .btn { flex: 0 0 auto; }
+.ck-tab .ck-note { flex: 1 1 200px; }
+/* Promoted when the store has not recognised the shopper: the frame is most
+   likely having its cookies blocked, and nothing on our side can grant them. */
+.ck-tab-up { border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+
+/* The optional single-use card. Boxed rather than inline because the numbers
+   in it are the only thing on this screen somebody has to transcribe, and a
+   box is what says "this part, now". */
+.ck-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+.ck-card-live { border-color: var(--ok); }
+.ck-card-title { margin: 0; font-size: 14px; display: flex; align-items: baseline; gap: 8px; }
+.ck-brand { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.ck-otp { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px; }
+/* Tabular so the seconds do not shuffle the sentence sideways once a second. */
+.ck-countdown { font-variant-numeric: tabular-nums; color: var(--fg); }
+
+/* app/dev/checkout — the stand-in framed in the store's place in modo prueba.
+   Kept visibly unlike Día on purpose: see that page's header. */
+.dev-checkout { padding: 20px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.dev-checkout h1 { margin: 0; font-size: 20px; text-transform: capitalize; }
+.dev-checkout-badge {
+  margin: 0;
+  font-size: 12px;
+  color: var(--warn);
+  border: 1px dashed var(--warn);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.dev-checkout-total { margin: 0; font-size: 15px; font-variant-numeric: tabular-nums; }
+.dev-checkout-done { margin: 0; font-size: 14px; color: var(--ok); }
 
 .pay-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
 .pay-lines li { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: baseline; }
@@ -1135,5 +1309,348 @@ a:hover { color: var(--chg-arcilla); }
     padding: 0 8px calc(4px + env(safe-area-inset-bottom, 0px));
     font-size: 11px;
     line-height: 1.25;
+  }
+}
+
+/* ------------------------------------------------------- the three columns
+
+   History on the left, the chat in the middle, the basket on the right.
+
+   The whole block is additive on purpose. Below WIDE the deck is
+   `display: contents`, which means it is not in the layout at all: the shell
+   keeps its own `position: fixed` and its own centring, and every rule above
+   — including the 156-line 560px block that fits an empty chat into a
+   360x740 phone — applies exactly as it did before the wrapper existed. The
+   rails are simply not rendered there, except the history drawer.
+
+   1200px is where three columns start being honest rather than cramped:
+   below it the middle would be narrower than the thread was designed for,
+   and a 704px chat with two rails reads worse than an 820px chat with none.
+
+   The rails are `min-height: 0` flex children with their own overflow. They
+   must never become a second document scroller — the page does not scroll,
+   that is what --vvh is for. */
+
+.deck { display: contents; }
+
+.rail { display: none; }
+
+/* The scrim only exists for the drawer. */
+.rail-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(42, 26, 20, 0.38);
+}
+
+/* ------------------------------------------- history drawer, narrow window */
+
+/* In the masthead flow, beside the brand — not fixed. Fixed at top-left put
+   it exactly on the brand mark at 390px and 768px alike, and there is no free
+   corner: the composer, the footer and the dev overlay have the other three. */
+.deck-drawer-toggle {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Off-canvas. `visibility` rather than display so the transform animates and
+   so a closed drawer is out of the tab order. */
+.rail-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: fixed;
+  z-index: 50;
+  top: var(--vv-top, 0px);
+  left: 0;
+  width: min(300px, 86vw);
+  height: var(--vvh, 100dvh);
+  padding: 16px 12px;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition: transform 180ms ease, visibility 0s linear 180ms;
+}
+
+.rail-history.is-open {
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform 180ms ease, visibility 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-history { transition: none; }
+}
+
+.rail-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.rail-history-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.rail-new { flex-shrink: 0; }
+
+.rail-history-empty,
+.rail-cart-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.rail-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* The list scrolls, not the rail: "Nueva compra" stays reachable under a
+     long history, the same way the composer does under a long thread. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.rail-history-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.rail-history-row:hover { background: rgba(42, 26, 20, 0.06); }
+.rail-history-row.is-active {
+  background: rgba(42, 26, 20, 0.08);
+  border-color: var(--border);
+}
+.rail-history-row:focus-visible {
+  outline: 3px solid var(--chg-espresso);
+  outline-offset: -3px;
+}
+
+.rail-history-row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-chip {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  /* --warn is an accent at ~2.9:1 and is never a text colour here; the ink
+     token is what carries the letters. See lib/test/contrast.test.ts. */
+  color: var(--warn-ink);
+  background: rgba(224, 122, 95, 0.18);
+}
+
+.rail-chip-paid {
+  color: var(--chg-espresso);
+  background: var(--chg-sunflower);
+}
+
+/* ------------------------------------------------------- the wide window */
+
+@media (min-width: 1200px) {
+  .deck {
+    display: grid;
+    position: fixed;
+    top: var(--vv-top, 0px);
+    left: 0;
+    width: 100%;
+    height: var(--vvh, 100dvh);
+    max-height: var(--vvh, 100dvh);
+    grid-template-columns: 236px minmax(0, 820px) 308px;
+    grid-template-rows: 100%;
+    justify-content: center;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* Out of the fixed position and into the middle cell. Everything inside it
+     — the column flex, the thread as the only scroller, the sticky composer
+     — is unchanged. */
+  .shell {
+    position: static;
+    top: auto;
+    left: auto;
+    width: auto;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+
+  .rail {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    padding: 24px 14px 0;
+  }
+
+  /* The drawer becomes a column: no scrim, no transform, no close button,
+     and nothing to open it with. */
+  .rail-scrim,
+  .deck-drawer-toggle,
+  .rail-history-close {
+    display: none;
+  }
+
+  .rail-history {
+    position: static;
+    z-index: auto;
+    width: auto;
+    height: auto;
+    border-right: 0;
+    transform: none;
+    visibility: visible;
+    transition: none;
+    padding: 24px 14px 0;
+  }
+
+  /* 46px, not the 24px the other rail uses: the mascot hangs 34px above the
+     panel and .deck clips, so this is the mascot's headroom, not a margin. */
+  .rail-cart { padding-top: 46px; }
+
+  /* overflow: visible so the mascot can hang over the corner. The panel is
+     the border; the list inside it is the scroller. */
+  .rail-cart-panel {
+    position: relative;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    gap: 10px;
+    padding: 14px 12px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+  }
+
+  .rail-mascot {
+    position: absolute;
+    top: -34px;
+    right: -10px;
+    height: 64px;
+    width: auto;
+    pointer-events: none;
+  }
+
+  .rail-cart-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    /* Room for the mascot's feet. */
+    padding-right: 44px;
+    flex-shrink: 0;
+  }
+
+  .rail-cart-title { font-weight: 700; font-size: 14px; }
+  .rail-cart-store { font-size: 12px; color: var(--muted); }
+
+  .rail-cart-lines {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .rail-cart-line {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 6px;
+    align-items: baseline;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .rail-cart-line.is-oos {
+    color: var(--muted);
+    text-decoration: line-through;
+  }
+
+  .rail-cart-qty { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .rail-cart-name { min-width: 0; overflow-wrap: anywhere; }
+  .rail-cart-amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .rail-cart-foot {
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+
+  .rail-cart-warn {
+    margin: 0 0 6px;
+    font-size: 12px;
+    color: var(--warn-ink);
+  }
+
+  .rail-cart-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    font-size: 14px;
+  }
+
+  .rail-cart-total strong { font-size: 17px; font-variant-numeric: tabular-nums; }
+
+  /* A paid order. The chip and the date sit on one line above the lines it
+     paid for, so the panel reads as a receipt from its first row rather than
+     as a basket with a badge on it. */
+  .rail-cart-paid {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .rail-cart-ref {
+    margin: 6px 0 0;
+    font-size: 11px;
+    color: var(--muted);
+    overflow-wrap: anywhere;
   }
 }

@@ -7,13 +7,16 @@ import {
   applyEvent,
   endTurn,
   failTurn,
+  idNumber,
   initialState,
   omitErrorMessage,
   retryUser,
+  seedIds,
   sendUser,
   type ChatState,
   type SendFailure,
 } from './chat-state';
+import type { StoredChat } from './chat-store.ts';
 import { notifyHumanRequired, SOLO_HUMANOS } from './human-gate-ui';
 import { LOGIN_REQUIRED, LOGIN_REQUIRED_MESSAGE } from './login-constants';
 import { parseEvents, type ChatRequest } from './protocol';
@@ -248,5 +251,50 @@ export function useChat(auth?: UseChatAuth) {
     abort.current?.abort();
   }, []);
 
-  return { state, send, retry, stop, loginRequired, clearLoginRequired };
+  /**
+   * Put a stored chat back on screen, transcript and session id together.
+   *
+   * CLAUDE.md §4 is explicit that restoring one without the other is worse
+   * than restoring neither, so this takes both or nothing: a chat the store
+   * says is no longer resumable arrives here with `sessionId: null` and the
+   * conversation comes back as a record the shopper can read but not continue.
+   *
+   * Seeding the id counter is not optional. The restored blocks are named
+   * `b1`…`bN` while the module counter is still at 0, so the next block minted
+   * would reuse `b1`. React keys off it and would paint a new message into an
+   * old bubble.
+   */
+  const resume = useCallback((chat: StoredChat) => {
+    if (inFlight.current) return;
+    abort.current?.abort();
+    seedIds(chat.blocks.reduce((hi, b) => Math.max(hi, idNumber(b.id)), 0));
+    sessionId.current = chat.sessionId ?? '';
+    snapshot.current = chat.snapshot ?? undefined;
+    setLoginRequired(false);
+    setState({
+      blocks: chat.blocks,
+      streaming: false,
+      ...(chat.snapshot ? { snapshot: chat.snapshot } : {}),
+      ...(chat.cart ? { cart: { cart: chat.cart, ...(chat.handoffUrl ? { handoffUrl: chat.handoffUrl } : {}) } } : {}),
+    });
+  }, []);
+
+  /** A blank conversation the server has never heard of. */
+  const reset = useCallback(() => {
+    if (inFlight.current) abort.current?.abort();
+    sessionId.current = '';
+    snapshot.current = undefined;
+    setLoginRequired(false);
+    setState(initialState);
+  }, []);
+
+  /**
+   * The agent's session id, or null before the first send mints one. A getter
+   * rather than a value: it lives in a ref precisely because it must not
+   * trigger a render, and the saver needs the one from the turn that just
+   * finished.
+   */
+  const currentSessionId = useCallback(() => sessionId.current || null, []);
+
+  return { state, send, retry, stop, loginRequired, clearLoginRequired, resume, reset, currentSessionId };
 }

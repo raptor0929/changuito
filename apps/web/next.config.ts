@@ -1,12 +1,20 @@
 import type { NextConfig } from 'next';
 
-import { appSecurityHeaders } from './lib/security-headers.ts';
+import { appSecurityHeaders, fixtureSecurityHeaders, FIXTURE_PATH } from './lib/security-headers.ts';
 
 const config: NextConfig = {
   // www already drops it; there is no reason to advertise the framework.
   poweredByHeader: false,
   async headers() {
-    return [{ source: '/:path*', headers: appSecurityHeaders() }];
+    // Order matters: a later rule's value wins for the same header key, so
+    // the fixture's relaxed frame-ancestors has to come second. Outside
+    // development `fixtureSecurityHeaders` is empty and the rule is not
+    // added at all — see lib/security-headers.ts for why that is two locks.
+    const fixture = fixtureSecurityHeaders();
+    return [
+      { source: '/:path*', headers: appSecurityHeaders() },
+      ...(fixture.length ? [{ source: FIXTURE_PATH, headers: fixture }] : []),
+    ];
   },
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
   // `@changuito/mcp` is a workspace package of compiled ESM. It gets bundled

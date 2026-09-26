@@ -6,6 +6,7 @@ import '@pollar/react/styles.css';
 import { useState } from 'react';
 
 import { TurnProgressLine, UserBubble } from '../../../components/Chat';
+import { CheckoutModal } from '../../../components/CheckoutModal';
 import { FaucetConfirm } from '../../../components/FaucetConfirm';
 import { PollarSpanish } from '../../../components/PollarSpanish';
 import type { ChatState } from '../../../lib/chat-state';
@@ -53,11 +54,33 @@ const SEARCHING: ChatState = {
   ],
 };
 
+/**
+ * A basket for the checkout dialog. Unlike the payment modal it needs no
+ * wallet — the shopper pays the súper themselves — so it can be opened here,
+ * which is the only cheap way to look at the frame and the deposit step
+ * without driving a whole conversation against a live supermarket.
+ */
+const CHECKOUT_CART = {
+  retailer: 'dia',
+  cartId: 'f0e1d2c3b4a5968778695a4b3c2d1e0f',
+  lines: [
+    { index: 0, skuId: '1', sellerId: '1', name: 'Leche descremada 1L', quantity: 2, available: true,
+      unitPrice: { centavos: 157500, display: '$1.575,00' },
+      lineTotal: { centavos: 315000, display: '$3.150,00' } },
+    { index: 1, skuId: '2', sellerId: '1', name: 'Galletitas de avena 250g', quantity: 1, available: true,
+      unitPrice: { centavos: 300000, display: '$3.000,00' },
+      lineTotal: { centavos: 300000, display: '$3.000,00' } },
+  ],
+  total: { centavos: 615000, display: '$6.150,00' },
+  messages: [],
+};
+
 const IDLE: AuthState = { step: 'idle' } as AuthState;
 const CODE: AuthState = { step: 'entering_code' } as AuthState;
 
 export function Fixtures() {
   const [faucet, setFaucet] = useState<'empty' | 'full' | null>(null);
+  const [checkout, setCheckout] = useState(false);
 
   return (
     <>
@@ -99,6 +122,23 @@ export function Fixtures() {
           balanceUnits={faucet === 'empty' ? 0n : ENOUGH_UNITS}
           onClose={() => setFaucet(null)}
           onConfirm={() => setFaucet(null)}
+        />
+      ) : null}
+
+      <button
+        type="button"
+        className="btn"
+        data-testid="fixture-open-checkout"
+        onClick={() => setCheckout(true)}
+      >
+        Abrir el checkout
+      </button>
+      {checkout ? (
+        <CheckoutModal
+          cart={CHECKOUT_CART}
+          handoffUrl="https://diaonline.supermercadosdia.com.ar/checkout/?orderFormId=f0e1d2c3b4a5968778695a4b3c2d1e0f"
+          onClose={() => setCheckout(false)}
+          onPaid={() => setCheckout(false)}
         />
       ) : null}
 

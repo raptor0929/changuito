@@ -1,6 +1,7 @@
 import { StrKey } from '@stellar/stellar-sdk';
 
 import { DEFAULT_NETWORK, isConfigured, type NetworkId } from './deployments.ts';
+import { canDeposit } from './deposit.ts';
 import { envFlag } from './env-flag.ts';
 
 /**
@@ -43,7 +44,8 @@ export interface NetworkAccess {
   /** Whether this wallet may ask for this network. Says nothing about uptime. */
   allowed: boolean;
   /**
-   * Whether the contracts exist yet. A fact about us, not the caller, and
+   * Whether there is anything to reach on this network yet — contracts, or
+   * an account that can take a deposit. A fact about us, not the caller, and
    * told to everybody who asks — contract ids are public the moment they
    * are deployed. `denyNetwork` still answers allowlist-first, so a
    * refusal never reveals it; this field is what lets the toggle say
@@ -88,7 +90,13 @@ export function networkAccess(
   net: NetworkId,
   env: NodeJS.ProcessEnv = process.env,
 ): NetworkAccess {
-  const configured = isConfigured(net);
+  // Either rail counts. The escrow needs contracts; a deposit needs only an
+  // account to pay into, which is why mainnet can be usable with nothing
+  // deployed. Keeping the disjunction here rather than widening `isConfigured`
+  // leaves that function meaning what every escrow caller already relies on:
+  // `deployment(net)` still throws for a network with no contracts, so a route
+  // on the escrow path cannot be reached by this door.
+  const configured = isConfigured(net) || canDeposit(net, env);
   const yes = (mode: RealModeMode, allowed: boolean) => ({ mode, allowed, configured, usable: allowed && configured });
 
   if (net === DEFAULT_NETWORK) return yes('open', true);

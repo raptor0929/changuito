@@ -1,0 +1,245 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import type { IssuedCard } from '../app/api/card/route.ts';
+import type { ThreeDsCode } from '../app/api/card/3ds/route.ts';
+import { track } from '../lib/analytics';
+import type { CheckoutCopy } from '../lib/checkout-copy.ts';
+import type { NetworkId } from '../lib/deployments.ts';
+import { CopyField } from './CopyField';
+
+/**
+ * The card the shopper does not have to own.
+ *
+ * Strictly the second option. The frame is the súper's own checkout and takes
+ * anybody's card for free, so this is for the shopper who would rather not put
+ * their real one into a page they reached through a chat — and for a
+ * deployment with no card provider it does not exist at all, which is why the
+ * button is behind `intent.cardAvailable` rather than behind an error.
+ *
+ * ## Where the numbers live
+ *
+ * In this component's state, for as long as the dialog is open, and nowhere
+ * else. Not localStorage — chat-store.ts has an allow-list precisely so a PAN
+ * cannot arrive there by accident. Not a log. Not a Playwright trace, which is
+ * why e2e/app-auth.spec.ts turns traces off for this repo. When the dialog
+ * closes the card is terminated and the state goes with the unmount.
+ *
+ * ## The code the bank sends to a card with no phone
+ *
+ * A 3DS challenge normally goes to the cardholder's mobile. This cardholder is
+ * a server, so the code lands at the card provider and has about three minutes
+ * to reach the shopper. Hence the poll and the countdown: a code shown without
+ * one is a code somebody types just after it stops working.
+ */
+
+/** The same cadence ephemeral-card.ts polls at — the code has ~3 minutes to live. */
+const OTP_POLL_MS = 3_000;
+/** Stop after ~2.5 minutes of nothing, matching OTP_TIMEOUT_MS there. */
+const OTP_MAX_POLLS = 50;
+
+interface Props {
+  /** The order's name. Also its credential: the server looks up which card
+   *  this deposit bought rather than trusting a card id from the browser. */
+  memo: string;
+  network: NetworkId;
+  copy: CheckoutCopy;
+  /** Fired when a card starts existing, so the dialog knows it owes one back. */
+  onIssued: () => void;
+}
+
+export function CardPanel({ memo, network, copy, onIssued }: Props) {
+  const [card, setCard] = useState<IssuedCard | null>(null);
+  const [minting, setMinting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [otp, setOtp] = useState<ThreeDsCode | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [polls, setPolls] = useState(0);
+  // Ids already put in front of the shopper. `pickChallenge` in
+  // packages/mcp/src/pay/ephemeral-card.ts keeps the same set for the same
+  // reason: showing a stale code twice sends someone back to a form that will
+  // reject it. A ref, not state — changing it must not restart the poll.
+  const seen = useRef<string[]>([]);
+
+  const issue = useCallback(async () => {
+    if (minting || card) return;
+    setMinting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/card', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ memo, network }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        // The server's own sentence when it has one worth reading — "el
+        // importe supera el máximo" tells the shopper something they can act
+        // on, where a generic failure does not. The routes write theirs as
+        // lowercase fragments, so it is punctuated here rather than there:
+        // it is about to be followed by another sentence.
+        setError(typeof body?.error === 'string' ? sentence(body.error) : copy.cardError);
+        return;
+      }
+      setCard(body as IssuedCard);
+      onIssued();
+      track('card_issued', { network });
+    } catch {
+      setError(copy.cardError);
+    } finally {
+      setMinting(false);
+    }
+  }, [minting, card, memo, network, copy.cardError, onIssued]);
+
+  // Watch for a challenge for as long as there is a card to challenge. A
+  // failed poll is a poll, not a verdict — the route answers `code: null` for
+  // an unreachable provider too, and the next tick asks again.
+  useEffect(() => {
+    if (!card || polls >= OTP_MAX_POLLS) return;
+    let live = true;
+    const id = setTimeout(async () => {
+      try {
+        const q = new URLSearchParams({ memo, network, seen: seen.current.join(',') });
+        const res = await fetch(`/api/card/3ds?${q}`);
+        if (!res.ok || !live) return;
+        const body = (await res.json()) as { code: ThreeDsCode | null };
+        if (!live || !body.code) return;
+        // The route already filters by `seen`, and this list is what it
+        // filters by — so a repeat means the provider re-sent a code we have
+        // shown. Adding it twice would grow the query string on every poll
+        // and restart the countdown on a code that is already running out.
+        if (seen.current.includes(body.code.id)) return;
+        seen.current = [...seen.current, body.code.id];
+        setOtp(body.code);
+        track('card_3ds', { network });
+      } catch {
+        /* ask again */
+      } finally {
+        if (live) setPolls((n) => n + 1);
+      }
+    }, OTP_POLL_MS);
+    return () => {
+      live = false;
+      clearTimeout(id);
+    };
+  }, [card, polls, memo, network]);
+
+  // One second at a time, and only while there is something counting down.
+  //
+  // `now` is read straight away rather than left at whatever it was: it was
+  // last set when the panel mounted, which may be a minute before a code
+  // arrives, and the first frame of a countdown would otherwise show a figure
+  // that is too high by exactly that long before correcting itself.
+  useEffect(() => {
+    if (!otp?.expiresAt) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(id);
+  }, [otp?.expiresAt]);
+
+  const left = otp?.expiresAt ? Math.max(0, Math.floor((otp.expiresAt - now) / 1000)) : null;
+  const expired = left === 0;
+
+  if (!card) {
+    return (
+      <div className="ck-card" data-testid="checkout-card">
+        <h4 className="ck-card-title">{copy.cardTitle}</h4>
+        <p className="ck-note">{copy.cardLead}</p>
+        {error ? (
+          <p className="pay-warn" role="status" data-testid="checkout-card-error">
+            {error} {copy.cardFallback}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          className="btn btn-ghost"
+          data-testid="checkout-card-issue"
+          onClick={() => void issue()}
+          disabled={minting}
+        >
+          {minting ? copy.cardMinting : copy.cardCta}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ck-card ck-card-live" data-testid="checkout-card">
+      <h4 className="ck-card-title">
+        {copy.cardTitle} <span className="ck-brand">{card.brand}</span>
+      </h4>
+      <dl className="ck-fields">
+        <CopyField
+          label={copy.cardNumberLabel}
+          // Grouped to be read off a screen and typed into a form; the
+          // clipboard gets the digits, because most forms reject the spaces.
+          value={groups(card.pan)}
+          copyValue={card.pan}
+          testid="checkout-card-pan"
+          mono
+        />
+        <CopyField
+          label={copy.cardExpiryLabel}
+          value={`${card.expiryMonth}/${card.expiryYear}`}
+          testid="checkout-card-expiry"
+          mono
+        />
+        <CopyField
+          label={copy.cardCvvLabel}
+          value={card.cvv}
+          testid="checkout-card-cvv"
+          mono
+        />
+      </dl>
+      {/* The figure first: it is the fact, and the sentence is the reassurance. */}
+      <p className="ck-note">
+        {card.fundedDisplay}. {copy.cardFunded}
+      </p>
+      <p className="ck-note">{copy.cardNote}</p>
+
+      <div className="ck-otp" data-testid="checkout-otp">
+        <h4 className="ck-card-title">{copy.otpTitle}</h4>
+        {!otp ? (
+          <p className="ck-waiting" role="status">
+            {copy.otpWaiting}
+          </p>
+        ) : expired ? (
+          <p className="pay-warn" role="status" data-testid="checkout-otp-expired">
+            {copy.otpExpired}
+          </p>
+        ) : (
+          <>
+            <dl className="ck-fields">
+              <CopyField label={copy.otpLabel} value={otp.otp} testid="checkout-otp-code" mono />
+            </dl>
+            <p className="ck-note" role="status">
+              {copy.otpLead}
+              {left === null ? null : <span className="ck-countdown"> {clock(left)}</span>}
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A fragment from an API turned into something that can sit in a paragraph. */
+function sentence(text: string): string {
+  const t = text.trim();
+  if (!t) return '';
+  const capped = t[0].toUpperCase() + t.slice(1);
+  return /[.!?]$/.test(capped) ? capped : `${capped}.`;
+}
+
+/** 4111111111111111 -> 4111 1111 1111 1111. Display only. */
+function groups(pan: string): string {
+  return pan.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim();
+}
+
+function clock(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}

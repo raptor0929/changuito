@@ -1,5 +1,6 @@
 import { ANALYTICS_IDS, type AnalyticsIds } from './analytics.ts';
 import { DEPLOYMENTS, NETWORK_IDS } from './deployments.ts';
+import { STOREFRONT_ORIGINS } from './storefront.ts';
 
 /**
  * Response headers for the shopper, mirroring www's (apps/landing/lib/csp.ts).
@@ -15,6 +16,9 @@ import { DEPLOYMENTS, NETWORK_IDS } from './deployments.ts';
  *   and Albedo are top-level navigations and popups, which CSP does not
  *   restrict. Neither Pollar nor the Stellar SDK uses eval.
  * - Product photos: every retailer serves them from *.vtexassets.com.
+ * - Supermarket checkout: framed inside the chat, so the store's own origin
+ *   is in frame-src. See lib/storefront.ts for what that does and does not
+ *   buy — a store can start refusing at any time and nothing warns us.
  * - Analytics: only the vendors whose id is set, same as www.
  *
  * `'unsafe-inline'` for scripts stays for the reason www gives: a nonce makes
@@ -81,7 +85,11 @@ export function appContentSecurityPolicy(
     `img-src 'self' data: blob: ${PRODUCT_IMAGES} ${POLLAR_ASSETS}${join(vendors.img)}`,
     "font-src 'self' data:",
     `connect-src 'self'${isProd ? '' : ' ws: wss:'} ${POLLAR_API} ${STELLAR.join(' ')}${join(vendors.connect)} ${TURNSTILE_ORIGIN}`,
-    `frame-src ${TURNSTILE_ORIGIN}`,
+    // Turnstile's challenge, and the supermarket checkout the shopper
+    // finishes the order on. 'self' is the dev fixture at /dev/checkout,
+    // which stands in for a store that has no sandbox. This is the frames
+    // *we* may open; being framed is still refused outright, below.
+    `frame-src 'self' ${TURNSTILE_ORIGIN} ${STOREFRONT_ORIGINS.join(' ')}`,
     "worker-src 'self' blob:",
     "frame-ancestors 'none'",
     "base-uri 'self'",
@@ -89,6 +97,37 @@ export function appContentSecurityPolicy(
     "object-src 'none'",
     ...(isProd ? ['upgrade-insecure-requests'] : []),
   ].join('; ');
+}
+
+/** The one path that is allowed to be framed, and only outside production. */
+export const FIXTURE_PATH = '/dev/checkout';
+
+/**
+ * The app's headers with exactly one line relaxed, for the checkout fixture.
+ *
+ * `frame-ancestors 'none'` and `X-Frame-Options: DENY` refuse framing by
+ * *anyone*, and a browser counts us among them: the checkout dialog framing
+ * our own /dev/checkout is blocked by our own header, which is the header
+ * working. The fixture is the stand-in for a store with no sandbox, so it has
+ * to be framable by us and nobody else — `'self'` says precisely that.
+ *
+ * Returns nothing in production, where app/dev/checkout `notFound()`s anyway.
+ * Two independent reasons a real deployment cannot serve a framable page that
+ * says "pagado" and takes no money, because one is a single edit away from
+ * being deleted by someone who does not know why it is there.
+ */
+export function fixtureSecurityHeaders(
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+  ids: AnalyticsIds = ANALYTICS_IDS,
+): { key: string; value: string }[] {
+  if (nodeEnv === 'production') return [];
+  return appSecurityHeaders(nodeEnv, ids).map((h) =>
+    h.key === 'Content-Security-Policy'
+      ? { key: h.key, value: h.value.replace("frame-ancestors 'none'", "frame-ancestors 'self'") }
+      : h.key === 'X-Frame-Options'
+        ? { key: h.key, value: 'SAMEORIGIN' }
+        : h,
+  );
 }
 
 export function appSecurityHeaders(

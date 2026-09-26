@@ -1,9 +1,16 @@
-# Playwright against production.
+# Playwright.
 #
 # Automatic runs: a push to main (a merge) whose diff touches a backend path
 # below. That run always executes both the landing project and the app project.
 # Anything else, including pull requests and frontend-only pushes, does not
-# start this workflow. Use workflow_dispatch and pick landing, app, or both.
+# start this workflow. Use workflow_dispatch and pick a suite.
+#
+# `landing` and `app` are smokes against production. `checkout` is not: it is
+# the frame-checkout flow end to end against a `next dev` the runner starts
+# itself, with the agent, the ledger, the card issuer and the store scripted.
+# It cannot run against a deployment — the fixture it frames in the store's
+# place notFound()s in production, on purpose. So it is never part of an
+# automatic run and never touches anything live; ask for it by name.
 #
 # Backend, for this filter:
 # - packages/mcp — supermarket MCP server
@@ -69,7 +76,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: Which smoke to run
+        description: Which suite to run
         required: true
         type: choice
         default: both
@@ -77,6 +84,7 @@ on:
           - both
           - landing
           - app
+          - checkout
 
 permissions:
   contents: read
@@ -105,6 +113,7 @@ jobs:
           ${{ fromJSON(
             github.event.inputs.suite == 'landing' && '["landing"]' ||
             github.event.inputs.suite == 'app' && '["app"]' ||
+            github.event.inputs.suite == 'checkout' && '["checkout"]' ||
             '["landing","app"]') }}
     steps:
       - name: Checkout

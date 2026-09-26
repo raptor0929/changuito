@@ -1,15 +1,6 @@
 import type { Cart } from '@changuito/mcp/types';
 
-/**
- * The retailer id is a lowercase slug because it is a key in the MCP server's
- * config. "Abrir en dia" is not how the store is spelled.
- */
-const DISPLAY: Record<string, string> = {
-  dia: 'Día',
-  carrefour: 'Carrefour',
-  jumbo: 'Jumbo',
-  disco: 'Disco',
-};
+import { RETAILER_NAMES } from '../lib/retailers.ts';
 
 /**
  * The basket as the store itself reports it, including its complaints.
@@ -28,7 +19,7 @@ export function CartCard({
   onPay?: (cart: Cart) => void;
 }) {
   const unavailable = cart.lines.filter((l) => !l.available);
-  const store = DISPLAY[cart.retailer] ?? cart.retailer;
+  const store = RETAILER_NAMES[cart.retailer] ?? cart.retailer;
   return (
     <section className="cart" aria-label="Carrito">
       <header className="cart-head">
