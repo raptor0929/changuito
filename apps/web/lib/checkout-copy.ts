@@ -37,6 +37,27 @@ export interface CheckoutCopy {
   demoPayWorking: string;
   /** The default reason, when the server has none worth reading out. */
   demoPayError: string;
+  /**
+   * Production only, and the mirror image of the demo trio above: here the
+   * shopper's own money pays, from the account they are signed in to, in one
+   * press. Empty in the test mode — a visitor with no session has no balance
+   * to spend, which is the whole shape of preview.
+   *
+   * `walletPayNote` is the manual path, kept and demoted rather than removed.
+   * Somebody whose dollars sit on an exchange still needs the address and the
+   * código, and that is a different person from the one this button is for,
+   * not an earlier step in the same journey.
+   */
+  walletPayCta: string;
+  walletPayWorking: string;
+  /** Above the button. Says where the money comes off, since nothing else does. */
+  walletPayLead: string;
+  /** Introduces the address and the código, once they are no longer the only way. */
+  walletPayNote: string;
+  /** The default reason, when the outcome carries none worth reading out. */
+  walletPayError: string;
+  /** Not enough saldo. Checked before the press, so it is a sentence and not a refusal. */
+  walletPayShort: string;
   /** Said once, plainly, because it is the part that cannot be undone by a button. */
   refundNote: string;
   checkoutTitle: string;
@@ -104,6 +125,12 @@ const COMMON = {
   demoPayCta: '',
   demoPayWorking: '',
   demoPayError: '',
+  walletPayCta: '',
+  walletPayWorking: '',
+  walletPayLead: '',
+  walletPayNote: '',
+  walletPayError: '',
+  walletPayShort: '',
   checkoutTitle: 'Paso 2: pagá en el súper',
   checkoutLead: 'Esta es la página del súper, tal cual. Nosotros no vemos lo que pasa adentro.',
   loginLead: 'Para pagar necesitás entrar a tu cuenta del súper. Se abre en una pestaña aparte, en la página del súper, con la barra de direcciones a la vista.',
@@ -154,8 +181,22 @@ const PRUEBA: CheckoutCopy = {
 
 const REAL: CheckoutCopy = {
   ...COMMON,
-  depositTitle: 'Paso 1: mandá el importe',
-  depositLead: 'Mandá este importe a esta dirección, con este código, desde donde tengas tus USDC.',
+  // "Mandá" was the only instruction here, and for a shopper signed in with
+  // dollars already loaded it was busywork: copy an address out of one app and
+  // into another to reach an account we control, when the balance on screen
+  // could simply pay. So the title stops issuing an instruction and the lead
+  // names both ways, in the order they are offered.
+  depositTitle: 'Paso 1: el importe',
+  depositLead: 'Se paga con los dólares que tenés en tu cuenta. Si los tenés en otro lado, también podés mandarlos a mano.',
+  walletPayCta: 'Pagar con mis dólares',
+  walletPayWorking: 'Pagando…',
+  walletPayLead: 'Lo descontamos de tu saldo. No hay nada que copiar.',
+  walletPayNote: 'O mandalo vos, desde donde tengas tus dólares:',
+  walletPayError: 'No pudimos hacer el pago. Probá de nuevo.',
+  // Deliberately not "cargá dólares arriba": this dialog has no funding
+  // control in it, and pointing at one that is not on screen is worse than
+  // saying only the part that is true.
+  walletPayShort: 'No te alcanza el saldo para este pago.',
   cardAgainLead: 'Es la misma de siempre: le sumamos el importe de esta compra y seguís con ella.',
   cardAgainCta: 'Usar mi tarjeta',
   // Not "se cierra con la ventana": this one does not. The numbers still live

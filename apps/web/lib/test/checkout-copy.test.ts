@@ -58,6 +58,38 @@ describe('checkout copy', () => {
   it('says the memo is not optional', () => {
     for (const m of CHECKOUT_MODES) assert.match(m.memoNote, /sí o sí/);
   });
+
+  it('RULE: the one-button words exist only where the shopper has a balance', () => {
+    // Preview has no session, so no saldo of the shopper's own to spend — the
+    // demo wallet pays there and says so. Offering "pagar con mis dólares" to
+    // somebody who has none would be a button about money that is not theirs.
+    assert.equal(checkoutCopy('testnet').walletPayCta, '');
+    assert.equal(checkoutCopy('testnet').walletPayLead, '');
+    assert.equal(checkoutCopy('mainnet').demoPayCta, '');
+    assert.match(checkoutCopy('mainnet').walletPayCta, /mis dólares/);
+  });
+
+  it('RULE: the manual path is still offered, as a second way and not a failure', () => {
+    // The address and the código stay on screen under the button, for the
+    // shopper whose dollars are on an exchange. The sentence that introduces
+    // them must read as an alternative — "o mandalo vos" — rather than as
+    // something to fall back on after the button did not work.
+    const real = checkoutCopy('mainnet');
+    assert.match(real.walletPayNote, /^O mandalo vos/);
+    assert.doesNotMatch(real.walletPayNote, /error|falló|no funciona|si no/i);
+    // And the lead names both, in the order they are offered, so a shopper who
+    // reads only the first line still knows the button is there.
+    assert.match(real.depositLead, /dólares que tenés en tu cuenta/);
+    assert.match(real.depositLead, /a mano/);
+  });
+
+  it('RULE: a short balance is said before the press, and points nowhere false', () => {
+    // There is no funding control in this dialog, so "cargá dólares arriba"
+    // would send them looking for a button that is not on the screen.
+    const short = checkoutCopy('mainnet').walletPayShort;
+    assert.match(short, /No te alcanza/);
+    assert.doesNotMatch(short, /arriba|acá/i);
+  });
 });
 
 describe('the single-use card', () => {

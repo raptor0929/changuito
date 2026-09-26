@@ -1,5 +1,6 @@
 'use client';
 
+import type { SendPaymentParams, SubmitOutcome } from '@pollar/core';
 import { usePollar } from '@pollar/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -15,6 +16,8 @@ import { DEFAULT_NETWORK } from '../lib/deployments.ts';
 import { pollarEnabledOn } from '../lib/pollar.ts';
 import { realModeNeedsProof } from '../lib/real-mode.ts';
 import { isFramableCheckout, STOREFRONT_HOSTS } from '../lib/storefront.ts';
+import { stroops } from '../lib/units.ts';
+import { useBalances } from '../lib/use-balances.ts';
 import { useNetworkAccess } from '../lib/use-network-access.ts';
 import { useWalletSigner } from '../lib/use-wallet-signer.ts';
 import { signWalletProof, type WalletProof, type WalletSigner } from '../lib/wallet-proof.ts';
@@ -101,7 +104,42 @@ interface Props {
 }
 
 /**
- * `usePollar()` throws outside a provider, and there are two places without
+ * ## Why production pays with one button too
+ *
+ * The shopper is signed in, their dollars are in the account they signed in
+ * to, and the importe has to reach an address we control. Asking them to copy
+ * that address and a código into some other app to move money between two
+ * accounts *we* can both see was work the browser could do — and it was the
+ * step the flow lost people on, because it is four copies and a network
+ * picker before anything happens.
+ *
+ * So `sendPayment` sends it, with the código attached as MEMO_TEXT, and
+ * nothing downstream changes: the same 4s poll reads the same classic payment
+ * off the same ledger. `matchDeposit` never asks who sent it.
+ *
+ * Three things hold this up, and all three are load-bearing:
+ *
+ * - **The memo.** `options.memo` is the only reason this settles at all. A
+ *   payment without it arrives, costs the shopper real money and is never
+ *   matched — the código is what ties an importe to this basket and not
+ *   another. It is asserted on in lib/test/checkout-modal.test.ts because a
+ *   silent regression here is unrecoverable money.
+ * - **A `G…` account.** On a passkey smart wallet `sendPayment` becomes a SAC
+ *   transfer, which leaves a contract event and no classic payment record, so
+ *   the poll would wait for ever. Such a session cannot reach this step anyway
+ *   — the deposit gate wants a SEP-53 signature a C-address cannot give — but
+ *   the failure would be invisible, so it is guarded here as well.
+ * - **The balance, read first.** A short balance is a sentence before the
+ *   press rather than `op_underfunded` after it.
+ *
+ * The address and the código stay on screen, below the button. Somebody whose
+ * dollars sit on an exchange still needs them, and that is a different shopper
+ * rather than an earlier step in this one's journey — so it is demoted, not
+ * deleted, and it disappears once the wallet has actually paid.
+ *
+ * ## Why `usePollar()` is not called here
+ *
+ * It throws outside a provider, and there are two places without
  * one: a deployment with no Pollar key, and app/dev/ui, which renders this
  * dialog on its own. The same split WalletWidget and PaymentModal make — but
  * ending in the dialog either way rather than in `null`, because checkout in
@@ -112,21 +150,32 @@ export function CheckoutModal(props: Props) {
   return pollarEnabledOn(network) ? (
     <CheckoutWithWallet {...props} />
   ) : (
-    <CheckoutDialog {...props} address={null} sign={null} />
+    <CheckoutDialog {...props} address={null} sign={null} pay={null} />
   );
 }
 
 function CheckoutWithWallet(props: Props) {
-  const { wallet, isAuthenticated } = usePollar();
+  const { wallet, isAuthenticated, sendPayment } = usePollar();
   const sign = useWalletSigner();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
-  return <CheckoutDialog {...props} address={address} sign={sign} />;
+  // Only handed down with a session. `sendPayment` exists on the context
+  // either way and would throw on a wallet that is not there; passing null
+  // instead is what lets the dialog decide by asking whether it *has* a way to
+  // pay rather than by re-deriving who is signed in.
+  return (
+    <CheckoutDialog {...props} address={address} sign={sign} pay={isAuthenticated ? sendPayment : null} />
+  );
 }
+
+/** Just the part of Pollar's `sendPayment` this dialog uses. */
+export type WalletPay = (params: SendPaymentParams) => Promise<SubmitOutcome>;
 
 interface DialogProps extends Props {
   /** The logged-in wallet, or null when there is none to sign with. */
   address: string | null;
   sign: WalletSigner | null;
+  /** Sends the importe from the shopper's own balance, or null when nothing can. */
+  pay: WalletPay | null;
 }
 
 type Step = 'deposit' | 'checkout';
@@ -140,7 +189,7 @@ const IDENTIFY_PATIENCE = 4;
 /** Stop asking eventually; the manual button is always there. */
 const IDENTIFY_MAX = 12;
 
-function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, sign }: DialogProps) {
+function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, sign, pay }: DialogProps) {
   const { network } = useNetwork();
   const copy = checkoutCopy(network);
 
@@ -159,6 +208,19 @@ function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, si
   const [demoPaying, setDemoPaying] = useState(false);
   const [demoSent, setDemoSent] = useState(false);
   const [demoError, setDemoError] = useState<string | null>(null);
+
+  // Production's one-button payment, and `walletSent` outlives the request for
+  // exactly the reason `demoSent` does — except here the second press would
+  // spend the shopper's own money twice on one basket, and only the first of
+  // the two would ever be matched to it.
+  const [walletPaying, setWalletPaying] = useState(false);
+  const [walletSent, setWalletSent] = useState(false);
+  const [walletError, setWalletError] = useState<string | null>(null);
+
+  // One read, no polling: the number only matters at the moment of the press,
+  // and `useBalances` does nothing at all without an address, which is every
+  // preview checkout.
+  const { data: balance } = useBalances(address, network);
 
   const [identified, setIdentified] = useState(false);
   const [polls, setPolls] = useState(0);
@@ -377,6 +439,53 @@ function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, si
     }
   }, [intent, demoPaying, demoSent, copy.demoPayError]);
 
+  const payWithMyWallet = useCallback(async () => {
+    if (!intent || !pay || walletPaying || walletSent) return;
+    setWalletPaying(true);
+    setWalletError(null);
+    try {
+      const outcome = await pay({
+        destination: intent.address,
+        amount: intent.amount,
+        asset:
+          intent.asset.issuer === null
+            ? { type: 'native' }
+            : {
+                // Four characters or fewer is `credit_alphanum4` and the ledger
+                // treats the two as different assets, so guessing one would
+                // build a payment in an asset nobody holds.
+                type: intent.asset.code.length > 4 ? 'credit_alphanum12' : 'credit_alphanum4',
+                code: intent.asset.code,
+                issuer: intent.asset.issuer,
+              },
+        // The código, as MEMO_TEXT, and the single line that makes this settle.
+        // `matchDeposit` rejects every payment whose `memo_type` is not `text`
+        // or whose memo is not this exact string — so a send without it lands
+        // on the ledger, takes the shopper's money and is never found.
+        options: { memo: { type: 'text', value: intent.memo } },
+      });
+      if (outcome.status === 'error') {
+        // `details` and `resultCode` are the ledger's verdict: English at best,
+        // `tx_bad_seq` at worst. The console is where they help somebody; the
+        // shopper gets the sentence written for them.
+        console.error('deposit payment failed', outcome);
+        track('payment_fail', { flow: 'deposit', code: outcome.resultCode ?? outcome.code ?? 'unknown' });
+        setWalletError(copy.walletPayError);
+        return;
+      }
+      // `pending` counts as sent. Horizon has the transaction either way, and
+      // the poll is looking for it on the ledger rather than in this response —
+      // a button that came back up here would invite a second payment for a
+      // código that can only ever be credited once.
+      setWalletSent(true);
+      track('deposit_pay', { network: intent.network });
+    } catch {
+      setWalletError(copy.walletPayError);
+    } finally {
+      setWalletPaying(false);
+    }
+  }, [intent, pay, walletPaying, walletSent, copy.walletPayError]);
+
   const settle = useCallback(() => {
     if (!intent) return;
     // Before the receipt, not after: the order is over, and the residual goes
@@ -434,6 +543,23 @@ function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, si
   // Preview *and* a deployment that can actually sign. Both, because the mode
   // alone would render a button that 503s on a checkout with no secret set.
   const demoPays = Boolean(intent) && appMode(network) === 'preview' && intent!.demoPayable;
+  // Production's equivalent. `address.startsWith('G')` is the smart-wallet
+  // guard described in the header: a C-address pays by SAC transfer, which
+  // leaves no classic payment for the poll to find.
+  const walletPays =
+    intent !== null && appMode(network) === 'production' && pay !== null && Boolean(address?.startsWith('G'));
+  // Only comparable when the importe is in the asset the balance is of. A
+  // network with no USDC issuer quotes native XLM (lib/deposit.ts) and
+  // `balance.usdc` is not that number, so there this abstains rather than
+  // guessing — and an unread balance is unknown, never zero, which is why
+  // "no te alcanza" needs `balance` to be non-null before it is allowed to say
+  // anything. Same rule as PaymentModal's `short`.
+  const owed = intent && intent.asset.issuer !== null ? stroops(intent.amount) : null;
+  const short = balance !== null && owed !== null && BigInt(balance.usdc) < owed;
+  // The address and the código, for a shopper who is going to send it
+  // themselves. Unchanged wherever one-click is not on offer; gone once the
+  // wallet has paid, because from there a manual send is a second payment.
+  const showManual = !demoPays && !(walletPays && (walletSent || confirmed));
   // The store has had four chances to say it knows this shopper and has not.
   // Most likely the frame's cookies are being blocked, which we cannot fix
   // from here — so the tab stops being the quiet option and becomes the loud
@@ -477,10 +603,44 @@ function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, si
                     copyValue={intent.amount}
                     testid="checkout-amount"
                   />
-                  {/* Nothing to copy in preview: there is no wallet to paste
-                      it into, and an address nobody can pay from is noise. */}
-                  {demoPays ? null : (
-                    <>
+                </dl>
+
+                {/* Before the address, because it is the way this is meant to
+                    go. Hidden once the importe has landed — a paid basket has
+                    nothing left to pay. */}
+                {walletPays && !confirmed ? (
+                  <>
+                    <p className="ck-note">{copy.walletPayLead}</p>
+                    <button
+                      type="button"
+                      className="btn"
+                      data-testid="checkout-wallet-pay"
+                      disabled={walletPaying || walletSent || short}
+                      onClick={() => void payWithMyWallet()}
+                    >
+                      {walletPaying ? copy.walletPayWorking : copy.walletPayCta}
+                    </button>
+                    {short ? (
+                      <p className="pay-warn" data-testid="checkout-wallet-short">
+                        {copy.walletPayShort}
+                      </p>
+                    ) : null}
+                    {walletError ? (
+                      <p className="pay-error" data-testid="checkout-wallet-error">
+                        {walletError}
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
+
+                {/* Nothing to copy in preview: there is no wallet to paste it
+                    into, and an address nobody can pay from is noise. In
+                    production it is the second way rather than the only one, so
+                    it is introduced as such. */}
+                {showManual ? (
+                  <>
+                    {walletPays ? <p className="ck-note">{copy.walletPayNote}</p> : null}
+                    <dl className="ck-fields">
                       <CopyField
                         label={copy.addressLabel}
                         value={intent.address}
@@ -488,10 +648,10 @@ function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, si
                         mono
                       />
                       <CopyField label={copy.memoLabel} value={intent.memo} testid="checkout-memo" mono />
-                    </>
-                  )}
-                </dl>
-                {demoPays ? null : <p className="ck-note">{copy.memoNote}</p>}
+                    </dl>
+                    <p className="ck-note">{copy.memoNote}</p>
+                  </>
+                ) : null}
                 <p className="ck-note">{copy.refundNote}</p>
 
                 {demoPays && !confirmed ? (

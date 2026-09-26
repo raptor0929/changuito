@@ -14,6 +14,15 @@
 import type { NetworkId } from './deployments.ts';
 import type { DepositAsset } from './deposit.ts';
 import { horizon } from './stellar.ts';
+import { stroops } from './units.ts';
+
+/**
+ * Re-exported, not re-declared. The implementation moved to lib/units.ts so a
+ * client component could have it without @stellar/stellar-sdk coming too —
+ * see the header there — and this line is what keeps every existing caller,
+ * and the test that pins the arithmetic, importing it from where it belongs.
+ */
+export { stroops };
 
 /** The fields of a Horizon payment record this cares about, and no others. */
 export interface PaymentRecord {
@@ -105,20 +114,6 @@ export function matchDeposit(
     return { txHash: r.transaction_hash ?? '', amount: r.amount ?? '0', at: r.created_at ?? '' };
   }
   return null;
-}
-
-/**
- * A 7-decimal decimal string as an integer, or null if it is not one.
- *
- * Hand-rolled rather than `Number(x) * 1e7`: that multiplication is exactly
- * the floating-point error this exists to avoid, and BigInt cannot parse a
- * decimal point. Anything Horizon emits is `\d+(\.\d{1,7})?`; anything else is
- * not a Stellar amount and is refused rather than coerced.
- */
-export function stroops(amount: string): bigint | null {
-  if (!/^\d+(\.\d{1,7})?$/.test(amount)) return null;
-  const [whole, frac = ''] = amount.split('.');
-  return BigInt(whole) * 10_000_000n + BigInt(frac.padEnd(7, '0'));
 }
 
 /**
