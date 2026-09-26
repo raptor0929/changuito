@@ -23,7 +23,15 @@ export const WALLET_PROOF_TTL_MS = 5 * 60_000;
 /** Clocks disagree a little; a proof from slightly in the future is fine. */
 export const WALLET_PROOF_SKEW_MS = 60_000;
 
-export type WalletIntent = 'login' | 'faucet' | 'deposit' | 'settle' | 'refund' | 'card' | 'orders';
+export type WalletIntent =
+  | 'login'
+  | 'faucet'
+  | 'deposit'
+  | 'settle'
+  | 'refund'
+  | 'card'
+  | 'orders'
+  | 'retire';
 
 const INTENT_TEXT: Record<WalletIntent, string> = {
   login: 'iniciar sesión',
@@ -33,6 +41,7 @@ const INTENT_TEXT: Record<WalletIntent, string> = {
   refund: 'reembolsar la orden',
   card: 'ver los datos de mi tarjeta',
   orders: 'ver mis compras',
+  retire: 'dar de baja mi tarjeta',
 };
 
 /** Intents that are about one order, and so carry its id. */
@@ -51,6 +60,13 @@ const NEEDS_REF: Record<WalletIntent, boolean> = {
   card: false,
   // The list is every order this wallet has, so there is no one order to name.
   orders: false,
+  // Same shape as `card`, and the same reason: the wallet has exactly one
+  // card, so naming it would put a card id in a sentence the shopper reads
+  // and could not check anyway. It is a *separate* intent from `card` because
+  // the two ask for very different things — somebody who approved "ver los
+  // datos de mi tarjeta" did not agree to destroy it, and a signature is only
+  // worth asking for if it cannot be spent on something else.
+  retire: false,
 };
 
 export interface WalletProof {

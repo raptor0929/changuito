@@ -188,6 +188,14 @@ function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, si
   // down and rebuilt every time something else in this dialog changes.
   const cardLive = useRef(false);
   const release = useCallback(() => {
+    // Preview only, and the flag is left standing so that reads plainly: in
+    // production the card is the customer's, it survives this basket, and
+    // closing a dialog is not a request to destroy it. `POST /api/card/terminate`
+    // refuses a kept card anyway — that guard is the load-bearing one, because
+    // it holds whatever any browser asks for. This is here so the browser does
+    // not ask, and so the next person reading `release` sees which of the two
+    // cards it is about.
+    if (appMode(network) !== 'preview') return;
     if (!cardLive.current || !intent) return;
     cardLive.current = false;
     // `keepalive` so it survives the unload this is sometimes called during.

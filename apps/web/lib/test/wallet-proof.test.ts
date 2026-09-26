@@ -30,6 +30,7 @@ const INTENTS: Record<WalletIntent, true> = {
   refund: true,
   card: true,
   orders: true,
+  retire: true,
 };
 const ALL_INTENTS = Object.keys(INTENTS) as WalletIntent[];
 const OTHER = 'b'.repeat(64);
@@ -58,7 +59,7 @@ describe('walletProofMessage', () => {
   });
 
   it('round-trips every intent', () => {
-    for (const intent of ['login', 'faucet', 'deposit', 'card', 'orders'] as const) {
+    for (const intent of ['login', 'faucet', 'deposit', 'card', 'orders', 'retire'] as const) {
       assert.deepEqual(parseWalletProofMessage(walletProofMessage(intent, buyer.publicKey(), now)), {
         intent,
         address: buyer.publicKey(),

@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   dollars,
+  KEPT_CARD,
   ORDER_STATUS,
   pesos,
   purchaseDate,
@@ -41,6 +42,45 @@ describe('the purchases page copy', () => {
   it('RULE: warns about the signature before asking for it', () => {
     assert.match(PURCHASES.signLead, /firma/i);
     assert.match(PURCHASES.signLead, /no mueve plata/i);
+  });
+});
+
+describe('the words that guard giving the card back', () => {
+  it('RULE: says it cannot be undone, before the press that does it', () => {
+    // The only irreversible thing on the page. A warning that arrives after
+    // the act is not a warning, so the whole of it sits between the two
+    // presses — and the test is here because a later edit shortening it for
+    // layout would be an easy, invisible mistake to make.
+    assert.match(KEPT_CARD.retireWarn, /no se puede deshacer/i);
+    assert.match(KEPT_CARD.retireWarn, /para siempre/i);
+  });
+
+  it('RULE: says where the money goes, since that is the question', () => {
+    assert.match(KEPT_CARD.retireWarn, /saldo/i);
+    assert.match(KEPT_CARD.retired, /saldo/i);
+  });
+
+  it('the two answers are not both yes', () => {
+    // A confirm and a cancel that read alike is how somebody destroys a card
+    // they meant to keep. One says "sí" and the other says "no", in that
+    // many words, rather than "Aceptar" / "Cancelar".
+    assert.match(KEPT_CARD.retireConfirm, /^sí/i);
+    assert.match(KEPT_CARD.retireCancel, /^no/i);
+    assert.notEqual(KEPT_CARD.retireConfirm, KEPT_CARD.retireCancel);
+  });
+
+  it('RULE: a frozen card promises nothing, because there is no way back', () => {
+    // Vyrion has `freezeCard` and no unfreeze. Copy that said "escribinos y
+    // la destrabamos" would be an offer this app cannot honour.
+    assert.match(KEPT_CARD.frozen, /bloqueada/i);
+    assert.doesNotMatch(KEPT_CARD.frozen, /destrab|desbloque|escribinos|contactanos/i);
+  });
+
+  it('RULE: having no card is not an error', () => {
+    // Most people have never had one. The first shop makes it, and the
+    // sentence says so rather than reading as something that went wrong.
+    assert.doesNotMatch(KEPT_CARD.none, /error|no pudimos|problema/i);
+    assert.match(KEPT_CARD.none, /primera compra/i);
   });
 });
 

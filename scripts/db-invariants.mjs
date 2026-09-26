@@ -81,6 +81,24 @@ try {
                         on conflict (network, address) do nothing returning card_id`;
     check('the same wallet on testnet is a separate card', tn.length === 1);
 
+    // unbindCard, which `POST /api/card/retire` runs after Vyrion has killed
+    // the card, and which `POST /api/card/mine` runs when it finds a binding
+    // that outlived one. Both name the card id in the WHERE clause, and this
+    // is why: the id is the only thing that distinguishes "give back the card
+    // I have" from "give back whatever card this wallet has now", and the two
+    // differ the moment a deposit lands between reading the page and pressing
+    // the button.
+    const unbind = (net, addr, id) => tx`delete from card_owner
+       where network=${net} and address=${addr} and card_id=${id} returning card_id`;
+    check('unbinding the wrong card id removes nothing', (await unbind('mainnet', A, 'card_loser')).length === 0);
+    check('and the binding is still there', (await tx`select 1 from card_owner where network='mainnet' and address=${A}`).length === 1);
+    check('unbinding another wallet removes nothing', (await unbind('mainnet', B, 'card_winner')).length === 0);
+    check('the testnet binding is not the mainnet one', (await unbind('testnet', A, 'card_winner')).length === 0);
+    check('the right wallet and the right card unbinds', (await unbind('mainnet', A, 'card_winner')).length === 1);
+    check('a second press removes nothing', (await unbind('mainnet', A, 'card_winner')).length === 0);
+    // Put back, because the checks below this line expect a bound card.
+    await tx`insert into card_owner (network, address, card_id) values ('mainnet', ${A}, 'card_winner')`;
+
     await tx`insert into chat (id, network, address, transcript) values (${CHAT}, 'mainnet', ${A}, '{"v":1}'::jsonb)`;
     await tx`insert into orders (chat_id, network, memo, address, amount_cents) values (${CHAT}, 'mainnet', 'chg-abc123', ${A}, 2450)`;
     const claim = (id) => tx`update orders set card_id=${id}, status='carded'
@@ -185,6 +203,20 @@ try {
     // direction.
     await tx`update orders set status='failed' where network='mainnet' and memo='chg-abc123'`;
     check('a failed order cannot be closed', (await done('chg-abc123')).length === 0);
+
+    // Retiring a card must not cost the shopper their purchase history. The
+    // orders that card paid for are a financial record; card_owner is a
+    // pointer, and 'chg-abc123' still carries card_winner in its card_id
+    // column. Same reasoning as the chat deletion below, one table over.
+    // Read first rather than named, because the re-quote above renamed the
+    // memo that holds card_winner and a literal here would quietly pass by
+    // matching nothing.
+    const paidFor = await tx`select memo from orders where network='mainnet' and card_id='card_winner'`;
+    await tx`delete from card_owner where network='mainnet' and address=${A} and card_id='card_winner'`;
+    const kept = await tx`select memo from orders where network='mainnet' and card_id='card_winner'`;
+    check('retiring a card leaves the orders it paid for',
+      paidFor.length === 1 && kept.length === 1 && kept[0].memo === paidFor[0].memo,
+      `${paidFor.length} before, ${kept.length} after`);
 
     // 0002 changed this from ON DELETE CASCADE. An order is a financial record
     // and a chat is a conversation: expiring a transcript under a retention

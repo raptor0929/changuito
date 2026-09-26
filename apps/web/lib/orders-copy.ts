@@ -37,6 +37,35 @@ export interface PurchasesCopy {
   cardNote: string;
 }
 
+/**
+ * The card the shopper keeps, and the one deliberate way to give it back.
+ *
+ * Its own block because it is its own act. Everything in `PurchasesCopy` is a
+ * record of something that already happened; this is the only place on the
+ * page where pressing something changes the world, and it is irreversible, so
+ * the words that guard it are worth keeping where they can be read together.
+ */
+export interface KeptCardCopy {
+  title: string;
+  lead: string;
+  showCta: string;
+  loading: string;
+  /** Not an error: most people have never had one, and the first shop makes it. */
+  none: string;
+  error: string;
+  balanceLabel: string;
+  /** Said plainly, with nothing offered, because there is no way back today. */
+  frozen: string;
+  retireCta: string;
+  /** The whole warning, before the second press rather than after it. */
+  retireWarn: string;
+  retireConfirm: string;
+  retireCancel: string;
+  retiring: string;
+  retired: string;
+  retireError: string;
+}
+
 export const PURCHASES: PurchasesCopy = {
   title: 'Mis compras',
   lead: 'Lo que compraste con Changuito, desde cualquier dispositivo.',
@@ -53,6 +82,24 @@ export const PURCHASES: PurchasesCopy = {
   back: 'Volver al chat',
   codeLabel: 'Código',
   cardNote: 'Pagada con una tarjeta que te dimos nosotros.',
+};
+
+export const KEPT_CARD: KeptCardCopy = {
+  title: 'Mi tarjeta',
+  lead: 'Es una sola y es tuya. Cada compra que hacés le carga el saldo.',
+  showCta: 'Ver mi tarjeta',
+  loading: 'Buscando tu tarjeta…',
+  none: 'Todavía no tenés una. Se crea sola cuando hagas tu primera compra.',
+  error: 'No pudimos leer tu tarjeta ahora. Probá de nuevo en un rato.',
+  balanceLabel: 'Saldo',
+  frozen: 'Está bloqueada y por ahora no se puede usar.',
+  retireCta: 'Dar de baja',
+  retireWarn: 'Se cierra para siempre y te devolvemos el saldo a tu cuenta. No se puede deshacer.',
+  retireConfirm: 'Sí, darla de baja',
+  retireCancel: 'No, dejarla',
+  retiring: 'Dando de baja…',
+  retired: 'Listo, la dimos de baja y te devolvimos el saldo.',
+  retireError: 'No pudimos darla de baja ahora. Probá de nuevo en un rato.',
 };
 
 /**
@@ -80,6 +127,7 @@ export const ORDER_STATUS: Record<OrderStatus, string> = {
 export const PURCHASES_COPY: readonly string[] = [
   ...Object.values(PURCHASES),
   ...Object.values(ORDER_STATUS),
+  ...Object.values(KEPT_CARD),
 ];
 
 const ARS = new Intl.NumberFormat('es-AR', {
