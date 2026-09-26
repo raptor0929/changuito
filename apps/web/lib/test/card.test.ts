@@ -9,10 +9,12 @@ import {
   claimDeposit,
   depositorOf,
   heldCard,
+  keepsOneCard,
   rememberDepositor,
   refuseFunding,
   timeoutFetch,
 } from '../card.ts';
+import { NETWORK_IDS } from '../deployments.ts';
 
 const WALLET = `G${'A'.repeat(55)}`;
 
@@ -59,6 +61,41 @@ describe('the funding bounds', () => {
     // Funding more than arrived would spend the treasury's money on somebody
     // else's basket, one cent at a time.
     assert.equal(refuseFunding(1), 'too-small');
+  });
+});
+
+describe('which of the two cards a deposit buys', () => {
+  // The three terms of keepsOneCard, one case each. What none of this can
+  // reach is the top-up itself: `hasDatabase()` is false in this suite, by
+  // design, so `POST /api/card` can only ever take the mint path here. The
+  // persistent path is covered where it can be — `npm run db:invariants` for
+  // the card_owner constraint, and by hand on a deploy for `fundCard`, whose
+  // behaviour on a card created without a limit is the open question the plan
+  // names. This test guards the *decision*, which is the part that can be
+  // broken by a refactor rather than by an API.
+  const env = (url?: string) => ({ NODE_ENV: 'test', DATABASE_URL: url }) as NodeJS.ProcessEnv;
+  const withDb = env('postgres://user:pw@example.test:6543/postgres');
+
+  it('RULE: a deposit nobody proved an owner for mints a card for the basket', () => {
+    // Preview's whole shape: no session, so no address, so nothing to keep.
+    for (const net of NETWORK_IDS) {
+      assert.equal(keepsOneCard(net, undefined, withDb), false);
+      assert.equal(keepsOneCard(net, '', withDb), false);
+    }
+  });
+
+  it('RULE: a proven owner on a mode that keeps no records still mints one', () => {
+    // The allowlist can prove a wallet on testnet. Preview must not write a
+    // row even then — inferring the path from `owner` alone would.
+    assert.equal(keepsOneCard('testnet', WALLET, withDb), false);
+    assert.equal(keepsOneCard('mainnet', WALLET, withDb), true);
+  });
+
+  it('RULE: with no database there is nowhere to remember a customer', () => {
+    // A binding a restart forgets would mint a second card for somebody who
+    // already has one, which is the one outcome the kept card exists to stop.
+    assert.equal(keepsOneCard('mainnet', WALLET, env()), false);
+    assert.equal(keepsOneCard('mainnet', WALLET, env('   ')), false);
   });
 });
 

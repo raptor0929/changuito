@@ -1,9 +1,13 @@
 /**
- * The single-use card the shopper types into the súper's own payment form.
+ * The card the shopper types into the súper's own payment form.
  *
  * The shopper can always pay with their own card — the frame is the store's
- * real checkout and nothing here is required. This is the other option: a
- * card funded with exactly this basket, usable once, terminated after.
+ * real checkout and nothing here is required. This is the other option, and
+ * it comes in two shapes, for the two products this bundle is: in preview a
+ * card funded with exactly this basket, usable once, terminated after; in
+ * production one card per customer, topped up by each deposit and kept.
+ * `keepsOneCard` below is the line between them, and the long version is in
+ * app/api/card/route.ts.
  *
  * ## What stops anyone minting one
  *
@@ -30,6 +34,7 @@
  */
 import { CARD_MAX_CENTS, CARD_MIN_CENTS, VyrionClient } from '@changuito/mcp/pay';
 
+import { modeKeepsRecords } from './app-mode.ts';
 import { claimOrder, hasDatabase, openOrder, orderByMemo } from './db.ts';
 import { depositAsset } from './deposit.ts';
 import { findDeposit } from './deposit-watch.ts';
@@ -95,12 +100,11 @@ export function cardClient(env: NodeJS.ProcessEnv = process.env): VyrionClient {
 /**
  * What the deposit is worth, read from the ledger rather than from the caller.
  *
- * On mainnet the asset is USDC and one is one dollar. On testnet it is XLM and
- * the figure is the same number of play tokens the quote asked for — see the
- * long note in app/api/deposit/route.ts about why that is deliberately not an
- * XLM price. Either way the arithmetic here is "what arrived", not "what was
- * asked for": a shopper who sent more gets a card for more, and one who sent
- * less does not get a card for the difference.
+ * The asset is USDC on both networks now — testnet's is one we issued, see
+ * scripts/setup-demo-asset.mjs — so one unit is one dollar either way and this
+ * is a plain conversion. The arithmetic is "what arrived", not "what was asked
+ * for": a shopper who sent more gets a card for more, and one who sent less
+ * does not get a card for the difference.
  */
 export function centsFromAmount(amount: string): number | null {
   if (!/^\d+(\.\d{1,7})?$/.test(amount)) return null;
@@ -138,6 +142,35 @@ export async function fundingFor(
   const cents = centsFromAmount(hit.amount);
   if (cents === null) return null;
   return { txHash: hit.txHash, cents };
+}
+
+/**
+ * Whether this deposit tops up a card the customer keeps, or mints one that
+ * dies with the basket.
+ *
+ * Three terms, and each rules out a different way of getting it wrong.
+ *
+ * `owner` is the wallet the gate proved at deposit time. Without one there is
+ * nobody to bind a card *to*, so there is nothing to keep.
+ *
+ * `modeKeepsRecords` is asked out loud rather than inferred from `owner`,
+ * because the allowlist can put a proven wallet on testnet and preview must
+ * never write a row. It is the same explicit check `archiveChat` makes, for
+ * the same reason: an invariant that holds by coincidence is one refactor
+ * from not holding.
+ *
+ * `hasDatabase` is here because `card_owner` is the binding. With no database
+ * the fallback in this file keeps claims in a per-instance Map and
+ * deliberately binds nothing — a binding a restart forgets would mint a second
+ * card for somebody who already has one, which is the single outcome the
+ * persistent path exists to prevent.
+ */
+export function keepsOneCard(
+  net: NetworkId,
+  owner: string | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return Boolean(owner) && modeKeepsRecords(net) && hasDatabase(env);
 }
 
 export type FundingRefusal = 'too-small' | 'too-large';
