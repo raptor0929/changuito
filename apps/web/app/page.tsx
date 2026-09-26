@@ -27,18 +27,15 @@ export default function Home() {
             <main className="shell">
               <header className="masthead">
                 <div className="brand">
-                  {/* Before the mark, so a keyboard lands on the way into the
-                      history before the way into the chat. Renders nothing at
-                      the wide breakpoint, where the rail is already a column. */}
+                  {/* First, so a keyboard lands on the way into the history
+                      before the way into the chat. Renders nothing at the wide
+                      breakpoint, where the rail is already a column. */}
                   <HistoryToggle />
-                  <img
-                    className="brand-mark"
-                    src="/brand/mascot-idle.png"
-                    alt=""
-                    aria-hidden="true"
-                    width={397}
-                    height={583}
-                  />
+                  {/* No mark here. The mascot is already in the corner of the
+                      cart rail, a few hundred pixels away and at the same size,
+                      and two of the same drawing on one screen read as a
+                      mistake rather than as branding. The wordmark carries the
+                      name on its own. */}
                   <div className="brand-copy">
                     {/* The name is text, not only an alt: tools that read a
                         heading's text content (crawlers, some audits) saw an

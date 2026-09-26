@@ -41,12 +41,22 @@ test('the home header is the wordmark alone', () => {
   assert.equal(page.includes('BrandLockup'), true);
 });
 
-test('the shopper header uses the idle mascot and the wordmark, not type', () => {
+test('the shopper header is the wordmark alone, not the mascot and not type', () => {
   const shopper = source(join(web, 'app/page.tsx'));
 
-  assert.match(shopper, /src="\/brand\/mascot-idle\.png"/);
   assert.match(shopper, /src="\/brand\/wordmark\.png"/);
   assert.equal(shopper.includes('lockup-stacked'), false);
+
+  // The mascot used to sit beside the wordmark here, and it is gone on
+  // purpose: the cart rail already draws one in the top-right corner at the
+  // same size, so the masthead's copy was the second of two. This is the
+  // assertion that keeps it gone — the img is three lines and would come back
+  // the next time somebody reaches for "the header looks bare".
+  //
+  // The src, not the word: the comment that replaced the img says why it is
+  // not there, and a test that reads prose would fail on the explanation.
+  assert.equal(shopper.includes('/brand/mascot-idle.png'), false);
+  assert.equal(shopper.includes('className="brand-mark"'), false);
 
   // The h1 is named by text a screen reader and a crawler can read, and the
   // only place that text lives is visually hidden: what shows is the image.

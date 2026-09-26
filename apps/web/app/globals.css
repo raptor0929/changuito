@@ -111,6 +111,9 @@ a:hover { color: var(--chg-arcilla); }
   min-height: 44px;
 }
 
+/* Only /mis-compras still draws this: there the mark is the whole link back
+   home, so it is the brand rather than a duplicate of it. The masthead on the
+   chat screen dropped its copy — the cart rail's mascot is the one on screen. */
 .brand-mark {
   height: 44px;
   width: auto;
@@ -1205,10 +1208,6 @@ a:hover { color: var(--chg-arcilla); }
   .shell:has(.chat.is-empty) .brand {
     gap: 8px;
     min-height: 0;
-  }
-
-  .shell:has(.chat.is-empty) .brand-mark {
-    height: 32px;
   }
 
   .shell:has(.chat.is-empty) .brand-wordmark {
