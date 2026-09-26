@@ -134,10 +134,12 @@ export async function unbindCard(net: NetworkId, address: string, cardId: string
 export type OrderStatus = 'quoted' | 'paid' | 'carded' | 'done' | 'failed';
 
 export interface OrderRow {
-  chatId: string;
+  /** Null until a chat claims it — see 0002_order_identity.sql. */
+  chatId: string | null;
   network: NetworkId;
   memo: string;
-  address: string;
+  /** Null in `open` mode, where no address was ever proven. */
+  address: string | null;
   status: OrderStatus;
   amountCents: number;
   arsQuoted: number | null;
@@ -150,10 +152,10 @@ export interface OrderRow {
 }
 
 const toOrder = (r: Record<string, unknown>): OrderRow => ({
-  chatId: r.chat_id as string,
+  chatId: (r.chat_id as string | null) ?? null,
   network: r.network as NetworkId,
   memo: r.memo as string,
-  address: r.address as string,
+  address: (r.address as string | null) ?? null,
   status: r.status as OrderStatus,
   amountCents: r.amount_cents as number,
   arsQuoted: (r.ars_quoted as number | null) ?? null,
@@ -171,33 +173,67 @@ const toOrder = (r: Record<string, unknown>): OrderRow => ({
  * This is where `rememberDepositor` used to write, and it records the same
  * fact: this memo was issued to a wallet the gate let through. What it adds is
  * that the fact no longer expires after 24 hours, so a deposit confirmed late
- * cannot become an unowned memo.
+ * cannot become an unowned memo — which was a 403 to somebody who had paid.
  *
- * `on conflict (chat_id) do update` because a shopper who re-quotes the same
- * basket is amending their order, not opening a second one — and chat_id being
- * the primary key is what makes "one order per chat" a fact rather than a hope.
+ * `address` is optional because in `realModeMode() === 'open'` nothing is
+ * proven, and the deposit route deliberately declines to write a claimed
+ * address down. The row still exists, so the claim latch still works; it just
+ * has no depositor to check against, which is exactly the state `open` means.
+ *
+ * `chatId` is optional because this runs before any chat id has crossed the
+ * wire. `attachChat` links them afterwards.
+ *
+ * The conflict target is the primary key `(network, memo)` — a re-quote against
+ * the same memo amends. In practice `mintMemo()` makes a fresh memo per quote,
+ * so this is the idempotency guard for a retried request rather than the
+ * common path.
  */
 export async function openOrder(o: {
-  chatId: string;
   network: NetworkId;
   memo: string;
-  address: string;
   amountCents: number;
+  address?: string | null;
+  chatId?: string | null;
   arsQuoted?: number | null;
   cartId?: string | null;
 }): Promise<OrderRow> {
   const rows = await db()`
-    insert into orders (chat_id, network, memo, address, amount_cents, ars_quoted, cart_id)
-    values (${o.chatId}, ${o.network}, ${o.memo}, ${o.address},
+    insert into orders (network, memo, address, chat_id, amount_cents, ars_quoted, cart_id)
+    values (${o.network}, ${o.memo}, ${o.address ?? null}, ${o.chatId ?? null},
             ${o.amountCents}, ${o.arsQuoted ?? null}, ${o.cartId ?? null})
-    on conflict (chat_id) do update
-       set memo         = excluded.memo,
-           amount_cents = excluded.amount_cents,
-           ars_quoted   = excluded.ars_quoted,
-           cart_id      = excluded.cart_id,
-           status       = 'quoted'
+    on conflict (network, memo) do update
+       set amount_cents = excluded.amount_cents,
+           ars_quoted   = coalesce(excluded.ars_quoted, orders.ars_quoted),
+           cart_id      = coalesce(excluded.cart_id, orders.cart_id),
+           address      = coalesce(orders.address, excluded.address),
+           chat_id      = coalesce(orders.chat_id, excluded.chat_id)
     returning *`;
   return toOrder(rows[0]);
+}
+
+/**
+ * Link an order to the conversation that produced it.
+ *
+ * Separate from `openOrder` because the chat id arrives later and from a
+ * different place. `where chat_id is null` makes it write-once: a memo cannot
+ * be re-pointed at a second conversation, so the audit trail cannot be edited
+ * by replaying a request.
+ *
+ * A conflict on `orders_one_per_chat` (23505) means that chat already has an
+ * order — the "one order per chat" rule refusing, which is not an error the
+ * caller should crash on.
+ */
+export async function attachChat(net: NetworkId, memo: string, chatId: string): Promise<boolean> {
+  try {
+    const rows = await db()`
+      update orders set chat_id = ${chatId}
+       where network = ${net} and memo = ${memo} and chat_id is null
+       returning chat_id`;
+    return rows.length > 0;
+  } catch (err) {
+    if ((err as { code?: string }).code === '23505') return false;
+    throw err;
+  }
 }
 
 /** The order a memo belongs to, if any. */

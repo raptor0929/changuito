@@ -144,18 +144,26 @@ export async function POST(req: Request): Promise<Response> {
 
     const memo = mintMemo();
 
-    // Only where the signature above actually proved the address. In mode
-    // 'open' nothing was proven, so writing the claimed address down would be
-    // recording a guess and then trusting it later — and `POST /api/card`
-    // skips the check in that mode for the same reason.
-    if (realModeNeedsProof(auth.mode)) {
-      // A failure here is not the shopper's problem *yet* — it becomes one when
-      // they try to mint a card, which will refuse rather than let an unowned
-      // memo through. Loud, because that is a manual refund.
-      await rememberDepositor(network, memo, (input.address as string).trim().toUpperCase()).catch((err) => {
-        console.error('[deposit] could not record the depositor:', err instanceof Error ? err.message : String(err));
-      });
-    }
+    // The order is opened for every memo, so the claim latch that `POST
+    // /api/card` needs always has a row to latch onto. The *address* is written
+    // only where the signature above actually proved one: in mode 'open'
+    // nothing was proven, so recording the claimed address would be writing
+    // down a guess and then trusting it later — and `POST /api/card` skips the
+    // ownership check in that mode for exactly the same reason.
+    //
+    // A failure here is not the shopper's problem *yet*. It becomes one when
+    // they try to mint a card, which refuses rather than let an unowned memo
+    // through. Loud, because the recovery is a manual refund.
+    const depositor = realModeNeedsProof(auth.mode)
+      ? (input.address as string).trim().toUpperCase()
+      : undefined;
+    await rememberDepositor(network, memo, {
+      address: depositor,
+      amountCents: usdCents,
+      arsQuoted: centavos,
+    }).catch((err) => {
+      console.error('[deposit] could not record the deposit:', err instanceof Error ? err.message : String(err));
+    });
 
     const intent: DepositIntent = {
       network,

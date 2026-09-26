@@ -3,7 +3,18 @@ import { describe, it } from 'node:test';
 
 import { CARD_MAX_CENTS, CARD_MIN_CENTS } from '@changuito/mcp/pay';
 
-import { canIssueCard, centsFromAmount, refuseFunding, timeoutFetch } from '../card.ts';
+import {
+  canIssueCard,
+  centsFromAmount,
+  claimDeposit,
+  depositorOf,
+  heldCard,
+  rememberDepositor,
+  refuseFunding,
+  timeoutFetch,
+} from '../card.ts';
+
+const WALLET = `G${'A'.repeat(55)}`;
 
 describe('what a deposit is worth', () => {
   it('reads a ledger amount as integer cents', () => {
@@ -91,5 +102,65 @@ describe('the fetch wrapper', () => {
     }) as unknown as typeof fetch;
     await assert.rejects(() => timeoutFetch(inner)('https://example.test/'), /socket hang up/);
     assert.equal(calls, 3);
+  });
+});
+
+describe('the deposit record, with no database configured', () => {
+  // These run against the in-process fallback, because DATABASE_URL is not set
+  // in the test environment and deliberately is not: a unit suite that needs a
+  // live Postgres is a unit suite that stops being run. The fallback is a real
+  // path — it is what a fresh clone uses — so proving it holds the once-only
+  // rule is worth doing on its own.
+  //
+  // What this cannot prove is that the SQL says the same thing. That is
+  // `npm run db:invariants`, which exercises the constraints against the real
+  // database inside a transaction it always rolls back.
+
+  it('remembers who opened a memo, and tells the truth when nobody did', async () => {
+    const memo = 'chg-remember-1';
+    assert.equal(await depositorOf('testnet', memo), undefined);
+    await rememberDepositor('testnet', memo, { address: WALLET, amountCents: 2450 });
+    assert.equal(await depositorOf('testnet', memo), WALLET);
+  });
+
+  it('records no address in open mode rather than recording a guess', async () => {
+    // The deposit route omits `address` when realModeMode() is 'open', where
+    // nothing was proven. undefined must mean "nobody was checked" — if it
+    // returned the claimed address, POST /api/card would later check a value
+    // the caller supplied against itself.
+    const memo = 'chg-remember-open';
+    await rememberDepositor('testnet', memo, { amountCents: 2450 });
+    assert.equal(await depositorOf('testnet', memo), undefined);
+  });
+
+  it('RULE: a deposit buys exactly one card', async () => {
+    const memo = 'chg-claim-1';
+    assert.equal(await heldCard('testnet', memo), undefined);
+
+    const first = await claimDeposit('testnet', memo, 'card_first', 2450);
+    assert.deepEqual(first, { claimed: true });
+
+    const second = await claimDeposit('testnet', memo, 'card_second', 2450);
+    assert.equal(second.claimed, false, 'a second claim on the same memo must lose');
+    assert.equal(second.existing, 'card_first', 'the loser must be told whose card won');
+
+    assert.equal(await heldCard('testnet', memo), 'card_first');
+  });
+
+  it('keeps testnet and mainnet claims apart', async () => {
+    const memo = 'chg-claim-net';
+    await claimDeposit('testnet', memo, 'card_testnet', 2450);
+    const main = await claimDeposit('mainnet', memo, 'card_mainnet', 2450);
+    assert.equal(main.claimed, true, 'the same memo on another network is another deposit');
+    assert.equal(await heldCard('testnet', memo), 'card_testnet');
+    assert.equal(await heldCard('mainnet', memo), 'card_mainnet');
+  });
+
+  it('heldCard never claims', async () => {
+    const memo = 'chg-claim-readonly';
+    assert.equal(await heldCard('testnet', memo), undefined);
+    assert.equal(await heldCard('testnet', memo), undefined);
+    // Still claimable afterwards — a read must not have latched anything.
+    assert.equal((await claimDeposit('testnet', memo, 'card_x', 2450)).claimed, true);
   });
 });

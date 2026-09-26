@@ -179,7 +179,7 @@ export async function POST(req: Request): Promise<Response> {
       metadata: { memo, network, tx: funding.txHash },
     });
 
-    const claim = await claimDeposit(network, memo, card.id);
+    const claim = await claimDeposit(network, memo, card.id, funding.cents);
     if (!claim.claimed) {
       // Lost the race. This card is not the one the deposit owns, so it goes
       // back immediately; the winner's is what the shopper asked for.
