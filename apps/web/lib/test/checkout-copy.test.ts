@@ -76,7 +76,35 @@ describe('the single-use card', () => {
   it('RULE: says the numbers are not kept', () => {
     // They live in React state for the length of the dialog and nowhere else.
     // If that ever changes, this sentence becomes a lie and this test is where
-    // it gets caught.
+    // it gets caught. lib/card-store.ts writes four digits and an id, which
+    // is not "la tarjeta" and is the reason that file has a validator rather
+    // than a serializer.
     for (const m of CHECKOUT_MODES) assert.match(m.cardNote, /No la guardamos/);
+  });
+
+  it('RULE: only the mode where the card dies says it dies with the window', () => {
+    // In production there is one card per customer and it is topped up, so
+    // "cuando cerrás esta ventana, la tarjeta se cierra con ella" would be
+    // false — and false in the direction that matters, because a shopper who
+    // believes it will not think to come back to a card that still has money.
+    assert.match(checkoutCopy('testnet').cardNote, /se cierra con ella/);
+    assert.doesNotMatch(checkoutCopy('mainnet').cardNote, /se cierra/);
+  });
+
+  it('RULE: the returning-customer words exist only where a card is kept', () => {
+    // Empty in the test mode, and the panel keys off that emptiness rather
+    // than off the network — so a mode with nothing to come back to cannot
+    // render a sentence about a card it no longer has.
+    assert.equal(checkoutCopy('testnet').cardAgainCta, '');
+    assert.equal(checkoutCopy('testnet').cardAgainLead, '');
+    assert.match(checkoutCopy('mainnet').cardAgainCta, /tarjeta/i);
+    assert.match(checkoutCopy('mainnet').cardAgainLead, /misma/i);
+  });
+
+  it('RULE: a kept card is described by its balance, not by this basket', () => {
+    // It can carry change from the last shop, so "justo el importe de esta
+    // compra" would be wrong about the one number on screen.
+    assert.match(checkoutCopy('testnet').cardFunded, /justo el importe de esta compra/);
+    assert.match(checkoutCopy('mainnet').cardFunded, /saldo que tiene ahora/);
   });
 });

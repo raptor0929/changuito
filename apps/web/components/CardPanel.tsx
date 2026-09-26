@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { IssuedCard } from '../app/api/card/route.ts';
 import type { ThreeDsCode } from '../app/api/card/3ds/route.ts';
 import { track } from '../lib/analytics';
+import { type CardHint, recallCard, rememberCard } from '../lib/card-store.ts';
 import type { CheckoutCopy } from '../lib/checkout-copy.ts';
 import type { NetworkId } from '../lib/deployments.ts';
 import { CopyField } from './CopyField';
@@ -25,6 +26,15 @@ import { CopyField } from './CopyField';
  * cannot arrive there by accident. Not a log. Not a Playwright trace, which is
  * why e2e/app-auth.spec.ts turns traces off for this repo. When the dialog
  * closes the card is terminated and the state goes with the unmount.
+ *
+ * The one thing that does outlive the dialog is four digits and a card id, in
+ * `lib/card-store.ts`, and it exists to fix a sentence rather than to save a
+ * round trip. In production there is one card per customer, so the second
+ * deposit tops up the first — and a returning shopper shown "Generar una
+ * tarjeta" would reasonably conclude they are about to be given a second one.
+ * The hint changes the words. It decides nothing: the server reads
+ * `card_owner` against the wallet the deposit proved, so clearing the key
+ * changes the sentence and not the card.
  *
  * ## The code the bank sends to a card with no phone
  *
@@ -53,6 +63,15 @@ export function CardPanel({ memo, network, copy, onIssued }: Props) {
   const [card, setCard] = useState<IssuedCard | null>(null);
   const [minting, setMinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Read once, after mount. Never during render: the server has no
+  // localStorage, so reading it in the render body would make the first
+  // browser paint disagree with the HTML it is hydrating. Only where the copy
+  // for it exists, which is the mode where a card is actually kept.
+  const [hint, setHint] = useState<CardHint | null>(null);
+  useEffect(() => {
+    if (copy.cardAgainCta) setHint(recallCard(network));
+  }, [network, copy.cardAgainCta]);
 
   const [otp, setOtp] = useState<ThreeDsCode | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -83,15 +102,22 @@ export function CardPanel({ memo, network, copy, onIssued }: Props) {
         setError(typeof body?.error === 'string' ? sentence(body.error) : copy.cardError);
         return;
       }
-      setCard(body as IssuedCard);
+      const issued = body as IssuedCard;
+      setCard(issued);
+      // Four digits and an id, and only in the mode that keeps a card. In
+      // preview this would be a note about a card that no longer exists by
+      // the time anyone reads it.
+      if (copy.cardAgainCta) {
+        rememberCard(network, { cardId: issued.cardId, last4: issued.last4, brand: issued.brand });
+      }
       onIssued();
-      track('card_issued', { network });
+      track('card_issued', { network, again: Boolean(hint) });
     } catch {
       setError(copy.cardError);
     } finally {
       setMinting(false);
     }
-  }, [minting, card, memo, network, copy.cardError, onIssued]);
+  }, [minting, card, memo, network, copy.cardError, copy.cardAgainCta, hint, onIssued]);
 
   // Watch for a challenge for as long as there is a card to challenge. A
   // failed poll is a poll, not a verdict — the route answers `code: null` for
@@ -143,10 +169,14 @@ export function CardPanel({ memo, network, copy, onIssued }: Props) {
   const expired = left === 0;
 
   if (!card) {
+    // The same button either way — `POST /api/card` works out for itself
+    // whether this deposit mints a card or tops one up, and it is the only
+    // thing that can. All that changes here is what the shopper is told is
+    // about to happen.
     return (
       <div className="ck-card" data-testid="checkout-card">
         <h4 className="ck-card-title">{copy.cardTitle}</h4>
-        <p className="ck-note">{copy.cardLead}</p>
+        <p className="ck-note">{hint ? copy.cardAgainLead : copy.cardLead}</p>
         {error ? (
           <p className="pay-warn" role="status" data-testid="checkout-card-error">
             {error} {copy.cardFallback}
@@ -159,7 +189,7 @@ export function CardPanel({ memo, network, copy, onIssued }: Props) {
           onClick={() => void issue()}
           disabled={minting}
         >
-          {minting ? copy.cardMinting : copy.cardCta}
+          {minting ? copy.cardMinting : hint ? `${copy.cardAgainCta} ····${hint.last4}` : copy.cardCta}
         </button>
       </div>
     );
