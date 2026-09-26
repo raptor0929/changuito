@@ -9,8 +9,12 @@ target/
 **/*.rs.bk
 
 # Secrets. The treasury key signs mints and settlements; it never lands in git.
-.env
-.env*.local
+# `.env*` rather than `.env` plus `.env*.local`: those two together still let
+# .env.production and .env.mainnet through, which is where a DATABASE_URL or a
+# live API key is most likely to be written.
+.env*
+!.env.example
+!.env*.example
 .secrets/
 *.keystore.json
 
