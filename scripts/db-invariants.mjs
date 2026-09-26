@@ -163,6 +163,29 @@ try {
       after.status === 'carded' && after.tx_hash === 'tx_first',
       `${after.status}/${after.tx_hash}`);
 
+    // markDone, the one status the browser's word decides. CHAT's order is at
+    // 'carded' with tx_first on it, which is where a shopper presses "ya lo
+    // pagué" — so this is the transition as it actually happens.
+    const done = (memo) => tx`update orders set status = 'done'
+       where network='mainnet' and memo=${memo}
+         and status in ('paid', 'carded')
+       returning status`;
+    check('a carded order can be closed', (await done('chg-def456')).length === 1);
+    check('pressing it twice writes nothing', (await done('chg-def456')).length === 0);
+
+    // The guard that matters. `done` is the only status a request can ask for,
+    // so it must not be reachable from a state where no money arrived —
+    // chg-nochat-2 is still at 'quoted' and has to stay there.
+    check('an unpaid order cannot be closed', (await done('chg-nochat-2')).length === 0);
+    const unpaid = (await tx`select status from orders where network='mainnet' and memo='chg-nochat-2'`)[0];
+    check('and it is still unpaid afterwards', unpaid.status === 'quoted', unpaid.status);
+
+    // Nor can it revive one that ended badly: a refunded or abandoned order
+    // reading "Terminada" on /mis-compras would be the wrong lie in the wrong
+    // direction.
+    await tx`update orders set status='failed' where network='mainnet' and memo='chg-abc123'`;
+    check('a failed order cannot be closed', (await done('chg-abc123')).length === 0);
+
     // 0002 changed this from ON DELETE CASCADE. An order is a financial record
     // and a chat is a conversation: expiring a transcript under a retention
     // policy must orphan the order, never erase the evidence money moved.

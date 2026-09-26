@@ -390,20 +390,6 @@ export async function claimOrder(
   return { claimed: false, existing: held?.cardId ?? undefined };
 }
 
-export async function markOrder(
-  net: NetworkId,
-  memo: string,
-  status: OrderStatus,
-  extra: { txHash?: string; handoffUrl?: string } = {},
-): Promise<void> {
-  await db()`
-    update orders
-       set status      = ${status},
-           tx_hash     = coalesce(${extra.txHash ?? null}, tx_hash),
-           handoff_url = coalesce(${extra.handoffUrl ?? null}, handoff_url)
-     where network = ${net} and memo = ${memo}`;
-}
-
 /**
  * The deposit landed, and the order says so from now on.
  *
@@ -429,6 +415,39 @@ export async function markPaid(net: NetworkId, memo: string, txHash: string): Pr
            tx_hash = coalesce(tx_hash, ${txHash})
      where network = ${net} and memo = ${memo}
        and (status = 'quoted' or tx_hash is null)`;
+}
+
+/**
+ * The shopper has their groceries, and the order stops being open.
+ *
+ * This is the only status the browser's word decides, and it is deliberately
+ * the harmless one: `done` moves no money, issues nothing and reveals nothing.
+ * It is a shopper saying "that one is finished" so /mis-compras can stop
+ * listing it as in flight. `markPaid` above is the opposite kind of fact — it
+ * is written from a payment read off the ledger, never from a request.
+ *
+ * Monotonic in the same shape and for a sharper reason. An order only closes
+ * from `paid` or `carded`, so a `done` cannot arrive before the money did and
+ * cannot resurrect a `failed` one. A second press writes nothing at all, which
+ * is what keeps `orders_touch` from moving `updated_at` on a row where
+ * nothing happened.
+ *
+ * There is no `markOrder(status)` any more. It had no caller and it was the
+ * exact footgun this pair of functions exists to avoid: a caller that can set
+ * any status can set `paid`, and `paid` is a claim about a ledger.
+ *
+ * Returns whether a row actually closed — for the log line, not for the
+ * shopper. The route answers the same either way, because a memo that closes
+ * nothing is indistinguishable from one that does not exist and the caller has
+ * no business learning which.
+ */
+export async function markDone(net: NetworkId, memo: string): Promise<boolean> {
+  const rows = await db()`
+    update orders set status = 'done'
+     where network = ${net} and memo = ${memo}
+       and status in ('paid', 'carded')
+     returning memo`;
+  return rows.length > 0;
 }
 
 /** A customer's orders, newest first, for /mis-compras. */

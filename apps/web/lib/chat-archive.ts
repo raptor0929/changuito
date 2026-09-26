@@ -38,6 +38,7 @@
  * reply.
  */
 import { encodeTurn } from './agent/turn-store.ts';
+import { modeKeepsRecords } from './app-mode.ts';
 import { hasDatabase, saveChat } from './db.ts';
 import type { NetworkId } from './deployments.ts';
 
@@ -73,10 +74,10 @@ export interface ArchiveInput {
 
 /**
  * Why nothing was written, when nothing was. Returned rather than logged so a
- * caller can count them; `guest` and `no-database` are ordinary, `failed` is
- * the one worth watching.
+ * caller can count them; `guest`, `preview` and `no-database` are ordinary,
+ * `failed` is the one worth watching.
  */
-export type ArchiveOutcome = 'saved' | 'guest' | 'no-database' | 'failed';
+export type ArchiveOutcome = 'saved' | 'guest' | 'preview' | 'no-database' | 'failed';
 
 export interface ArchiveDeps {
   hasDatabase: () => boolean;
@@ -87,6 +88,13 @@ const REAL: ArchiveDeps = { hasDatabase, saveChat };
 
 export async function archiveChat(i: ArchiveInput, deps: ArchiveDeps = REAL): Promise<ArchiveOutcome> {
   if (!i.address) return 'guest';
+  // Asked out loud, not inferred from the address. Preview has no session so
+  // it cannot get past the line above — today. That is a coincidence of two
+  // unrelated facts (Pollar sells one key, and it is the mainnet one) rather
+  // than a rule, and "no Supabase in preview" is a rule. `keepsOneCard` asks
+  // the same question the same way for the same reason; this is the check its
+  // comment already claims is here.
+  if (!modeKeepsRecords(i.network)) return 'preview';
   if (!deps.hasDatabase()) return 'no-database';
   try {
     await deps.saveChat({

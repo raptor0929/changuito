@@ -63,11 +63,38 @@ describe('archiving a conversation', () => {
     assert.deepEqual(deps.calls, [], 'a guest transcript reached the database');
   });
 
-  it('writes nothing with no database configured', async () => {
+  it('RULE: preview is never written down either, address or no address', async () => {
+    // The allowlist can put a proven wallet on testnet, so "no session" does
+    // not cover this on its own. `modeKeepsRecords` is asked out loud, and
+    // this is the case that would otherwise hold only by coincidence.
+    const deps = spy();
+    const outcome = await archiveChat(
+      { id: 'c1', network: 'testnet', address: WALLET, turn: turnWith('hola'), title: 'hola' },
+      deps,
+    );
+    assert.equal(outcome, 'preview');
+    assert.deepEqual(deps.calls, [], 'a preview transcript reached the database');
+  });
+
+  it('RULE: the mode is checked before the database, so preview never dials one', async () => {
+    // Ordering, not pedantry: a deployment always has DATABASE_URL set, so
+    // asking `hasDatabase` first would answer 'no-database' for nobody and
+    // hide the reason preview writes nothing.
     const deps = { ...spy(), hasDatabase: () => false };
     assert.equal(
       await archiveChat(
         { id: 'c1', network: 'testnet', address: WALLET, turn: turnWith('hola'), title: 'hola' },
+        deps,
+      ),
+      'preview',
+    );
+  });
+
+  it('writes nothing with no database configured', async () => {
+    const deps = { ...spy(), hasDatabase: () => false };
+    assert.equal(
+      await archiveChat(
+        { id: 'c1', network: 'mainnet', address: WALLET, turn: turnWith('hola'), title: 'hola' },
         deps,
       ),
       'no-database',
@@ -93,7 +120,7 @@ describe('archiving a conversation', () => {
   it('RULE: the render cache survives the trip, because a Map does not stringify', async () => {
     const deps = spy();
     await archiveChat(
-      { id: 'c1', network: 'testnet', address: WALLET, turn: turnWith('hola'), title: null },
+      { id: 'c1', network: 'mainnet', address: WALLET, turn: turnWith('hola'), title: null },
       deps,
     );
     const saved = deps.calls[0] as { transcript: { v: number; products: [string, unknown][] } };
@@ -116,7 +143,7 @@ describe('archiving a conversation', () => {
     };
     assert.equal(
       await archiveChat(
-        { id: 'c1', network: 'testnet', address: WALLET, turn: turnWith('hola'), title: null },
+        { id: 'c1', network: 'mainnet', address: WALLET, turn: turnWith('hola'), title: null },
         deps,
       ),
       'failed',

@@ -374,6 +374,17 @@ function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, si
     // Before the receipt, not after: the order is over, and the residual goes
     // back to the wallet the moment the card dies.
     release();
+    // And the record stops saying the shop is in flight. Fire-and-forget with
+    // `keepalive` for the same reason `release` is: this is the end of a
+    // checkout the shopper is about to walk away from, and nothing on screen
+    // waits for the answer. In preview the route is a no-op — there is no row
+    // to close — which is why this is not conditioned on the mode here.
+    void fetch('/api/order/done', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ memo: intent.memo, network: intent.network }),
+      keepalive: true,
+    }).catch(() => {});
     onPaid({
       // The código is the order's name everywhere: it is what tied the importe
       // to this basket on the ledger, so it is what a person chasing it later

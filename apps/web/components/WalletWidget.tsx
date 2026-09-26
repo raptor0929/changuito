@@ -211,6 +211,13 @@ function ConnectedWallet() {
             {funding ? 'Cargando…' : 'Cargar USDC'}
           </button>
         ) : null}
+        {/* The record, which the rail beside the chat is not: that lists the
+            conversations this browser kept, and this lists what was actually
+            bought, on any device. A link and not a button — it is a page, and
+            a middle click should open it in a tab. */}
+        <a className="btn btn-sm btn-ghost" href="/mis-compras" data-testid="wallet-purchases">
+          Mis compras
+        </a>
         {/* No visible label: the name is aria-label, and the 44px box is the target. */}
         <button
           type="button"

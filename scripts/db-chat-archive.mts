@@ -38,24 +38,28 @@ let failed = 0;
 const ok = (name: string, cond: boolean) => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${name}`); if (!cond) failed++; };
 
 try {
-  const outcome = await archiveChat({ id: ID, network: 'testnet', address: MINE, turn: turn as never, title: chatTitle('  fideos\n  y salsa ') });
+  // mainnet, because that is where a transcript is written at all: preview
+  // keeps no records (lib/app-mode.ts) and `archiveChat` answers 'preview'
+  // without dialling anything. The row is deleted in the finally below either
+  // way, so this touches the same table the app does and leaves nothing.
+  const outcome = await archiveChat({ id: ID, network: 'mainnet', address: MINE, turn: turn as never, title: chatTitle('  fideos\n  y salsa ') });
   ok('archiveChat reports saved against the real database', outcome === 'saved');
 
   const mine = await loadChat(ID, MINE);
   ok('the owner reads it back', Boolean(mine));
-  ok('the network came back', mine?.network === 'testnet');
+  ok('the network came back', mine?.network === 'mainnet');
   const t = mine?.transcript as { v: number; products: [string, unknown][] };
   ok('jsonb kept the v:1 codec', t?.v === 1);
   ok('the product Map survived jsonb', Array.isArray(t?.products) && t.products[0]?.[0] === 'sku-1');
 
   ok('RULE: another wallet reads nothing', (await loadChat(ID, THEIRS)) === undefined);
 
-  const list = await chatsOf('testnet', MINE, 5);
+  const list = await chatsOf('mainnet', MINE, 5);
   ok('it appears in the list with its title', list.some((c) => c.id === ID && c.title === 'fideos y salsa'));
 
   // A second turn must not rename it, and must replace the transcript.
-  await archiveChat({ id: ID, network: 'testnet', address: MINE, turn: { messages: [{ role: 'user', content: 'y queso' }], cache: { products: new Map() } } as never, title: 'y queso' });
-  const again = await chatsOf('testnet', MINE, 5);
+  await archiveChat({ id: ID, network: 'mainnet', address: MINE, turn: { messages: [{ role: 'user', content: 'y queso' }], cache: { products: new Map() } } as never, title: 'y queso' });
+  const again = await chatsOf('mainnet', MINE, 5);
   ok('the title is the first one, not the latest', again.find((c) => c.id === ID)?.title === 'fideos y salsa');
   const after = (await loadChat(ID, MINE))?.transcript as { messages: { content: string }[] };
   ok('the transcript is the latest', after?.messages?.[0]?.content === 'y queso');
