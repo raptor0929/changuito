@@ -28,7 +28,7 @@ const proof = (kp: Keypair, message: string) => ({ message, signature: sep53(kp,
 
 describe('walletProofMessage', () => {
   it('round-trips every intent', () => {
-    for (const intent of ['login', 'faucet'] as const) {
+    for (const intent of ['login', 'faucet', 'deposit', 'card'] as const) {
       assert.deepEqual(parseWalletProofMessage(walletProofMessage(intent, buyer.publicKey(), now)), {
         intent,
         address: buyer.publicKey(),
@@ -118,5 +118,74 @@ describe('signWalletProof', () => {
     const p = await signWalletProof(async (m) => sep53(buyer, m), 'login', buyer.publicKey(), undefined, now);
     assert.ok(p);
     assert.deepEqual(verifyWalletProof({ intent: 'login', address: buyer.publicKey(), proof: p, now }), { ok: true });
+  });
+});
+
+describe('the card intent', () => {
+  // This is the only proof that hands back a PAN without a deposit in flight,
+  // so the separation between it and every other intent is the whole guarantee
+  // — see the header of app/api/card/mine/route.ts.
+
+  it('RULE: no other intent can be replayed as a card proof', () => {
+    for (const intent of ['login', 'faucet', 'deposit'] as const) {
+      const p = proof(buyer, walletProofMessage(intent, buyer.publicKey(), now));
+      assert.deepEqual(
+        verifyWalletProof({ intent: 'card', address: buyer.publicKey(), proof: p, now }),
+        { ok: false, error: 'proof_invalid' },
+        `a ${intent} proof was accepted as a card proof`,
+      );
+    }
+    for (const intent of ['settle', 'refund'] as const) {
+      const p = proof(buyer, walletProofMessage(intent, buyer.publicKey(), now, ORDER));
+      assert.deepEqual(
+        verifyWalletProof({ intent: 'card', address: buyer.publicKey(), proof: p, now }),
+        { ok: false, error: 'proof_invalid' },
+        `a ${intent} proof was accepted as a card proof`,
+      );
+    }
+  });
+
+  it('RULE: a card proof cannot be spent on anything else', () => {
+    const p = proof(buyer, walletProofMessage('card', buyer.publicKey(), now));
+    for (const intent of ['login', 'faucet', 'deposit'] as const) {
+      assert.equal(
+        verifyWalletProof({ intent, address: buyer.publicKey(), proof: p, now }).ok,
+        false,
+        `a card proof was accepted as a ${intent} proof`,
+      );
+    }
+  });
+
+  it('accepts the real thing', () => {
+    const p = proof(buyer, walletProofMessage('card', buyer.publicKey(), now));
+    assert.deepEqual(verifyWalletProof({ intent: 'card', address: buyer.publicKey(), proof: p, now }), { ok: true });
+  });
+
+  it('RULE: is one wallet\'s card, not whoever holds the signature', () => {
+    // The route never takes a card id, so the address in the message is the
+    // only thing that selects a card. A proof signed by somebody else for
+    // their own address must not read this wallet's card.
+    const theirs = proof(stranger, walletProofMessage('card', stranger.publicKey(), now));
+    assert.equal(verifyWalletProof({ intent: 'card', address: buyer.publicKey(), proof: theirs, now }).ok, false);
+
+    // Nor a message naming this wallet but signed by another key.
+    const forged = proof(stranger, walletProofMessage('card', buyer.publicKey(), now));
+    assert.deepEqual(verifyWalletProof({ intent: 'card', address: buyer.publicKey(), proof: forged, now }), {
+      ok: false,
+      error: 'proof_invalid',
+    });
+  });
+
+  it('goes stale, so a captured signature is not a standing key to the PAN', () => {
+    const p = proof(buyer, walletProofMessage('card', buyer.publicKey(), now));
+    assert.deepEqual(
+      verifyWalletProof({ intent: 'card', address: buyer.publicKey(), proof: p, now: now + WALLET_PROOF_TTL_MS + 1 }),
+      { ok: false, error: 'proof_expired' },
+    );
+  });
+
+  it('carries no order id, and is refused if one is smuggled in', () => {
+    const smuggled = `Changuito: ver los datos de mi tarjeta ${ORDER} con ${buyer.publicKey()} (${new Date(now).toISOString()})`;
+    assert.equal(parseWalletProofMessage(smuggled), null);
   });
 });
