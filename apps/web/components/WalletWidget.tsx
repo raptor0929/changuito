@@ -4,9 +4,10 @@ import { usePollar } from '@pollar/react';
 import { useEffect, useRef, useState } from 'react';
 
 import { track, trackLoginStart } from '../lib/analytics';
-import { modeCopy, PREVIEW_MASTHEAD } from '../lib/mode-copy.ts';
+import { modeCopy, PREVIEW_MASTHEAD, TRUSTLINE } from '../lib/mode-copy.ts';
 import { pollarEnabled, shortAddress } from '../lib/pollar.ts';
 import { ensureUserCookie, forgetUserCookie } from '../lib/session-login.ts';
+import { usdcAsset } from '../lib/trustline.ts';
 import type { FaucetProof } from '../lib/faucet-proof.ts';
 import { useBalances } from '../lib/use-balances.ts';
 import { useFaucetAccess } from '../lib/use-faucet-access.ts';
@@ -15,6 +16,7 @@ import { signWalletProof } from '../lib/wallet-proof.ts';
 import { FaucetConfirm } from './FaucetConfirm';
 import { ModeBadge } from './ModeBadge';
 import { useNetwork } from './NetworkProvider';
+import { ReceiveModal } from './ReceiveModal';
 
 /**
  * The balance widget in the masthead.
@@ -48,7 +50,7 @@ function NoWallet() {
 }
 
 function ConnectedWallet() {
-  const { wallet, isAuthenticated, verified, openLoginModal, logout } = usePollar();
+  const { wallet, isAuthenticated, verified, openLoginModal, logout, setTrustline } = usePollar();
   const { network } = useNetwork();
   const sign = useWalletSigner();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
@@ -77,6 +79,47 @@ function ConnectedWallet() {
     // The dialog took focus from this button; keyboard users land back on it.
     requestAnimationFrame(() => fundButton.current?.focus());
   };
+
+  const [receiving, setReceiving] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
+  const receiveButton = useRef<HTMLButtonElement>(null);
+
+  const closeReceive = () => {
+    setReceiving(false);
+    requestAnimationFrame(() => receiveButton.current?.focus());
+  };
+
+  /**
+   * Opens the USDC line from the receive dialog.
+   *
+   * The same call PaymentModal makes, deliberately duplicated rather than
+   * hoisted, because *when* is the whole difference: there it is the last step
+   * before paying, here it is before the money is sent at all. A classic asset
+   * cannot reach an account that has not opted in — the transfer fails after
+   * the sender pressed send — so the one screen that hands out the address is
+   * the right place to notice.
+   *
+   * `refresh()` is what clears the warning, not this function's return value:
+   * the state comes back from the ledger, so a success that did not land
+   * cannot make the dialog say the line is open.
+   */
+  async function openLine() {
+    const asset = usdcAsset(network);
+    if (!asset) return;
+    setOpening(true);
+    setOpenError(null);
+    try {
+      const outcome = await setTrustline(asset);
+      if (outcome.status === 'error') throw new Error(outcome.details ?? TRUSTLINE.failed);
+      refresh();
+    } catch (err) {
+      track('payment_fail', { flow: 'receive', code: 'trustline' });
+      setOpenError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setOpening(false);
+    }
+  }
 
   // After Pollar login, set httpOnly chg_user so /api/chat skips the guest turn
   // limit. Shared with the chat, which awaits the same promise before it
@@ -165,11 +208,20 @@ function ConnectedWallet() {
     <div className="wallet">
       <div className="wallet-head">
         <span className="wallet-label">Tu pago</span>
+        {/* It used to copy the address on click, silently: no confirmation,
+            no way to see the whole thing, and nothing for somebody holding a
+            phone. It opens the dialog that does all three. */}
         <button
+          ref={receiveButton}
           type="button"
           className="wallet-addr"
-          onClick={() => void navigator.clipboard?.writeText(address)}
-          title={`${address}. Clic para copiar`}
+          data-testid="wallet-receive"
+          aria-haspopup="dialog"
+          onClick={() => {
+            setOpenError(null);
+            setReceiving(true);
+          }}
+          title={`${address}. Clic para ver el QR y copiarla`}
         >
           {shortAddress(address)}
         </button>
@@ -243,6 +295,17 @@ function ConnectedWallet() {
           <LogoutIcon />
         </button>
       </div>
+
+      {receiving ? (
+        <ReceiveModal
+          address={address}
+          trustline={data?.trustline ?? 'not-needed'}
+          enabling={opening}
+          enableError={openError}
+          onEnable={() => void openLine()}
+          onClose={closeReceive}
+        />
+      ) : null}
 
       {confirming && faucet?.allowed ? (
         <FaucetConfirm

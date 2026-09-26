@@ -9,6 +9,7 @@ import { TurnProgressLine, UserBubble } from '../../../components/Chat';
 import { CheckoutModal } from '../../../components/CheckoutModal';
 import { FaucetConfirm } from '../../../components/FaucetConfirm';
 import { PollarSpanish } from '../../../components/PollarSpanish';
+import { ReceiveModal } from '../../../components/ReceiveModal';
 import type { ChatState } from '../../../lib/chat-state';
 import { ENOUGH_UNITS } from '../../../lib/faucet-policy';
 
@@ -75,12 +76,21 @@ const CHECKOUT_CART = {
   messages: [],
 };
 
+/**
+ * A real mainnet address, so the QR encodes the length it will actually have —
+ * 56 base32 characters is what decides the code's version, and a placeholder
+ * half that long would draw a smaller one than any shopper ever sees. This is
+ * the deposit account from deployments.json, which is public.
+ */
+const DEMO_ADDRESS = 'GDVSFA5SYQ2K7PUQ5JXKYL4XHHHM2A7T3ZTPXYQWFZGDIZ3ZHFHMNEZK';
+
 const IDLE: AuthState = { step: 'idle' } as AuthState;
 const CODE: AuthState = { step: 'entering_code' } as AuthState;
 
 export function Fixtures() {
   const [faucet, setFaucet] = useState<'empty' | 'full' | null>(null);
   const [checkout, setCheckout] = useState(false);
+  const [receive, setReceive] = useState<'ok' | 'needed' | null>(null);
 
   return (
     <>
@@ -125,6 +135,28 @@ export function Fixtures() {
         />
       ) : null}
 
+      {/* Presentational, so it needs no session — which is the only reason the
+          QR is cheap to look at. Both states, because the one-time step
+          changes which button is the primary one and which gets focus. */}
+      <div className="cart-actions">
+        <button type="button" className="btn btn-sm" data-testid="fixture-receive" onClick={() => setReceive('ok')}>
+          Cargar dólares
+        </button>
+        <button type="button" className="btn btn-sm btn-ghost" onClick={() => setReceive('needed')}>
+          Cargar dólares (sin habilitar)
+        </button>
+      </div>
+      {receive ? (
+        <ReceiveModal
+          address={DEMO_ADDRESS}
+          trustline={receive}
+          enabling={false}
+          enableError={null}
+          onEnable={noop}
+          onClose={() => setReceive(null)}
+        />
+      ) : null}
+
       <button
         type="button"
         className="btn"
@@ -145,7 +177,15 @@ export function Fixtures() {
       {/* Pollar's own template, so the translation runs against the real
           markup rather than a copy of it. */}
       <PollarSpanish />
-      <div data-testid="fixture-pollar" style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+      {/* `isolation` caps this block's stacking context at the flow. Pollar's
+          own stylesheet puts its overlay near the top of the z-axis, which is
+          right when it is a login modal and wrong when it is a picture of one
+          on a fixtures page — it was painting over any dialog opened above it,
+          which is most of what this page is for. */}
+      <div
+        data-testid="fixture-pollar"
+        style={{ display: 'flex', gap: 16, flexWrap: 'wrap', position: 'relative', zIndex: 0, isolation: 'isolate' }}
+      >
         {[IDLE, CODE].map((authState) => (
           <div key={authState.step} className="pollar-overlay" style={{ position: 'static', inset: 'auto' }}>
             <LoginModalTemplate

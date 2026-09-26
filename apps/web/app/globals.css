@@ -648,6 +648,17 @@ a:hover { color: var(--chg-arcilla); }
   cursor: pointer;
 }
 .wallet-addr:hover { color: var(--chg-arcilla); }
+/* It opens a dialog now rather than copying in silence, so it has to look like
+   a control. A dotted underline and not a solid one: it is a button, not a
+   link, and the address underneath still has to be readable character by
+   character. */
+.wallet-addr {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border);
+}
+.wallet-addr:hover { text-decoration-color: currentColor; }
 .wallet-balance { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
 .wallet-balance strong { font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .wallet-unit { font-size: 12px; color: var(--muted); }
@@ -876,6 +887,42 @@ a:hover { color: var(--chg-arcilla); }
 .pay-warn { margin: 0; font-size: 13px; color: var(--warn); }
 .pay-error { margin: 0; font-size: 13px; color: var(--warn); word-break: break-word; }
 .pay-fine-line { margin: 0; font-size: 12px; color: var(--muted); text-align: center; }
+/* The dialog that hands out the shopper's own address. See ReceiveModal. */
+.receive-modal { max-width: 380px; }
+/* A white plate, in both themes and on purpose: a QR is dark-on-light by
+   definition and a dark-mode inversion simply does not scan. The padding is
+   part of it — the quiet zone is inside the viewBox (lib/qr.ts), and this is
+   the border radius's share on top. */
+.receive-qr {
+  align-self: center;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  line-height: 0;
+}
+/* Capped rather than fluid: past about 240px a QR gains nothing — a phone
+   camera locks on to the pattern, not to its size — and the address below it
+   would be pushed off a short screen. */
+.receive-qr svg {
+  display: block;
+  width: min(220px, 56vw);
+  height: auto;
+}
+.receive-facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+/* A middle dot between the facts rather than three bullets on three lines:
+   they are one answer to one form, read left to right. */
+.receive-facts li + li::before { content: '·'; margin-right: 8px; }
+
 /* The one-time step before a first real payment. A card rather than another
    line of fine print, because it is the thing the button now does — see
    lib/trustline.ts for why it exists at all. */

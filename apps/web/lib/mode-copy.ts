@@ -139,3 +139,41 @@ export const TRUSTLINE = {
   /** The way out, so a refusal is not a dead end. */
   back: 'Volver al carrito',
 } as const;
+
+/**
+ * The dialog that hands the shopper their own address so somebody can send
+ * money to it.
+ *
+ * The premise is that they are about to withdraw dollars from wherever they
+ * already keep them — Lemon, Belo, Buenbit, Binance — into changuito. Which
+ * means the copy has exactly two jobs: give them the address in both forms
+ * they might need it (a camera and a clipboard), and name the two ways the
+ * transfer can arrive as nothing.
+ *
+ * Those two are why this says more than "here is your address":
+ *
+ * - **The network.** A USDC withdrawal asks which chain, and a shopper who
+ *   picks Ethereum or Tron sends real money to an address that does not exist
+ *   there. It is unrecoverable and it is the single most common way this goes
+ *   wrong, so it is the first thing on the screen and it is the one place the
+ *   word "Stellar" is allowed to appear — the forbidden list in the agent
+ *   prompt is about unprompted blockchain talk in a shopping conversation, and
+ *   this is a withdrawal form asking a question only that word answers.
+ * - **The asset.** Same address, wrong token, same outcome.
+ *
+ * No memo: this is the shopper's own wallet, not an exchange's pooled account,
+ * and a memo field left empty is correct. Said out loud because every
+ * withdrawal form asks, and a shopper who does not know invents one.
+ */
+export const RECEIVE = {
+  title: 'Cargar dólares',
+  /** Above the QR. What they are looking at, in case they opened this by accident. */
+  lead: 'Esta es tu dirección. Mandá USDC acá desde donde los tengas.',
+  qrAlt: 'Código QR con tu dirección',
+  addressLabel: 'Tu dirección',
+  /** The two answers a withdrawal form asks for, as a list so neither is prose. */
+  facts: ['Red: Stellar', 'Moneda: USDC', 'Memo: no hace falta'] as readonly string[],
+  /** The unrecoverable mistake, said plainly rather than as a warning icon. */
+  warn: 'Si elegís otra red, el dinero no llega y no se puede recuperar.',
+  dismiss: 'Listo',
+} as const;
