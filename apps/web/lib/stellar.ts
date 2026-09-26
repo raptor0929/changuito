@@ -56,8 +56,15 @@ export interface FundingResult {
 /**
  * Below this we go back to friendbot. Existing-and-non-empty is not the test:
  * Pollar creates its wallets with a sponsored createAccount at a "0" starting
- * balance, so the account is very much there while holding nothing, and a
- * wallet that cannot pay a fee is no better than one that does not exist.
+ * balance, so the account is very much there while holding nothing.
+ *
+ * This is the faucet's threshold, and only the faucet's. It used to be the
+ * app's too — `/api/balance` read it to decide a wallet could not pay a fee —
+ * and that was wrong once Pollar sponsored fees; see the header of
+ * app/api/balance/route.ts. What is left here is the demo's own need: the
+ * testnet faucet tops an account up before minting it play USDC, because a
+ * balance is easier to reason about than a sponsorship when the point of the
+ * exercise is to watch a payment settle.
  */
 export const MIN_XLM = 5;
 

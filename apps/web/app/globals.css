@@ -666,7 +666,6 @@ a:hover { color: var(--chg-arcilla); }
 .wallet-balance strong { font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .wallet-unit { font-size: 12px; color: var(--muted); }
 .wallet-sub { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
-.wallet-warn { color: var(--warn); }
 .wallet-muted { color: var(--muted); }
 .wallet-error { margin: 0; font-size: 12px; color: var(--warn); }
 

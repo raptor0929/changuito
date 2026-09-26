@@ -25,9 +25,34 @@
  * for the two cases that genuinely need it: a holder that is a contract, whose
  * balance lives in contract storage and not on any Horizon account, and a
  * network whose USDC has no issuer at all.
+ *
+ * ## There is no `funded` field, and its absence is the decision
+ *
+ * There was one. It meant "holds at least MIN_XLM, so it can pay a fee", and
+ * two screens turned that into *falta saldo para comisiones*.
+ *
+ * Pollar sponsors the fee. A custodial session's `signTx` comes back as a
+ * fee-bumped envelope the app pays for, `setTrustline` sponsors the 0.5 XLM
+ * reserve as well, and a smart wallet has no Horizon account to hold XLM in
+ * at all. Nothing in this repo passes `skipSponsorship`, and `WalletProvider`
+ * configures no wallet adapters, so there is no session here that spends the
+ * shopper's own XLM.
+ *
+ * Which made the warning worse than useless: a Pollar wallet is created
+ * sponsored at 0 XLM and stays there, so it fired for every signed-in shopper,
+ * about a problem they did not have and could not have fixed.
+ *
+ * `xlm` stays. It is free — the same Horizon read — and it is the number to
+ * look at when a signature fails. What is gone is the app deciding, from that
+ * number, that something is wrong.
+ *
+ * This rests on something outside this repo: sponsorship is a switch in the
+ * Pollar dashboard. Turn it off and signing starts failing with
+ * `tx_insufficient_fee`; the honest answer then is to bring the field back,
+ * not to widen the error copy.
  */
 import { networkOrDefault, type NetworkId } from '../../../lib/deployments.ts';
-import { accountBalances, addressKind, classicBalance, formatUsdc, MIN_XLM } from '../../../lib/stellar.ts';
+import { accountBalances, addressKind, classicBalance, formatUsdc } from '../../../lib/stellar.ts';
 import { usdcBalance } from '../../../lib/token.ts';
 import { trustlineFor, usdcAsset, type TrustlineState } from '../../../lib/trustline.ts';
 import { requireHuman } from '../../../lib/human-gate.ts';
@@ -45,8 +70,6 @@ export interface BalanceResponse {
   usdc: string;
   /** The same number, rounded for a person: "12.34". */
   usdcDisplay: string;
-  /** True once the address exists on-ledger and can pay a fee. */
-  funded: boolean;
   /**
    * Whether this account has opted into the network's USDC. Both networks now
    * have a classic issuer, so both can answer `needed` — the asymmetry this
@@ -75,9 +98,9 @@ export async function GET(req: Request): Promise<Response> {
   const asset = usdcAsset(network);
 
   try {
-    // The whole Horizon account rather than just its XLM: the fee balance, the
-    // trustline and the USDC on it are three facts in one response, and asking
-    // separately would be three round trips for one read.
+    // The whole Horizon account rather than just its XLM: the trustline and
+    // the USDC on it come out of the same answer, and asking separately would
+    // be three round trips for one read.
     const balances = kind === 'account' ? await accountBalances(address, network) : null;
     const xlm = balances === null ? null : (balances.find((b) => b.asset_type === 'native')?.balance ?? '0');
 
@@ -100,11 +123,6 @@ export async function GET(req: Request): Promise<Response> {
       xlm,
       usdc: usdc.toString(),
       usdcDisplay: formatUsdc(usdc),
-      // "Funded" has to mean "can pay a fee", not "the account row exists" —
-      // a Pollar wallet is created sponsored at 0 XLM, so existence alone left
-      // this true while the widget showed 0.00 and the warning stayed hidden.
-      // A contract wallet pays fees some other way, so it is never unfunded.
-      funded: kind === 'contract' || (xlm !== null && Number(xlm) >= MIN_XLM),
       // A smart wallet holds a SAC asset in contract storage, so there is no
       // trustline to open and `balances` is null for a reason that is not
       // "has opted into nothing".

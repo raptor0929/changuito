@@ -238,8 +238,9 @@ function ConnectedWallet() {
       <ModeBadge network={network} />
 
       <div className="wallet-sub">
-        {/* Warn only when the account cannot pay network fees yet. */}
-        {data && !data.funded && <span className="wallet-warn">falta saldo para comisiones</span>}
+        {/* No fee warning here. Pollar sponsors the fee — see the note on
+            BalanceResponse — so a shopper holding 0 XLM is the normal, working
+            state rather than something to act on. */}
         {!verified && <span className="wallet-muted">verificando sesión…</span>}
       </div>
 

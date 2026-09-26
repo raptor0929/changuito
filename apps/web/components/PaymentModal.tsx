@@ -250,14 +250,6 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
             {trustlineError ? <p className="pay-error">{TRUSTLINE.failed}</p> : null}
           </div>
         ) : null}
-        {address && balance && !balance.funded ? (
-          <p className="pay-warn">
-            {canFund
-              ? 'Te falta saldo para la comisión de la red. Usá “Cargar USDC”.'
-              : 'Te falta saldo para la comisión de la red.'}
-          </p>
-        ) : null}
-
         <p className="pay-note">
           {mode.payNote ? <strong>{mode.payNote} </strong> : null}
           El monto queda reservado hasta que completes la compra en el súper. Si no se concreta,
