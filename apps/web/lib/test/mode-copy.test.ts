@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { NETWORK_IDS } from '../deployments.ts';
-import { MODES, modeCopy, PREVIEW_MASTHEAD, TRUSTLINE } from '../mode-copy.ts';
+import { BALANCE, MODES, modeCopy, PREVIEW_MASTHEAD, TRUSTLINE } from '../mode-copy.ts';
 
 /**
  * The chrome obeys the same vocabulary rule as the agent: lib/agent/prompt.ts
@@ -15,6 +15,7 @@ const every = [
   ...MODES.flatMap((m) => [m.label, m.short, m.balanceUnit, m.hint, m.payNote, m.holdNote, m.payLabel('12,34')]),
   ...Object.values(TRUSTLINE),
   ...Object.values(PREVIEW_MASTHEAD),
+  ...Object.values(BALANCE),
 ].filter(Boolean);
 
 describe('mode copy', () => {
@@ -70,6 +71,16 @@ describe('mode copy', () => {
     assert.match(TRUSTLINE.failed, /volver a intentar/);
     assert.match(TRUSTLINE.back, /carrito/);
     for (const text of Object.values(TRUSTLINE)) assert.doesNotMatch(text, /modo prueba/);
+  });
+
+  it('RULE: a failed balance read says one thing, and it is not the failure', () => {
+    // What this replaces: the hook parsed the body before checking the
+    // status, so a gateway's HTML error page produced a SyntaxError and the
+    // shopper read `Unexpected token '<', "<!DOCTYPE "…` beside their money.
+    // Nothing a server or a parser says is written for them.
+    assert.doesNotMatch(BALANCE.unavailable, /[<>{}]|DOCTYPE|token|error|null|undefined|\d{3}/i);
+    // It has to say the thing they can act on: looking again is free.
+    assert.match(BALANCE.unavailable, /de nuevo/);
   });
 
   it('names the consequence of leaving preview, not the mechanism', () => {

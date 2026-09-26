@@ -646,6 +646,26 @@ found: check `DATABASE_URL` is set in Vercel and `npm run db:status` shows both
 migrations applied. The routes answer 503 rather than mint a duplicate, so this
 looks like a failure and not like a silent extra card.
 
+**A red message where the balance should be, right after signing in.** Fixed,
+and worth knowing what it was: `/api/balance` asked a Soroban contract for the
+USDC, and mainnet's USDC is a classic Circle asset, so the call was built with
+an empty contract id and failed every time. The number is read off the Horizon
+trustline now. The shopper never sees a server message beside their balance any
+more either — `BALANCE.unavailable` in `lib/mode-copy.ts` is the only string
+that surface can show, and the detail goes to the browser console under
+`[balance]`.
+
+**A chat turn hangs for a minute and then says "No se envió".** That copy means
+the request never delivered a first byte (CLAUDE.md §6), which rules out the
+model: Ollama and Anthropic are both reached well after `/api/chat` has written
+`status: received`. The only I/O before that byte is the rate-limit counters in
+`lib/login-gate.ts`. They are bounded now — a 2.5 s signal per call, one retry,
+and the guest path's round trips batched from seven to two — so a Redis that is
+slow or down answers 503 *"No pudimos verificar tu cupo"* in a few seconds
+instead of sitting there until the gateway gives up. If you see this again,
+check the Upstash status and the KV variables in [2.6](#26-conversation-history-and-quotas)
+before looking at the model.
+
 **Contract ids stopped resolving.** Testnet is wiped periodically. Re-run
 `npm run deploy:testnet -- --force` and commit the new ids.
 

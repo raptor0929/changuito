@@ -95,6 +95,26 @@ export const PREVIEW_MASTHEAD = {
 } as const;
 
 /**
+ * When the number beside the balance cannot be read.
+ *
+ * Its own string because it used to be whatever the failure happened to say.
+ * `useBalances` parsed the response body before checking the status, so a
+ * gateway that answered with an HTML error page produced a SyntaxError, and
+ * the hook painted its text — `Unexpected token '<', "<!DOCTYPE "…` — in red
+ * beside the balance. A server message is written for whoever reads the log,
+ * and it is in English, and it names machinery; none of that belongs on a
+ * shopper's screen, whatever went wrong.
+ *
+ * So there is exactly one thing this says, and it is the only thing the
+ * shopper can act on: we could not read it, and looking again is free. The
+ * number itself already renders as `-` when there is nothing to show, so this
+ * line is the explanation and not the absence.
+ */
+export const BALANCE = {
+  unavailable: 'No pudimos leer tu saldo ahora. Probá de nuevo en un rato.',
+} as const;
+
+/**
  * The one-time step before the first real payment.
  *
  * Nobody asked for this and nobody will understand why it exists, so the copy

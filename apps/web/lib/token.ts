@@ -28,8 +28,26 @@ export function usdcClient(publicKey?: string, net: NetworkId = DEFAULT_NETWORK)
   });
 }
 
-/** Token units (7 decimals), not a display string. Zero for an unknown holder. */
+/**
+ * Token units (7 decimals), not a display string. Zero for an unknown holder.
+ *
+ * ## This reads the *token*, and mainnet's USDC is not one
+ *
+ * Only a network whose USDC is a Soroban token can answer this. Mainnet's is a
+ * classic Circle asset: `contracts.usdc.id` is `""` there, and so is
+ * `accounts.resolver`, so the client above is built with an empty contract id
+ * and an empty source account and the SDK rejects both ("Invalid contract ID").
+ * Every mainnet call landed in the caller's catch, which is how a signed-in
+ * shopper came to see `could not read balances` beside their balance.
+ *
+ * The guard is here rather than at the call site because the failure was
+ * unreadable, not because it was a surprise. A caller that has a classic
+ * issuer should not be here at all — `classicBalance` in lib/stellar.ts reads
+ * that number off the Horizon account it already fetched.
+ */
 export async function usdcBalance(address: string, net: NetworkId = DEFAULT_NETWORK): Promise<bigint> {
+  const d = deployment(net);
+  if (!d.usdcId) throw new Error(`no hay un token USDC desplegado en ${net}`);
   const tx = await usdcClient(undefined, net).balance({ id: address });
   return tx.result;
 }

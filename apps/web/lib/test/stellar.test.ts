@@ -5,10 +5,12 @@ import { afterEach, describe, it } from 'node:test';
 import { DEFAULT_NETWORK, DEPLOYMENTS, NETWORK_IDS, asNetwork, deployment, isConfigured, networkOrDefault } from '../deployments.ts';
 import {
   centsToUnits,
+  classicBalance,
   ensureFunded,
   explorer,
   formatUsdc,
   MIN_XLM,
+  unitsFromDecimal,
   unitsToCents,
 } from '../stellar.ts';
 
@@ -171,6 +173,73 @@ describe('USDC units', () => {
     assert.equal(formatUsdc(0n), '0.00');
     assert.equal(formatUsdc(50_000n), '0.00', 'half a cent rounds down, not up');
     assert.equal(formatUsdc(-123_400_000n), '-12.34');
+  });
+
+  it('parses a Horizon decimal without going through a float', () => {
+    assert.equal(unitsFromDecimal('1.0000000'), 10_000_000n);
+    assert.equal(unitsFromDecimal('12.34'), 123_400_000n);
+    assert.equal(unitsFromDecimal('0'), 0n);
+    assert.equal(unitsFromDecimal('0.0000001'), 1n, 'one stroop');
+    assert.equal(unitsFromDecimal('-1.5'), -15_000_000n);
+    assert.equal(unitsFromDecimal('.5'), 5_000_000n, 'Horizon omits a leading zero for nothing, but be liberal');
+    // `Number('0.1') * 1e7` is 1000000.0000000001. The whole point.
+    assert.equal(unitsFromDecimal('0.1'), 1_000_000n);
+    // Bigger than a double can hold exactly.
+    assert.equal(unitsFromDecimal('922337203685.4775807'), 9_223_372_036_854_775_807n);
+  });
+
+  it('round-trips a formatted amount back through the parser', () => {
+    for (const units of [0n, 1n, 10_000_000n, 123_456_789n, 999_999_999_999n]) {
+      assert.equal(unitsFromDecimal(formatUsdc(units)) <= units, true, `${units} grew`);
+    }
+  });
+
+  it('refuses something that is not a number rather than reading it as zero', () => {
+    for (const bad of ['', '  ', 'abc', '1.2.3', '1e7', '<!DOCTYPE html>']) {
+      assert.throws(() => unitsFromDecimal(bad), /not a decimal amount/, `accepted ${JSON.stringify(bad)}`);
+    }
+  });
+});
+
+/**
+ * The read that used to go to a Soroban contract with an empty id. Mainnet's
+ * USDC is a classic Circle asset, so the number is on the trustline Horizon
+ * already returned — see the header of app/api/balance/route.ts.
+ */
+describe('classic balances', () => {
+  const USDC = 'USDC';
+  const ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN';
+  const OTHER = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
+
+  it('reads the line for exactly this code and this issuer', () => {
+    const balances = [
+      { asset_type: 'native', balance: '9.9999900' },
+      { asset_type: 'credit_alphanum4', balance: '12.3400000', asset_code: USDC, asset_issuer: ISSUER },
+    ];
+    assert.equal(classicBalance(balances, USDC, ISSUER), 123_400_000n);
+  });
+
+  it('RULE: a different issuer of the same code is a different asset', () => {
+    // Anybody may issue an asset called USDC. Matching on the code alone would
+    // let one show up as the shopper's dollars.
+    const balances = [
+      { asset_type: 'credit_alphanum4', balance: '1000.0000000', asset_code: USDC, asset_issuer: OTHER },
+    ];
+    assert.equal(classicBalance(balances, USDC, ISSUER), 0n);
+  });
+
+  it('is zero for an account with no such line, which is the truth', () => {
+    assert.equal(classicBalance([{ asset_type: 'native', balance: '100.0000000' }], USDC, ISSUER), 0n);
+  });
+
+  it('is zero for an account that is not on the ledger at all', () => {
+    assert.equal(classicBalance(null, USDC, ISSUER), 0n);
+  });
+
+  it('never reads the native line as the asset', () => {
+    // `asset_code` is absent on a native line, so a loose match would compare
+    // undefined to undefined and hand back the XLM.
+    assert.equal(classicBalance([{ asset_type: 'native', balance: '50.0000000' }], '', ''), 0n);
   });
 });
 

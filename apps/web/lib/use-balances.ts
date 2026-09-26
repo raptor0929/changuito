@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { BalanceResponse } from '../app/api/balance/route.ts';
 import { DEFAULT_NETWORK, type NetworkId } from './deployments.ts';
 import { SOLO_HUMANOS } from './human-gate-ui';
+import { BALANCE } from './mode-copy.ts';
 
 export interface Balances {
   data: BalanceResponse | null;
@@ -34,6 +35,19 @@ export interface Balances {
  * hook that has no opinion about chains, and the arm costs nothing — it is
  * one fetch with a different query string. If a second Pollar key ever
  * returns, this is one of the few places that needs no change.
+ *
+ * ## `error` is copy, never a message from somewhere else
+ *
+ * It is rendered verbatim beside the balance, so everything that reaches it
+ * has to be written for a shopper. It was not: the hook parsed the body
+ * before looking at the status, threw whatever the server or the JSON parser
+ * said, and painted that. A route's own 502 put `could not read balances:
+ * Invalid contract ID:` on screen; a gateway's HTML error page put
+ * `Unexpected token '<', "<!DOCTYPE "…` there, which is what a signed-in
+ * shopper actually saw.
+ *
+ * Both are now one Spanish line, and the detail goes to the console, where
+ * whoever is debugging can find it and nobody else has to read it.
  */
 export function useBalances(address: string | null, network: NetworkId = DEFAULT_NETWORK): Balances {
   const [data, setData] = useState<BalanceResponse | null>(null);
@@ -63,23 +77,38 @@ export function useBalances(address: string | null, network: NetworkId = DEFAULT
     setLoading(true);
     fetch(`/api/balance?address=${encodeURIComponent(address)}&network=${encodeURIComponent(network)}`)
       .then(async (res) => {
-        const json = await res.json();
+        // Status first, body second. A lambda that crashed or a gateway that
+        // timed out answers with an HTML error page, and parsing that throws
+        // before there is anything to check — which is how the parser's own
+        // complaint ended up being the error the shopper read.
+        const json = (await res.json().catch(() => null)) as
+          | (Partial<BalanceResponse> & { error?: string; message?: string })
+          | null;
         if (cancelled) return;
-        if (!res.ok) {
+        if (!res.ok || !json) {
           // The human gate already explains this. The raw code `solo_humanos`
           // was showing up in red inside the wallet.
-          if (json.error === SOLO_HUMANOS) {
+          if (json?.error === SOLO_HUMANOS) {
             setData(null);
             setError(null);
             return;
           }
-          throw new Error(json.message ?? json.error ?? `balance read failed (${res.status})`);
+          console.warn('[balance] read failed:', res.status, json?.error ?? json?.message ?? '(unparseable body)');
+          setData(null);
+          setError(BALANCE.unavailable);
+          return;
         }
         setData(json as BalanceResponse);
         setError(null);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        if (cancelled) return;
+        // The browser's own text is English and names nothing anybody can act
+        // on, so it goes to the console and the shopper gets the same line as
+        // every other way this read can fail.
+        console.warn('[balance] request failed:', err);
+        setData(null);
+        setError(BALANCE.unavailable);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

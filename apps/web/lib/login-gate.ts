@@ -13,6 +13,27 @@
  * rather than waving the request through, and production without Redis
  * credentials refuses too. Outside production an in-memory map stands in,
  * the same compromise as turn-store on one developer's machine.
+ *
+ * ## Failing closed has to mean failing *fast*
+ *
+ * This gate runs before /api/chat writes the first byte of its stream, and
+ * that byte is what tells the browser the message landed — the difference
+ * between a failed turn reading "No se envió" and "Se cortó antes de
+ * responder" (CLAUDE.md §6). So every millisecond spent here is spent with
+ * the shopper looking at a spinner and nothing behind it.
+ *
+ * Two things were wrong with that. `@upstash/redis` is constructed with no
+ * signal by default, so each REST call had *no timeout at all*, and it retries
+ * five times before giving up; one hung connection sat there until Vercel cut
+ * the request, and the browser's fetch rejected before it ever saw a response
+ * header. And the guest path made up to seven of those calls one after
+ * another. A slow round trip was therefore multiplied by seven and then
+ * allowed to run forever.
+ *
+ * So: a bounded signal on the client, and the independent reads and writes
+ * batched. Seven serial round trips become two, and the worst case is a few
+ * seconds and a 503 the shopper can read, rather than a minute of nothing.
+ * The verdict is unchanged — this is about how long it takes to reach it.
  */
 
 import { createHash } from 'node:crypto';
@@ -206,8 +227,27 @@ function credentials(env: NodeJS.ProcessEnv): { url: string; token: string } | u
   return url && token ? { url, token } : undefined;
 }
 
+/**
+ * How long one counter round trip may take.
+ *
+ * Generous for Upstash, which answers in tens of milliseconds from the same
+ * region, and short enough that the two batched phases below cannot come
+ * close to the time a gateway is willing to wait for a first byte. A signal
+ * *function* rather than a signal: the client re-evaluates it per attempt, so
+ * a shared one would already be spent by the time a retry used it.
+ */
+const COUNTER_TIMEOUT_MS = 2_500;
+
 function redisCounter(url: string, token: string): TurnCounter {
-  const redis = new Redis({ url, token });
+  const redis = new Redis({
+    url,
+    token,
+    signal: () => AbortSignal.timeout(COUNTER_TIMEOUT_MS),
+    // Down from the default five. A retry is worth one attempt at a dropped
+    // connection and no more: past that the store is not slow, it is down,
+    // and the honest answer is the 503 rather than another wait.
+    retry: { retries: 1, backoff: () => 250 },
+  });
   return {
     kind: 'redis',
     async get(key) {
@@ -386,18 +426,29 @@ export async function requireLoginOrFreeTurn(
       return null;
     }
 
-    const sessionCount = await store.get(KEY_SESSION(sessionId));
     const ip = clientIp(req);
-    const ipCount = ip ? await store.get(KEY_IP(ip)) : undefined;
     const human = readCookie(req.headers.get('cookie'), HUMAN_COOKIE);
-    const humanCount = human ? await store.get(KEY_HUMAN(human)) : undefined;
+
+    // Three independent questions, so one round trip. They were asked in
+    // sequence, which cost three and told us nothing extra: no answer here
+    // depends on another, and `guestChatVerdict` wants all of them anyway.
+    const [sessionCount, ipCount, humanCount] = await Promise.all([
+      store.get(KEY_SESSION(sessionId)),
+      ip ? store.get(KEY_IP(ip)) : Promise.resolve(undefined),
+      human ? store.get(KEY_HUMAN(human)) : Promise.resolve(undefined),
+    ]);
 
     const verdict = guestChatVerdict({ loggedIn: false, sessionCount, ipCount, humanCount });
     if (!verdict.allow) return loginRequiredResponse(verdict.turnsUsed);
 
-    await store.incr(KEY_SESSION(sessionId), TTL_SECONDS);
-    if (ip) await store.incr(KEY_IP(ip), TTL_SECONDS);
-    if (human) await store.incr(KEY_HUMAN(human), HUMAN_TTL_SECONDS);
+    // Likewise. They are three separate keys and nothing orders them; the
+    // turn is allowed or refused by the verdict above, and these only record
+    // that it happened.
+    await Promise.all([
+      store.incr(KEY_SESSION(sessionId), TTL_SECONDS),
+      ip ? store.incr(KEY_IP(ip), TTL_SECONDS) : Promise.resolve(0),
+      human ? store.incr(KEY_HUMAN(human), HUMAN_TTL_SECONDS) : Promise.resolve(0),
+    ]);
     return null;
   } catch (e) {
     if (e instanceof CounterUnavailable) return limiterUnavailableResponse();

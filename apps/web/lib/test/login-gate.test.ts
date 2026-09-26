@@ -168,6 +168,54 @@ describe('quotas fail closed', () => {
     assert.equal(res?.status, 429);
   });
 
+  /**
+   * The gate runs before /api/chat writes its first byte, so its wall clock is
+   * the window in which a failure reads "No se envió" rather than "Se cortó
+   * antes de responder". Seven serial Upstash round trips is what put a chat
+   * turn past a gateway's patience with nothing sent.
+   */
+  it('RULE: asks its independent counters together, not one after another', async () => {
+    let live = 0;
+    let mostAtOnce = 0;
+    const phases: number[] = [];
+    const slow = <T,>(v: T): Promise<T> =>
+      new Promise((resolve) => {
+        live++;
+        mostAtOnce = Math.max(mostAtOnce, live);
+        setTimeout(() => {
+          live--;
+          resolve(v);
+        }, 5);
+      });
+
+    const concurrent: TurnCounter = {
+      kind: 'memory',
+      async get() {
+        phases.push(1);
+        return slow(0);
+      },
+      async incr() {
+        phases.push(2);
+        return slow(1);
+      },
+    };
+    __resetTurnCounterForTests(concurrent);
+
+    const res = await requireLoginOrFreeTurn(
+      chat({ cookie: 'chg_human=a-pass', 'cf-connecting-ip': '1.1.1.1' }),
+      UUID,
+      prodEnv,
+    );
+    assert.equal(res, null);
+    // Three keys read, three written: session, IP, Turnstile pass.
+    assert.equal(phases.filter((p) => p === 1).length, 3);
+    assert.equal(phases.filter((p) => p === 2).length, 3);
+    // Two phases, not six. The reads must all land before the verdict, and
+    // the writes only happen once the verdict allowed the turn.
+    assert.equal(mostAtOnce, 3, 'the counter calls were serialised');
+    assert.deepEqual(phases, [1, 1, 1, 2, 2, 2]);
+  });
+
   it('counts guests per Turnstile pass across sessions', async () => {
     const req = () => chat({ cookie: 'chg_human=same-pass' });
     let allowed = 0;

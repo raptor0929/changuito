@@ -145,6 +145,26 @@ export function hasTrustline(balances: AccountBalance[], code: string, issuer: s
   return balances.some((b) => b.asset_type !== 'native' && b.asset_code === code && b.asset_issuer === issuer);
 }
 
+/**
+ * How much of a classic asset this account holds, in token units.
+ *
+ * Read off the trustline Horizon already returned rather than asked for
+ * separately, because a classic balance *is* the trustline: the line and the
+ * number on it are one record, and `accountBalances` has both the moment it
+ * answers. Asking a second time would be a second round trip for a fact
+ * already in hand — and, on mainnet, a round trip to a Soroban contract that
+ * does not exist. See the header of app/api/balance/route.ts.
+ *
+ * Zero for an account with no such line. That is the honest answer: an account
+ * that has not opted into the asset holds none of it, and cannot be sent any.
+ */
+export function classicBalance(balances: AccountBalance[] | null, code: string, issuer: string): bigint {
+  const line = balances?.find(
+    (b) => b.asset_type !== 'native' && b.asset_code === code && b.asset_issuer === issuer,
+  );
+  return line ? unitsFromDecimal(line.balance) : 0n;
+}
+
 // -------------------------------------------------------------------- units
 
 /**
@@ -152,7 +172,8 @@ export function hasTrustline(balances: AccountBalance[], code: string, issuer: s
  * their SAC reports `decimals() = 7`, so mock USDC and real USDC agree — and a
  * test pins that, because this being module-level is only safe while it holds.
  */
-const SCALE = 10n ** BigInt(DEPLOYMENTS[DEFAULT_NETWORK].usdcDecimals);
+const DECIMALS = DEPLOYMENTS[DEFAULT_NETWORK].usdcDecimals;
+const SCALE = 10n ** BigInt(DECIMALS);
 
 /**
  * US cents -> token units. Cents because that is what `arsToUsdCents` in the
@@ -166,6 +187,25 @@ export function centsToUnits(cents: number): bigint {
 
 export function unitsToCents(units: bigint): number {
   return Number((units * 100n) / SCALE);
+}
+
+/**
+ * Horizon's decimal string ("12.3456789") -> token units.
+ *
+ * Parsed rather than multiplied through a float: `Number('0.1') * 1e7` is
+ * 1000000.0000000001, and the whole reason `centsToUnits` exists is that a
+ * float on the way to an i128 loses stroops. Horizon never sends more than
+ * seven decimals for a classic asset, but extra ones are truncated rather
+ * than rounded, so a parse can only ever under-count — which is the safe
+ * direction for a number the app spends against.
+ */
+export function unitsFromDecimal(amount: string): bigint {
+  const m = /^(-?)(\d*)(?:\.(\d*))?$/.exec(amount.trim());
+  if (!m || (!m[2] && !m[3])) throw new Error(`not a decimal amount: ${amount}`);
+  const digits = DECIMALS;
+  const frac = (m[3] ?? '').padEnd(digits, '0').slice(0, digits);
+  const units = BigInt(m[2] || '0') * SCALE + BigInt(frac || '0');
+  return m[1] === '-' ? -units : units;
 }
 
 /** "12.34" — two decimals, because nobody reads seven. */
