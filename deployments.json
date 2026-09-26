@@ -10,7 +10,8 @@
       "deployedAt": "2026-09-21T06:53:57.747Z",
       "accounts": {
         "resolver": "GBGMPRHU3NW3BCXUNDNC7VSYQKS6FZKWFHSGEHHMR3G3TZOUWEDBHTFK",
-        "treasury": "GAXUICH5DZMB4ZIZVF6ETTE524RCZYRKHWLGG7EOLY6ECVD4IS6TBNZG"
+        "treasury": "GAXUICH5DZMB4ZIZVF6ETTE524RCZYRKHWLGG7EOLY6ECVD4IS6TBNZG",
+        "demoWallet": "GDFF477UQUWOFIHSOEXPPOD5GPUSEW6OLGZB5FCPS6AFRAOPTMINA55X"
       },
       "contracts": {
         "usdc": {
@@ -33,7 +34,8 @@
       "deployedAt": null,
       "accounts": {
         "resolver": "",
-        "treasury": ""
+        "treasury": "",
+        "demoWallet": ""
       },
       "contracts": {
         "usdc": {

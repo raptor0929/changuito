@@ -8,6 +8,7 @@ import type { Cart } from '@changuito/mcp/types';
 import type { DepositIntent, DepositStatus } from '../app/api/deposit/route.ts';
 import type { VerifyResponse } from '../app/api/order/verify/route.ts';
 import { track } from '../lib/analytics';
+import { appMode } from '../lib/app-mode.ts';
 import type { Receipt } from '../lib/chat-store.ts';
 import { checkoutCopy } from '../lib/checkout-copy.ts';
 import { DEFAULT_NETWORK } from '../lib/deployments.ts';
@@ -60,6 +61,19 @@ import { useNetwork } from './NetworkProvider';
  * only where the deployment can actually mint one — `intent.cardAvailable` —
  * and given back when this dialog closes, because a card left alive is money
  * sitting somewhere nobody is watching.
+ *
+ * ## Why preview pays with one button
+ *
+ * A visitor with no session has no wallet, so "send this importe to this
+ * address" is an instruction they cannot follow. `POST /api/deposit/demo`
+ * signs for them out of the demo wallet, and this dialog offers it as a single
+ * button instead of the address-and-memo fields. Nothing after it changes: the
+ * same 4s poll sees the same payment land on the same ledger.
+ *
+ * The button is behind `intent.demoPayable` rather than behind the mode alone,
+ * so a deployment with no `DEMO_WALLET_SECRET` falls back to showing the
+ * address and the memo. That path is not a demo any more — it is an operator
+ * paying by hand — but it works, which is better than a button that 503s.
  *
  * ## Why it signs in modo real
  *
@@ -130,6 +144,13 @@ function CheckoutDialog({ cart, handoffUrl, onClose, onPaid, address, sign }: Di
   const [intent, setIntent] = useState<DepositIntent | null>(null);
   const [mintError, setMintError] = useState<string | null>(null);
   const [deposit, setDeposit] = useState<DepositStatus | null>(null);
+
+  // Preview's one-button payment. `demoSent` outlives the request: once the
+  // payment is submitted the button must stay down until the poll confirms,
+  // or an impatient second press pays the same memo twice.
+  const [demoPaying, setDemoPaying] = useState(false);
+  const [demoSent, setDemoSent] = useState(false);
+  const [demoError, setDemoError] = useState<string | null>(null);
 
   const [identified, setIdentified] = useState(false);
   const [polls, setPolls] = useState(0);
@@ -310,6 +331,36 @@ function CheckoutDialog({ cart, handoffUrl, onClose, onPaid, address, sign }: Di
     };
   }, [step, rehearsal, identified, polls, handoffUrl, cart.retailer, itemsAtHandoff]);
 
+  const payWithDemoWallet = useCallback(async () => {
+    if (!intent || demoPaying || demoSent) return;
+    setDemoPaying(true);
+    setDemoError(null);
+    try {
+      const res = await fetch('/api/deposit/demo', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ memo: intent.memo, amount: intent.amount, network: intent.network }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        // `message` first, same order as the mint above: the route's `error`
+        // is a code for the logs and `message` is the sentence for a person.
+        const said = typeof body?.message === 'string' ? body.message : null;
+        setDemoError(said ?? copy.demoPayError);
+        return;
+      }
+      // Nothing to do with the hash. The poll that was already running finds
+      // the payment the same way it would find one the shopper sent, which is
+      // the point — preview settles through production's code.
+      setDemoSent(true);
+      track('demo_pay', { network: intent.network });
+    } catch {
+      setDemoError(copy.demoPayError);
+    } finally {
+      setDemoPaying(false);
+    }
+  }, [intent, demoPaying, demoSent, copy.demoPayError]);
+
   const settle = useCallback(() => {
     if (!intent) return;
     // Before the receipt, not after: the order is over, and the residual goes
@@ -353,6 +404,9 @@ function CheckoutDialog({ cart, handoffUrl, onClose, onPaid, address, sign }: Di
   }
 
   const confirmed = deposit?.status === 'confirmed';
+  // Preview *and* a deployment that can actually sign. Both, because the mode
+  // alone would render a button that 503s on a checkout with no secret set.
+  const demoPays = Boolean(intent) && appMode(network) === 'preview' && intent!.demoPayable;
   // The store has had four chances to say it knows this shopper and has not.
   // Most likely the frame's cookies are being blocked, which we cannot fix
   // from here — so the tab stops being the quiet option and becomes the loud
@@ -396,23 +450,55 @@ function CheckoutDialog({ cart, handoffUrl, onClose, onPaid, address, sign }: Di
                     copyValue={intent.amount}
                     testid="checkout-amount"
                   />
-                  <CopyField
-                    label={copy.addressLabel}
-                    value={intent.address}
-                    testid="checkout-address"
-                    mono
-                  />
-                  <CopyField label={copy.memoLabel} value={intent.memo} testid="checkout-memo" mono />
+                  {/* Nothing to copy in preview: there is no wallet to paste
+                      it into, and an address nobody can pay from is noise. */}
+                  {demoPays ? null : (
+                    <>
+                      <CopyField
+                        label={copy.addressLabel}
+                        value={intent.address}
+                        testid="checkout-address"
+                        mono
+                      />
+                      <CopyField label={copy.memoLabel} value={intent.memo} testid="checkout-memo" mono />
+                    </>
+                  )}
                 </dl>
-                <p className="ck-note">{copy.memoNote}</p>
+                {demoPays ? null : <p className="ck-note">{copy.memoNote}</p>}
                 <p className="ck-note">{copy.refundNote}</p>
-                <p
-                  className={confirmed ? 'ck-ok' : 'ck-waiting'}
-                  role="status"
-                  data-testid="checkout-deposit-status"
-                >
-                  {confirmed ? copy.confirmed : copy.waiting}
-                </p>
+
+                {demoPays && !confirmed ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn"
+                      data-testid="checkout-demo-pay"
+                      disabled={demoPaying || demoSent}
+                      onClick={() => void payWithDemoWallet()}
+                    >
+                      {demoPaying ? copy.demoPayWorking : copy.demoPayCta}
+                    </button>
+                    {demoError ? (
+                      <p className="pay-error" data-testid="checkout-demo-error">
+                        {demoError}
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
+
+                {/* Hidden until there is something to wait for. In preview
+                    "esperando que llegue" before the button is pressed would
+                    be waiting on the shopper, phrased as waiting on the
+                    network. */}
+                {demoPays && !demoSent && !confirmed ? null : (
+                  <p
+                    className={confirmed ? 'ck-ok' : 'ck-waiting'}
+                    role="status"
+                    data-testid="checkout-deposit-status"
+                  >
+                    {confirmed ? copy.confirmed : copy.waiting}
+                  </p>
+                )}
               </>
             )}
 

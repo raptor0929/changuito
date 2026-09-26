@@ -33,6 +33,14 @@ const entry = (name, n) => `  ${name}: {
     resolver: ${q(n.accounts.resolver)},
     /** Where a settled order's USDC ends up. The app never signs for it. */
     treasury: ${q(n.accounts.treasury)},
+    /**
+     * The account that pays for a preview shopper, and the only account this
+     * deployment has a secret for. Empty on every network but testnet, which
+     * is what stops \`DEMO_WALLET_SECRET\` from being usable anywhere real:
+     * lib/server/demo-wallet.ts checks the secret's public key against this,
+     * and an empty string matches nothing.
+     */
+    demoWallet: ${q(n.accounts.demoWallet ?? '')},
     escrowId: ${q(n.contracts.escrow.id)},
     usdcId: ${q(n.contracts.usdc.id)},
     /**

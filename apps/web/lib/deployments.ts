@@ -28,6 +28,14 @@ export const DEPLOYMENTS = {
     resolver: 'GBGMPRHU3NW3BCXUNDNC7VSYQKS6FZKWFHSGEHHMR3G3TZOUWEDBHTFK',
     /** Where a settled order's USDC ends up. The app never signs for it. */
     treasury: 'GAXUICH5DZMB4ZIZVF6ETTE524RCZYRKHWLGG7EOLY6ECVD4IS6TBNZG',
+    /**
+     * The account that pays for a preview shopper, and the only account this
+     * deployment has a secret for. Empty on every network but testnet, which
+     * is what stops `DEMO_WALLET_SECRET` from being usable anywhere real:
+     * lib/server/demo-wallet.ts checks the secret's public key against this,
+     * and an empty string matches nothing.
+     */
+    demoWallet: 'GDFF477UQUWOFIHSOEXPPOD5GPUSEW6OLGZB5FCPS6AFRAOPTMINA55X',
     escrowId: 'CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557',
     usdcId: 'CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF',
     /**
@@ -61,6 +69,14 @@ export const DEPLOYMENTS = {
     resolver: '',
     /** Where a settled order's USDC ends up. The app never signs for it. */
     treasury: '',
+    /**
+     * The account that pays for a preview shopper, and the only account this
+     * deployment has a secret for. Empty on every network but testnet, which
+     * is what stops `DEMO_WALLET_SECRET` from being usable anywhere real:
+     * lib/server/demo-wallet.ts checks the secret's public key against this,
+     * and an empty string matches nothing.
+     */
+    demoWallet: '',
     escrowId: '',
     usdcId: '',
     /**

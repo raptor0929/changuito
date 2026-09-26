@@ -28,6 +28,15 @@ export interface CheckoutCopy {
   memoNote: string;
   waiting: string;
   confirmed: string;
+  /**
+   * Preview only. There is no wallet to send from and nothing to copy — the
+   * demo wallet pays, one button, and the rest of the flow is unchanged.
+   * Empty on the real side, where offering to pay for somebody would be a lie.
+   */
+  demoPayCta: string;
+  demoPayWorking: string;
+  /** The default reason, when the server has none worth reading out. */
+  demoPayError: string;
   /** Said once, plainly, because it is the part that cannot be undone by a button. */
   refundNote: string;
   checkoutTitle: string;
@@ -75,13 +84,15 @@ export interface CheckoutCopy {
 
 const COMMON = {
   title: 'Terminar la compra',
-  depositTitle: 'Paso 1: mandá el importe',
   amountLabel: 'Importe',
   addressLabel: 'Dirección',
   memoLabel: 'Código',
   memoNote: 'Va sí o sí: es lo que hace que el importe caiga en esta compra y no en otra.',
   waiting: 'Esperando que llegue…',
   confirmed: '¡Llegó! Ya podés seguir.',
+  demoPayCta: '',
+  demoPayWorking: '',
+  demoPayError: '',
   checkoutTitle: 'Paso 2: pagá en el súper',
   checkoutLead: 'Esta es la página del súper, tal cual. Nosotros no vemos lo que pasa adentro.',
   loginLead: 'Para pagar necesitás entrar a tu cuenta del súper. Se abre en una pestaña aparte, en la página del súper, con la barra de direcciones a la vista.',
@@ -114,13 +125,22 @@ const COMMON = {
 
 const PRUEBA: CheckoutCopy = {
   ...COMMON,
-  depositLead: 'Es una prueba: mandá el importe de prueba a esta dirección con este código y seguimos.',
+  // It used to ask them to send the importe themselves. Nobody in this mode
+  // has anywhere to send it *from* — that is the whole shape of preview — so
+  // the sentence now says who pays, because "es una prueba" alone leaves a
+  // reader wondering what they are about to be charged.
+  depositTitle: 'Paso 1: el importe',
+  depositLead: 'Es una prueba y la ponemos nosotros: tocá el botón y seguimos.',
+  demoPayCta: 'Pagar con nuestra plata',
+  demoPayWorking: 'Pagando…',
+  demoPayError: 'No pudimos hacer el pago de prueba. Probá de nuevo.',
   refundNote: 'Es una prueba, así que no se mueve plata real.',
   failed: 'Algo salió mal. Como es una prueba, no hay nada que devolver.',
 };
 
 const REAL: CheckoutCopy = {
   ...COMMON,
+  depositTitle: 'Paso 1: mandá el importe',
   depositLead: 'Mandá este importe a esta dirección, con este código, desde donde tengas tus USDC.',
   // No automated outbound payment exists, and none is going to be implied.
   refundNote: 'Si algo sale mal, te devolvemos el importe a mano. No es automático.',

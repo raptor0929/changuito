@@ -7,9 +7,22 @@
  * is a question the public ledger answers and neither a database nor a webhook
  * is involved. The browser keeps the memo it was given and asks again.
  *
- * Nothing here can move money. There is no secret key in this deployment and
- * no outbound path: the server reads Horizon and reports. A refund is a human
- * doing it by hand, which is a worse product and a much smaller blast radius.
+ * Nothing *here* can move money. This route reads Horizon and reports; there
+ * is no outbound path in it and no parameter that could become one. A refund
+ * is a human doing it by hand, which is a worse product and a much smaller
+ * blast radius.
+ *
+ * That used to be true of the whole deployment, and it is worth saying plainly
+ * that it no longer is, because the old claim was load-bearing for anyone
+ * reading this file to work out what could go wrong. `POST /api/deposit/demo`
+ * holds a hot key. What that key can do is bounded four ways, set out in
+ * lib/server/demo-wallet.ts: the asset is testnet play money from an issuer
+ * that is locked and can never mint again, the destination is not a parameter,
+ * the network is pinned in deployments.json and blank on mainnet, and the
+ * secret is read at call time so a build without it still succeeds.
+ *
+ * The mainnet rail is exactly as it was: no key, no outbound path, refunds by
+ * hand. Preview is the only thing that pays for anybody.
  *
  * ## Who may ask
  *
@@ -34,6 +47,7 @@ import { depositAddress, depositAsset, isMemo, mintMemo, type DepositAsset } fro
 import { authorizeRealMode, realModeNeedsProof } from '../../../lib/deposit-gate.ts';
 import { findDeposit } from '../../../lib/deposit-watch.ts';
 import { requireHuman } from '../../../lib/human-gate.ts';
+import { canDemoPay } from '../../../lib/server/demo-wallet.ts';
 import { proofFromBody } from '../../../lib/wallet-proof-verify.ts';
 
 export const runtime = 'nodejs';
@@ -58,6 +72,16 @@ export interface DepositIntent {
    * card provider never renders a button that 503s.
    */
   cardAvailable: boolean;
+  /**
+   * Whether this deployment can pay the deposit itself. True only in preview,
+   * and only where `DEMO_WALLET_SECRET` is actually set — answered here for
+   * the same reason `cardAvailable` is, rather than in a `NEXT_PUBLIC_` flag:
+   * the browser learns it from the server that would have to honour it, so a
+   * deployment without the secret never renders a button that 503s. A preview
+   * shopper who gets `false` sees the address and the memo instead, which is
+   * the manual path and still works.
+   */
+  demoPayable: boolean;
 }
 
 export interface DepositStatus {
@@ -87,12 +111,14 @@ function networkFrom(value: string | null): NetworkId {
  * On mainnet the asset is USDC and this is a conversion: one USDC is one US
  * dollar, so US cents divided by a hundred is the amount.
  *
- * On testnet the asset is XLM — mock USDC is a Soroban token with no classic
- * payment record to carry a memo — and **this is deliberately not an XLM
- * price.** There is no XLM/ARS feed in this app and inventing one to move play
- * money would be a lie with a decimal point in it. The rehearsal sends the
- * same figure denominated in free testnet XLM, so every digit downstream is
- * exercised, and the copy says "de prueba" next to it.
+ * On testnet it is the same conversion, and now for the same reason: since
+ * scripts/setup-demo-asset.mjs the testnet asset is a classic USDC of our own
+ * rather than lumens, so one unit is one dollar there too and the figure is
+ * the figure. It used to be XLM — the old mock USDC was a Soroban token with
+ * no classic payment record to carry a memo — and the number was deliberately
+ * *not* an XLM price, because there is no XLM/ARS feed in this app and
+ * inventing one to move play money would have been a lie with a decimal point
+ * in it. That awkwardness is gone; the copy still says "de prueba".
  */
 export function depositAmount(usdCents: number): string {
   return (usdCents / 100).toFixed(7);
@@ -176,6 +202,7 @@ export async function POST(req: Request): Promise<Response> {
       arsPerUsd: rate.arsPerUsd,
       source: rate.source,
       cardAvailable: canIssueCard(),
+      demoPayable: canDemoPay(network),
     };
     return Response.json(intent);
   } catch (err) {
