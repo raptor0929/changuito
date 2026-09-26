@@ -61,8 +61,8 @@ function rule(selector: string): string {
   return css.slice(at, css.indexOf('}', at));
 }
 
-test('the selected modo real chip is espresso on sunflower, and clears 4.5:1', () => {
-  const body = rule(".mode-option[data-mode='mainnet'][aria-checked='true']");
+test('the modo real badge is espresso on sunflower, and clears 4.5:1', () => {
+  const body = rule(".mode-badge[data-mode='mainnet']");
   assert.match(body, /background:\s*var\(--brand\)/);
   assert.match(body, /color:\s*var\(--brand-ink\)/);
   // --brand and --brand-ink are aliases; check what they resolve to.
@@ -72,18 +72,22 @@ test('the selected modo real chip is espresso on sunflower, and clears 4.5:1', (
   assert.ok(r >= 4.5, `espresso on sunflower: ${r.toFixed(2)}`);
 });
 
-test('sunflower is never the mode chip text colour', () => {
-  for (const sel of ['.mode-option', ".mode-option[aria-checked='true']"]) {
+test('sunflower is never the mode badge text colour', () => {
+  for (const sel of ['.mode-badge', ".mode-badge[data-mode='mainnet']"]) {
     assert.doesNotMatch(rule(sel), /color:\s*var\(--brand\)/);
   }
 });
 
-test('RULE: the mode control has no closed position to style', () => {
-  // Unusable modes are not rendered greyed out, they are not rendered. If a
-  // disabled style comes back, so has a control that is dead for most of the
-  // people who see it — and so has the question of which excuse to print.
-  assert.doesNotMatch(css, /\.mode-option\[aria-disabled/);
+test('RULE: the mode badge does not dress up as a control', () => {
+  // It is a label: the mode follows the session, so there is nothing to
+  // press. A pointer cursor or a hover state would promise a click that
+  // does nothing, which is worse than no affordance at all. The older rule
+  // this replaces forbade a *disabled* style for the same reason — a dead
+  // control is a question about which excuse to print.
+  assert.doesNotMatch(css, /\.mode-badge[^{]*\[aria-disabled/);
+  assert.doesNotMatch(css, /\.mode-badge:hover/);
   assert.doesNotMatch(css, /\.mode-locked\b/);
+  assert.match(rule('.mode-badge'), /cursor:\s*default/);
 });
 
 test('--warn-ink still clears 4.5:1 on both surfaces it is used on', () => {

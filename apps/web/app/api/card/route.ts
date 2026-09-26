@@ -1,16 +1,46 @@
 /**
- * One card, one basket, funded by one deposit.
+ * The card a deposit pays for — minted, or topped up.
  *
  * The chain of custody is the whole route: a código arrives, the ledger is read
  * for a payment carrying it, the amount comes from that payment, the deposit is
- * claimed exactly once, and a card is created for that amount and no more.
+ * claimed exactly once, and a card ends up holding that amount and no more.
  * Nothing in the request body reaches the card except the código — and the
  * código is checked against a public ledger before it buys anything.
  *
- * Four ceilings, the same four packages/mcp/src/pay/ephemeral-card.ts sets:
- * funded with the order and nothing more, `spending_limit` equal to it so the
- * FX buffer cannot be spent, grocery MCCs only, and terminated when the shopper
- * says the order is done.
+ * ## Two cards, because there are two products
+ *
+ * A preview shopper has no identity, so their card is per-basket: created for
+ * this deposit, `spending_limit` equal to it, terminated when they are done.
+ * That is the card this route has always made, and it is unchanged.
+ *
+ * A production shopper has a wallet, and **one card per customer** is the
+ * decision — so the second deposit does not mint a second card, it funds the
+ * first. `card_owner` holds the binding, `cardOf` reads it, and a deposit that
+ * finds a live card calls `fundCard` instead of `createCard`.
+ *
+ * **The card they keep is created with no `spending_limit`, and that is not a
+ * relaxation — it is the only shape that works.** Vyrion sets the limit at
+ * creation and exposes no endpoint to raise it, so a standing card born with
+ * one could be topped up until the balance hit the limit and then never again:
+ * a card that silently stops working on some future shop. The ceiling the
+ * limit was carrying moves to the deposit instead, which is where it belongs —
+ * `refuseFunding` still bounds every single top-up by `CARD_MAX_CENTS`, and a
+ * card can only ever hold what somebody actually sent.
+ *
+ * `allowedCategories` matters more for the same reason. It is also fixed at
+ * creation, and on a card that lives for months it is the one ceiling still
+ * doing work every day: a standing balance stays locked to grocery MCCs.
+ *
+ * ## Claim first, spend second
+ *
+ * On the top-up path the deposit is claimed **before** `fundCard` is called,
+ * which is the reverse of the mint path and deliberate. Funding first would
+ * let two tabs both see an unclaimed deposit and both top up — one payment,
+ * twice the money. Claiming first can only fail the other way: a deposit
+ * marked spent against a card that was not topped up, which is loud in the log
+ * and fixed by hand. On the mint path the order cannot be reversed, because
+ * the card id does not exist until the card does, so a lost claim there hands
+ * the card straight back.
  *
  * ## Why it answers twice with the same card
  *
@@ -23,13 +53,40 @@
  * The response carries the PAN and the CVV, because the shopper has to type
  * them into the súper's form and there is no other way for them to arrive.
  * They are `no-store`, they are never logged, and lib/card.ts says the rest.
+ *
+ * ## Why this asks for no signature
+ *
+ * On a gated network `POST /api/deposit` already made the shopper sign, and
+ * this route checks that the memo belongs to the wallet that signed. It does
+ * **not** ask for a second signature, and that is a decision rather than an
+ * omission: a proof lives five minutes (`WALLET_PROOF_TTL_MS`) and a deposit
+ * can take longer than that to confirm, so requiring one here would refuse a
+ * shopper who has already sent real money — the worst available moment to
+ * fail, and one that ends in a refund done by hand.
+ *
+ * So the memo stays the credential at this step, which is exactly why
+ * `mintMemo` draws from the CSPRNG and why lib/card.ts is careful about what
+ * the depositor record does and does not prove.
  */
 import { CARD_MAX_CENTS, CARD_MIN_CENTS, formatUsd } from '@changuito/mcp/pay';
 
-import { canIssueCard, cardClient, claimDeposit, fundingFor, heldCard, refuseFunding } from '../../../lib/card.ts';
+import {
+  canIssueCard,
+  cardClient,
+  claimDeposit,
+  depositorOf,
+  type FundedDeposit,
+  fundingFor,
+  heldCard,
+  keepsOneCard,
+  refuseFunding,
+} from '../../../lib/card.ts';
+import { bindCard, cardOf, unbindCard } from '../../../lib/db.ts';
 import { depositAddress, isMemo } from '../../../lib/deposit.ts';
+import { realModeFor, realModeNeedsProof } from '../../../lib/deposit-gate.ts';
 import { DEFAULT_NETWORK, type NetworkId } from '../../../lib/deployments.ts';
 import { requireHuman } from '../../../lib/human-gate.ts';
+import { networkAccess } from '../../../lib/network-access.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -84,6 +141,27 @@ export async function POST(req: Request): Promise<Response> {
   const address = depositAddress(network);
   if (!address) return json({ error: 'los pagos no están habilitados en este entorno' }, 503);
 
+  // The deposit was opened by somebody the gate let in — or this is a memo
+  // nothing recognises. Skipped in mode 'open', where nothing was proven at
+  // deposit time either and there is no play money worth binding.
+  const mode = realModeFor(network);
+  let owner: string | undefined;
+  if (realModeNeedsProof(mode)) {
+    owner = await depositorOf(network, memo).catch(() => undefined);
+    if (!owner) {
+      // Either a forged código or a record we lost. Refusing is the recoverable
+      // side of that choice: the shopper can still pay with their own card at
+      // the store, and an importe that was really sent is refunded by hand.
+      console.error(`[card] no depositor recorded for ${network}:${memo}`);
+      return json({ error: 'no pudimos verificar este importe' }, 403);
+    }
+    // Re-read rather than trusted: an allowlist can shrink between the deposit
+    // and the card, and the second question is the one being answered now.
+    if (!networkAccess(owner, network).allowed) {
+      return json({ error: 'Esta cuenta no tiene habilitado el modo real.' }, 403);
+    }
+  }
+
   const client = cardClient();
 
   // Already minted for this código — a refresh, a second tab, a back button.
@@ -115,44 +193,183 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  // Which of the two cards this is, and why, is `keepsOneCard`'s doc comment.
   try {
-    const bins = await client.bins();
-    // bins() has already dropped anything without 3DS and sorted by acceptance.
-    // An empty list is an account problem, not a shopper one.
-    const bin = bins[0];
-    if (!bin) {
-      console.error('[card] no 3DS-capable BIN available on this Vyrion account');
-      return json({ error: 'no pudimos emitir una tarjeta en este momento' }, 502);
-    }
-
-    const card = await client.createCard({
-      binId: bin.id,
-      amountCents: funding.cents,
-      label: `changuito ${memo}`,
-      // Equal to the funded amount: the FX buffer is float, not spend.
-      spendingLimitCents: funding.cents,
-      allowedCategories: GROCERY_MCC,
-      metadata: { memo, network, tx: funding.txHash },
-    });
-
-    const claim = await claimDeposit(network, memo, card.id);
-    if (!claim.claimed) {
-      // Lost the race. This card is not the one the deposit owns, so it goes
-      // back immediately; the winner's is what the shopper asked for.
-      await client.terminateCard(card.id).catch((e) => {
-        console.error(`[card] could not terminate the losing card ${card.id}:`, message(e));
-      });
-      if (claim.existing) return describe(client, claim.existing, 200);
-      return json({ error: 'este importe ya tiene una tarjeta' }, 409);
-    }
-
-    return json(await issued(client, card.id, card.last4, card.network, funding.cents), 200);
+    return keepsOneCard(network, owner)
+      ? await fundTheCardTheyKeep(client, { net: network, owner: owner!, memo, funding })
+      : await mintOneForThisBasket(client, { net: network, memo, funding });
   } catch (err) {
     // Deliberately not the upstream message: a card API's errors can quote the
     // request back, and the request had a card in it.
     console.error('[card] issue failed:', message(err));
     return json({ error: 'no pudimos emitir una tarjeta en este momento' }, 502);
   }
+}
+
+interface Issuance {
+  net: NetworkId;
+  memo: string;
+  funding: FundedDeposit;
+}
+
+/**
+ * Preview's card, and the one this route has always made: born for this
+ * basket, dies with it. `spending_limit` equal to the funded amount because
+ * the FX buffer is float rather than spend, and nothing here has to survive
+ * a second deposit — so the limit costs nothing and closes a gap.
+ */
+async function mintOneForThisBasket(
+  client: ReturnType<typeof cardClient>,
+  { net, memo, funding }: Issuance,
+): Promise<Response> {
+  const bin = await firstBin(client);
+  if (!bin) return json({ error: 'no pudimos emitir una tarjeta en este momento' }, 502);
+
+  const card = await client.createCard({
+    binId: bin.id,
+    amountCents: funding.cents,
+    label: `changuito ${memo}`,
+    spendingLimitCents: funding.cents,
+    allowedCategories: GROCERY_MCC,
+    metadata: { memo, network: net, tx: funding.txHash },
+  });
+
+  const claim = await claimDeposit(net, memo, card.id, funding.cents);
+  if (!claim.claimed) {
+    // Lost the race. This card is not the one the deposit owns, so it goes
+    // back immediately; the winner's is what the shopper asked for.
+    await handBack(client, card.id);
+    if (claim.existing) return describe(client, claim.existing, 200);
+    return json({ error: 'este importe ya tiene una tarjeta' }, 409);
+  }
+
+  return json(await issued(client, card.id, card.last4, card.network, funding.cents), 200);
+}
+
+/**
+ * Production's card: one per customer, and this deposit tops it up.
+ *
+ * Reading the binding is allowed to fail the request. Treating an unreadable
+ * `card_owner` as "no card" would mint a second one for a customer who has
+ * one, which is the single thing this whole path exists to prevent — so the
+ * read throws and the caller answers 502.
+ */
+async function fundTheCardTheyKeep(
+  client: ReturnType<typeof cardClient>,
+  { net, owner, memo, funding }: Issuance & { owner: string },
+): Promise<Response> {
+  let cardId = await cardOf(net, owner);
+
+  if (cardId) {
+    // The binding outlives the card, because terminating one is irreversible
+    // and "ya terminé de comprar" does exactly that. A dead card cannot be
+    // funded, so forget it and mint the next one.
+    const held = await client.getCard(cardId);
+    if (held.status === 'terminated') {
+      await unbindCard(net, owner, cardId).catch((e) => {
+        console.error(`[card] could not unbind the terminated card ${cardId}:`, message(e));
+      });
+      cardId = undefined;
+    }
+  }
+
+  if (!cardId) {
+    const bin = await firstBin(client);
+    if (!bin) return json({ error: 'no pudimos emitir una tarjeta en este momento' }, 502);
+
+    const card = await client.createCard({
+      binId: bin.id,
+      amountCents: funding.cents,
+      // No `spendingLimitCents`, and the header says why at length: a limit
+      // set here can never be raised, so it would become the ceiling this
+      // card silently stops working at on some future shop.
+      label: `changuito ${owner.slice(-6)}`,
+      allowedCategories: GROCERY_MCC,
+      metadata: { owner, network: net, memo, tx: funding.txHash },
+    });
+
+    // Two lambdas can reach createCard for the same wallet; exactly one row
+    // wins. The loser learns it lost by getting an id back that is not its
+    // own, and hands its card in rather than leaving the customer with two.
+    let winner: string;
+    try {
+      winner = await bindCard(net, owner, card.id);
+    } catch (err) {
+      await handBack(client, card.id);
+      throw err;
+    }
+    if (winner !== card.id) {
+      await handBack(client, card.id);
+      cardId = winner;
+    } else {
+      // Creation funded it, so the claim comes after — there was no id to
+      // claim against before. Anything other than a clean win means this card
+      // should not exist: it goes back, and the binding goes with it, so the
+      // next attempt starts from nothing rather than from a card holding a
+      // deposit that is already spent.
+      let claim: Awaited<ReturnType<typeof claimDeposit>>;
+      try {
+        claim = await claimDeposit(net, memo, card.id, funding.cents);
+      } catch (err) {
+        await handBack(client, card.id);
+        await unbindCard(net, owner, card.id).catch(() => {});
+        throw err;
+      }
+      if (!claim.claimed) {
+        await handBack(client, card.id);
+        await unbindCard(net, owner, card.id).catch(() => {});
+        if (claim.existing) return describe(client, claim.existing, 200);
+        return json({ error: 'este importe ya tiene una tarjeta' }, 409);
+      }
+      return json(await issued(client, card.id, card.last4, card.network, funding.cents), 200);
+    }
+  }
+
+  // Claimed before a cent moves. See the header: this order is the difference
+  // between "the top-up did not happen" and "the top-up happened twice".
+  const claim = await claimDeposit(net, memo, cardId, funding.cents);
+  if (!claim.claimed) return describe(client, claim.existing ?? cardId, 200);
+
+  let funded;
+  try {
+    funded = await client.fundCard(cardId, funding.cents);
+  } catch (err) {
+    // The deposit is now marked spent against a card that did not receive it.
+    // Loud, and with everything needed to put it right by hand, because the
+    // shopper cannot retry their way out of this one.
+    console.error(
+      `[card] ${net}:${memo} is claimed against ${cardId} but the top-up failed — fund it by hand:`,
+      message(err),
+    );
+    throw err;
+  }
+
+  // What the card holds now, not what this deposit added: the shopper is
+  // about to type it into a form and the spendable figure is the one that
+  // matters. Their previous basket may have left change on it.
+  const balance = Math.round((funded.balance ?? 0) * 100);
+  return json(
+    await issued(client, cardId, funded.last4, funded.network, balance || funding.cents),
+    200,
+  );
+}
+
+/**
+ * The best BIN, or nothing. `bins()` has already dropped anything without 3DS
+ * and sorted by acceptance rate; an empty list is an account problem rather
+ * than a shopper one, so it is logged here and read as a 502 by the caller.
+ */
+async function firstBin(client: ReturnType<typeof cardClient>) {
+  const bin = (await client.bins())[0];
+  if (!bin) console.error('[card] no 3DS-capable BIN available on this Vyrion account');
+  return bin ?? null;
+}
+
+/** Give back a card we should not be holding. The balance returns at once. */
+async function handBack(client: ReturnType<typeof cardClient>, cardId: string): Promise<void> {
+  await client.terminateCard(cardId).catch((e) => {
+    console.error(`[card] could not terminate the losing card ${cardId}:`, message(e));
+  });
 }
 
 /** The card a claim already points at, read back in full. */
@@ -168,10 +385,12 @@ async function describe(
       // spent, so this is the end of the road rather than a retry.
       return json({ error: 'la tarjeta de esta compra ya se cerró' }, 409);
     }
-    // `spending_limit`, not `balance`: they are the same figure at birth and
-    // the balance drops the moment the súper authorises. The panel's sentence
-    // is about what the card was funded with, so it has to read the number
-    // that does not move.
+    // `spending_limit` first, `balance` second, and which one answers says
+    // which card this is. A per-basket card has a limit equal to what it was
+    // funded with — the figure that does not move while the súper authorises,
+    // which is what that panel's sentence is about. A card the customer keeps
+    // has no limit at all, so the balance is the only number there is, and on
+    // a standing card it is also the more useful one: what is spendable today.
     const funded = Math.round((card.spending_limit ?? card.balance ?? 0) * 100);
     return json(await issued(client, card.id, card.last4, card.network, funded), status);
   } catch (err) {

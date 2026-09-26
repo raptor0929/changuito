@@ -28,6 +28,15 @@ export interface CheckoutCopy {
   memoNote: string;
   waiting: string;
   confirmed: string;
+  /**
+   * Preview only. There is no wallet to send from and nothing to copy — the
+   * demo wallet pays, one button, and the rest of the flow is unchanged.
+   * Empty on the real side, where offering to pay for somebody would be a lie.
+   */
+  demoPayCta: string;
+  demoPayWorking: string;
+  /** The default reason, when the server has none worth reading out. */
+  demoPayError: string;
   /** Said once, plainly, because it is the part that cannot be undone by a button. */
   refundNote: string;
   checkoutTitle: string;
@@ -46,6 +55,17 @@ export interface CheckoutCopy {
   cardLead: string;
   cardCta: string;
   cardMinting: string;
+  /**
+   * The returning customer, production only. There is one card per person, so
+   * a second deposit tops up the first — and somebody who is shown "Generar
+   * una tarjeta" again will reasonably conclude they are about to be given a
+   * second one, which is the one thing the product promises not to do.
+   *
+   * Empty in the test mode, where the card really is per-basket and there is
+   * nothing to come back to.
+   */
+  cardAgainLead: string;
+  cardAgainCta: string;
   /** Under the numbers. Says where they live, which is nowhere. */
   cardNote: string;
   cardNumberLabel: string;
@@ -75,13 +95,15 @@ export interface CheckoutCopy {
 
 const COMMON = {
   title: 'Terminar la compra',
-  depositTitle: 'Paso 1: mandá el importe',
   amountLabel: 'Importe',
   addressLabel: 'Dirección',
   memoLabel: 'Código',
   memoNote: 'Va sí o sí: es lo que hace que el importe caiga en esta compra y no en otra.',
   waiting: 'Esperando que llegue…',
   confirmed: '¡Llegó! Ya podés seguir.',
+  demoPayCta: '',
+  demoPayWorking: '',
+  demoPayError: '',
   checkoutTitle: 'Paso 2: pagá en el súper',
   checkoutLead: 'Esta es la página del súper, tal cual. Nosotros no vemos lo que pasa adentro.',
   loginLead: 'Para pagar necesitás entrar a tu cuenta del súper. Se abre en una pestaña aparte, en la página del súper, con la barra de direcciones a la vista.',
@@ -98,11 +120,11 @@ const COMMON = {
   cardLead: 'Podés pagar con tu tarjeta de siempre en el formulario del súper. O, si preferís no ponerla, te damos una que sirve una sola vez y nada más que para esta compra.',
   cardCta: 'Generar una tarjeta',
   cardMinting: 'Generando…',
-  cardNote: 'Copiala en el formulario del súper. No la guardamos en ningún lado: cuando cerrás esta ventana, la tarjeta se cierra con ella.',
+  cardAgainLead: '',
+  cardAgainCta: '',
   cardNumberLabel: 'Número',
   cardExpiryLabel: 'Vence',
   cardCvvLabel: 'Código de seguridad',
-  cardFunded: 'Tiene justo el importe de esta compra y no se puede usar para otra cosa.',
   cardError: 'No pudimos generar la tarjeta.',
   cardFallback: 'Podés pagar con la tuya en el formulario del súper.',
   otpTitle: 'Código que te pide el súper',
@@ -114,14 +136,36 @@ const COMMON = {
 
 const PRUEBA: CheckoutCopy = {
   ...COMMON,
-  depositLead: 'Es una prueba: mandá el importe de prueba a esta dirección con este código y seguimos.',
+  // It used to ask them to send the importe themselves. Nobody in this mode
+  // has anywhere to send it *from* — that is the whole shape of preview — so
+  // the sentence now says who pays, because "es una prueba" alone leaves a
+  // reader wondering what they are about to be charged.
+  depositTitle: 'Paso 1: el importe',
+  depositLead: 'Es una prueba y la ponemos nosotros: tocá el botón y seguimos.',
+  demoPayCta: 'Pagar con nuestra plata',
+  demoPayWorking: 'Pagando…',
+  demoPayError: 'No pudimos hacer el pago de prueba. Probá de nuevo.',
+  // Per basket here, and it really does close with the window.
+  cardNote: 'Copiala en el formulario del súper. No la guardamos en ningún lado: cuando cerrás esta ventana, la tarjeta se cierra con ella.',
+  cardFunded: 'Tiene justo el importe de esta compra y no se puede usar para otra cosa.',
   refundNote: 'Es una prueba, así que no se mueve plata real.',
   failed: 'Algo salió mal. Como es una prueba, no hay nada que devolver.',
 };
 
 const REAL: CheckoutCopy = {
   ...COMMON,
+  depositTitle: 'Paso 1: mandá el importe',
   depositLead: 'Mandá este importe a esta dirección, con este código, desde donde tengas tus USDC.',
+  cardAgainLead: 'Es la misma de siempre: le sumamos el importe de esta compra y seguís con ella.',
+  cardAgainCta: 'Usar mi tarjeta',
+  // Not "se cierra con la ventana": this one does not. The numbers still live
+  // nowhere — they are asked for again each time the card is shown — and that
+  // is the promise this sentence has to keep without overclaiming the rest.
+  cardNote: 'Copiala en el formulario del súper. No la guardamos en ningún lado: cada vez que la necesites te la mostramos de nuevo.',
+  // The balance, not the basket. A kept card can carry change from the last
+  // shop, so "justo el importe de esta compra" would be wrong about the one
+  // number the shopper is looking at.
+  cardFunded: 'Ese es el saldo que tiene ahora, y solo sirve para el súper.',
   // No automated outbound payment exists, and none is going to be implied.
   refundNote: 'Si algo sale mal, te devolvemos el importe a mano. No es automático.',
   failed: 'No pudimos completar la compra. Escribinos y te devolvemos el importe a mano.',

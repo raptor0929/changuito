@@ -4,30 +4,35 @@ import { usePollar } from '@pollar/react';
 import { useEffect, useRef, useState } from 'react';
 
 import { track, trackLoginStart } from '../lib/analytics';
-import { modeCopy, modesFor } from '../lib/mode-copy.ts';
-import { pollarEnabledOn, shortAddress } from '../lib/pollar.ts';
+import { modeCopy, PREVIEW_MASTHEAD } from '../lib/mode-copy.ts';
+import { pollarEnabled, shortAddress } from '../lib/pollar.ts';
 import { ensureUserCookie, forgetUserCookie } from '../lib/session-login.ts';
 import type { FaucetProof } from '../lib/faucet-proof.ts';
 import { useBalances } from '../lib/use-balances.ts';
 import { useFaucetAccess } from '../lib/use-faucet-access.ts';
-import { useNetworkAccess } from '../lib/use-network-access.ts';
 import { useWalletSigner } from '../lib/use-wallet-signer.ts';
 import { signWalletProof } from '../lib/wallet-proof.ts';
 import { FaucetConfirm } from './FaucetConfirm';
-import { ModeSwitch } from './ModeSwitch';
+import { ModeBadge } from './ModeBadge';
 import { useNetwork } from './NetworkProvider';
 
 /**
  * The balance widget in the masthead.
  *
- * Two components rather than one with a conditional hook: the keys are build
- * constants, so `usePollar()` only ever runs inside a provider that exists.
+ * Two components rather than one with a conditional hook: the key is a build
+ * constant, so `usePollar()` only ever runs inside a provider that exists.
  * The condition has to be *the same one* WalletProvider uses, or this mounts
- * a component that calls `usePollar()` with no provider above it.
+ * a component that calls `usePollar()` with no provider above it. It asks
+ * `pollarEnabled` — is there a wallet at all — and not which network we are
+ * on, because the network follows the session and this is the thing the
+ * session is started from.
+ *
+ * `NoWallet` is now only the misconfiguration: a build with no key, where
+ * nobody can ever sign in. It is *not* what a signed-out visitor sees — that
+ * is preview, it works, and it is handled in `ConnectedWallet` below.
  */
 export function WalletWidget() {
-  const { network } = useNetwork();
-  return pollarEnabledOn(network) ? <ConnectedWallet /> : <NoWallet />;
+  return pollarEnabled ? <ConnectedWallet /> : <NoWallet />;
 }
 
 function NoWallet() {
@@ -35,7 +40,7 @@ function NoWallet() {
     track('payment_view', { state: 'unconfigured' });
   }, []);
   return (
-    <div className="wallet wallet-off" title="Falta NEXT_PUBLIC_POLLAR_API_KEY. Ver DEPLOY.md">
+    <div className="wallet wallet-off" title="Falta NEXT_PUBLIC_POLLAR_API_KEY_MAINNET. Ver DEPLOY.md">
       <span className="wallet-label">Tu pago</span>
       <span className="wallet-muted">pago no configurado</span>
     </div>
@@ -44,7 +49,7 @@ function NoWallet() {
 
 function ConnectedWallet() {
   const { wallet, isAuthenticated, verified, openLoginModal, logout } = usePollar();
-  const { network, setNetwork } = useNetwork();
+  const { network } = useNetwork();
   const sign = useWalletSigner();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
   const { data, loading, error, refresh } = useBalances(address, network);
@@ -52,20 +57,15 @@ function ConnectedWallet() {
   // sees the button: the route would refuse them anyway. On a network with no
   // friendbot the answer is always no, so the button leaves by itself.
   const faucet = useFaucetAccess(address, network);
-  // The same shape, for the mode control. Null while it loads, and null reads
-  // as "no" — an option that appears and then vanishes is worse than one that
-  // arrives late. With nothing usable but the safe mode there is no choice to
-  // offer, and ModeSwitch renders nothing at all.
-  const access = useNetworkAccess(address);
   const mode = modeCopy(network);
-  const modes = modesFor(access);
 
-  // If the saved mode turns out not to be theirs, they go back to the safe one
-  // rather than sitting in a mode every request will refuse. Only once the
-  // server has actually answered: `access` is null while it is still loading.
-  useEffect(() => {
-    if (access && network !== 'testnet' && !access[network]?.usable) setNetwork('testnet');
-  }, [access, network, setNetwork]);
+  // There is no "put them back in the safe mode" correction any more, and
+  // there must not be one. The mode is the session (lib/app-mode.ts), so
+  // moving a signed-in visitor to testnet would contradict `ModeSync`, which
+  // would move them straight back — a loop, on every render, forever. A
+  // wallet that is signed in but not allowed on the real rail is refused by
+  // `authorizeRealMode` at the moment it tries to pay, in words, which is
+  // both later and honest.
 
   const [funding, setFunding] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -145,11 +145,17 @@ function ConnectedWallet() {
     }
   }
 
+  // Preview: nobody is signed in, and that is a working state rather than a
+  // waiting one. The badge is the same one the other mode gets, because the
+  // qualifier on a number is the whole point of it — and the button is the
+  // door out, labelled with what is on the far side. See PREVIEW_MASTHEAD.
   if (!address) {
     return (
       <div className="wallet">
+        <ModeBadge network={network} />
+        <span className="wallet-muted">{PREVIEW_MASTHEAD.hint}</span>
         <button type="button" className="btn" onClick={() => trackLoginStart(openLoginModal)}>
-          Empezá a comprar
+          {PREVIEW_MASTHEAD.action}
         </button>
       </div>
     );
@@ -177,7 +183,7 @@ function ConnectedWallet() {
         {loading && <span className="wallet-muted">actualizando…</span>}
       </div>
 
-      <ModeSwitch network={network} modes={modes} onChange={setNetwork} />
+      <ModeBadge network={network} />
 
       <div className="wallet-sub">
         {/* Warn only when the account cannot pay network fees yet. */}
@@ -205,6 +211,13 @@ function ConnectedWallet() {
             {funding ? 'Cargando…' : 'Cargar USDC'}
           </button>
         ) : null}
+        {/* The record, which the rail beside the chat is not: that lists the
+            conversations this browser kept, and this lists what was actually
+            bought, on any device. A link and not a button — it is a page, and
+            a middle click should open it in a tab. */}
+        <a className="btn btn-sm btn-ghost" href="/mis-compras" data-testid="wallet-purchases">
+          Mis compras
+        </a>
         {/* No visible label: the name is aria-label, and the 44px box is the target. */}
         <button
           type="button"

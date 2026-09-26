@@ -19,6 +19,26 @@
  * leave the button out instead of showing one that can only fail. On a network
  * with no friendbot the answer is always no, which is how the button
  * disappears in modo real without a new conditional in the widget.
+ *
+ * ## Dormant: nothing in the app can reach this today
+ *
+ * Two independent reasons, both from the preview/production split:
+ *
+ *   1. It needs a connected wallet to fund, and since lib/app-mode.ts having
+ *      one means being signed in, which means mainnet — where there is no
+ *      friendbot and `faucetAccess` answers no. A preview visitor has no
+ *      address to pass.
+ *   2. It mints contracts/mock_usdc, the Soroban token. That is no longer the
+ *      testnet deposit asset: scripts/setup-demo-asset.mjs issued a classic
+ *      USDC, and preview pays from the demo wallet out of a fixed supply, not
+ *      from a faucet. Minting mock USDC would top up a balance the deposit
+ *      rail cannot see.
+ *
+ * Kept rather than deleted because it is the only thing that exercises
+ * `usdcAsAdmin` and the mock token end to end, and because the escrow it was
+ * built beside is dormant too, not dead. lib/faucet-gate.ts's `gateFaucet` is
+ * very much alive: it is the house pattern for "we are about to spend
+ * something on your behalf", and POST /api/deposit/demo follows it.
  */
 import { networkOrDefault } from '../../../lib/deployments.ts';
 import { faucetAccess } from '../../../lib/faucet-auth.ts';

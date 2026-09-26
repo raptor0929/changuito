@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { NETWORK_IDS } from '../deployments.ts';
-import { MODES, modeCopy, modesFor, TRUSTLINE } from '../mode-copy.ts';
+import { MODES, modeCopy, PREVIEW_MASTHEAD, TRUSTLINE } from '../mode-copy.ts';
 
 /**
  * The chrome obeys the same vocabulary rule as the agent: lib/agent/prompt.ts
@@ -14,6 +14,7 @@ const FORBIDDEN =
 const every = [
   ...MODES.flatMap((m) => [m.label, m.short, m.balanceUnit, m.hint, m.payNote, m.holdNote, m.payLabel('12,34')]),
   ...Object.values(TRUSTLINE),
+  ...Object.values(PREVIEW_MASTHEAD),
 ].filter(Boolean);
 
 describe('mode copy', () => {
@@ -63,39 +64,23 @@ describe('mode copy', () => {
     // have to be on screen, because none of them is guessable.
     assert.match(TRUSTLINE.body, /gratis/);
     assert.match(TRUSTLINE.body, /no se vuelve a pedir/);
-    assert.match(TRUSTLINE.failed, /modo prueba/);
-    assert.match(TRUSTLINE.back, /modo prueba/);
+    // The way out is back to the basket. It used to be "seguir en modo
+    // prueba", which a signed-in visitor can no longer do without being
+    // signed out — a way out that costs them their session is not one.
+    assert.match(TRUSTLINE.failed, /volver a intentar/);
+    assert.match(TRUSTLINE.back, /carrito/);
+    for (const text of Object.values(TRUSTLINE)) assert.doesNotMatch(text, /modo prueba/);
   });
 
-  it('RULE: an answer we do not have never offers the mode that spends money', () => {
-    // `access` is null while the request is in flight AND when it fails — a
-    // 403 from the human gate looks exactly like a slow one. Whatever the
-    // reason, an unanswered question is not permission.
-    for (const unknown of [null, undefined]) {
-      assert.deepEqual(modesFor(unknown).map((m) => m.network), ['testnet']);
-    }
+  it('names the consequence of leaving preview, not the mechanism', () => {
+    // "Iniciá sesión" would be the mechanism. A person who agrees to log in
+    // has not agreed that the next payment comes out of their own pocket,
+    // and that is the only thing that actually changes.
+    assert.match(PREVIEW_MASTHEAD.action, /modo real/);
+    assert.doesNotMatch(PREVIEW_MASTHEAD.action, /sesión|cuenta/i);
   });
 
-  it('RULE: the safe mode is offered no matter what the server says', () => {
-    // Including if it says no. There has to be something to fall back to, and
-    // a control with nothing in it is two bugs at once.
-    assert.deepEqual(
-      modesFor({ testnet: { usable: false }, mainnet: { usable: false } }).map((m) => m.network),
-      ['testnet'],
-    );
-  });
-
-  it('offers modo real only when it is both allowed and deployed', () => {
-    // `usable` is the conjunction. Being on the list is no use while there is
-    // nothing deployed to be on the list for, and vice versa — which is the
-    // state the app is in today.
-    assert.deepEqual(modesFor({ mainnet: { usable: true } }).map((m) => m.network), ['testnet', 'mainnet']);
-    assert.deepEqual(modesFor({ mainnet: { usable: false } }).map((m) => m.network), ['testnet']);
-    assert.deepEqual(modesFor({ mainnet: null }).map((m) => m.network), ['testnet']);
-    assert.deepEqual(modesFor({}).map((m) => m.network), ['testnet']);
-  });
-
-  it('keeps the safe mode first when both are offered', () => {
-    assert.equal(modesFor({ mainnet: { usable: true } })[0]?.network, 'testnet');
+  it('RULE: preview says whose money it is, because it is not theirs', () => {
+    assert.match(PREVIEW_MASTHEAD.hint, /nuestra plata/);
   });
 });

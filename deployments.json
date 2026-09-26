@@ -10,14 +10,15 @@
       "deployedAt": "2026-09-21T06:53:57.747Z",
       "accounts": {
         "resolver": "GBGMPRHU3NW3BCXUNDNC7VSYQKS6FZKWFHSGEHHMR3G3TZOUWEDBHTFK",
-        "treasury": "GAXUICH5DZMB4ZIZVF6ETTE524RCZYRKHWLGG7EOLY6ECVD4IS6TBNZG"
+        "treasury": "GAXUICH5DZMB4ZIZVF6ETTE524RCZYRKHWLGG7EOLY6ECVD4IS6TBNZG",
+        "demoWallet": "GDFF477UQUWOFIHSOEXPPOD5GPUSEW6OLGZB5FCPS6AFRAOPTMINA55X"
       },
       "contracts": {
         "usdc": {
           "id": "CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF",
           "decimals": 7,
           "symbol": "USDC",
-          "issuer": null
+          "issuer": "GCGV3225QTJFJ32KTPJNOR5SYANP4QWNUGKKGKVK7ILMK4QACZHJTGJB"
         },
         "escrow": {
           "id": "CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557"
@@ -33,14 +34,15 @@
       "deployedAt": null,
       "accounts": {
         "resolver": "",
-        "treasury": ""
+        "treasury": "",
+        "demoWallet": ""
       },
       "contracts": {
         "usdc": {
           "id": "",
           "decimals": 7,
           "symbol": "USDC",
-          "issuer": ""
+          "issuer": "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
         },
         "escrow": {
           "id": ""

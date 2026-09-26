@@ -22,6 +22,18 @@ export interface Balances {
  * different money on each chain. It is in the dep array, which is the whole
  * fix: flipping the mode drops the old number and refetches rather than
  * leaving one chain's balance on screen under the other one's label.
+ *
+ * ## Only ever called with mainnet now
+ *
+ * `address` comes from the connected wallet, and since lib/app-mode.ts the
+ * only way to have one is to be signed in, which is production, which is
+ * mainnet. So the testnet arm of this is unreachable from the app: preview
+ * shows no balance at all, because the money on screen would be ours.
+ *
+ * The `network` parameter stays. Removing it would hardcode a chain into a
+ * hook that has no opinion about chains, and the arm costs nothing — it is
+ * one fetch with a different query string. If a second Pollar key ever
+ * returns, this is one of the few places that needs no change.
  */
 export function useBalances(address: string | null, network: NetworkId = DEFAULT_NETWORK): Balances {
   const [data, setData] = useState<BalanceResponse | null>(null);

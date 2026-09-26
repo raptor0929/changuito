@@ -1,9 +1,11 @@
 import { newTurnState, runTurn } from '@/lib/agent/loop';
 import { turnStore } from '@/lib/agent/turn-store';
+import { archiveChat, chatTitle } from '@/lib/chat-archive';
+import { asNetwork, DEFAULT_NETWORK } from '@/lib/deployments';
 import { withSession } from '@/lib/mcp/session';
 import { encodeEvent, HEARTBEAT, SSE_HEADERS, type ChatRequest, type UiEvent } from '@/lib/protocol';
 import { requireHuman } from '@/lib/human-gate';
-import { requireLoginOrFreeTurn } from '@/lib/login-gate';
+import { readLoggedInUser, requireLoginOrFreeTurn } from '@/lib/login-gate';
 
 /**
  * Node, not edge: the MCP server reads `node:url` and the Stellar SDK needs
@@ -53,6 +55,15 @@ export async function POST(req: Request): Promise<Response> {
   // users (chg_user cookie from /api/session/login after Pollar) skip the limit.
   const loginGate = await requireLoginOrFreeTurn(req, body.sessionId);
   if (loginGate) return loginGate;
+
+  // Read again rather than have the gate hand it back: the gate's answer is
+  // "may this request run", and widening it to "and who is it" would make a
+  // quota decision the place identity is established. Verifying the cookie is
+  // an HMAC and no I/O, so the second read costs nothing worth saving.
+  // A guest is `null` here, and `archiveChat` writes nothing for a guest.
+  const user = await readLoggedInUser(req);
+  const owner = user.ok ? user.address : null;
+  const network = asNetwork(body.network) ?? DEFAULT_NETWORK;
 
   const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
   const hasOllama = Boolean(process.env.OLLAMA_URL?.trim());
@@ -110,6 +121,24 @@ export async function POST(req: Request): Promise<Response> {
           // Keeping the previous history leaves every stored value valid, at
           // the cost of one message the user is about to retry anyway.
           await turns.set(body.sessionId, turn);
+
+          // The durable copy, for a signed-in shopper only. Inside the same
+          // callback as the Redis write so `withSession`'s per-session queue
+          // covers both, and awaited so a lambda frozen at the response does
+          // not drop it — it cannot throw, and it is one round-trip per turn
+          // rather than one per hop.
+          await archiveChat({
+            id: body.sessionId,
+            network,
+            address: owner,
+            turn,
+            // Every turn offers a title and `saveChat` coalesces, so the
+            // first one to land wins and the rest are no-ops. Sending it only
+            // on the opening turn would read as tighter and be worse: a chat
+            // that started as a guest and signed in mid-basket has no opening
+            // turn to archive, and would sit in the list with no name on it.
+            title: chatTitle(body.message),
+          });
         });
 
         // The browser keeps this and sends it back, because this instance

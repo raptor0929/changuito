@@ -22,7 +22,7 @@ import { DEFAULT_NETWORK, type NetworkId } from './deployments.ts';
 
 export interface ModeCopy {
   network: NetworkId;
-  /** The toggle's option, read by a screen reader as the state's name. */
+  /** The mode's name, read by a screen reader off the badge. */
   label: string;
   /** The same at phone width, where two full labels do not fit. */
   short: string;
@@ -66,36 +66,33 @@ export function modeCopy(net: NetworkId = DEFAULT_NETWORK): ModeCopy {
   return COPY[net];
 }
 
-/** Both, in the order the toggle shows them: the safe one first. */
+/**
+ * Both, safe one first. There is no toggle to order them for any more — see
+ * ModeBadge — but the copy tests iterate this to check every mode's wording,
+ * and that is worth more than the array's original caller.
+ */
 export const MODES: readonly ModeCopy[] = [PRUEBA, REAL];
 
 /**
- * Which modes to put in the control, given what the server answered.
+ * The masthead, for a visitor with no session — which is to say, preview.
  *
- * A mode nobody can use is not shown. The earlier version rendered modo real
- * always and greyed it out with a reason, which sounds more helpful and is
- * not: almost every visitor is in the greyed case, so the common experience
- * of the control was a dead half and an apology for a feature nobody had
- * asked about. Worse, the reason had to be *chosen*, and "not for you" and
- * "not yet for anyone" are answers about different subjects — which is how
- * a request still in flight ended up telling people their account was
- * refused. An option that is absent says none of that. Nothing is claimed
- * about the account, so nothing can be claimed wrongly.
+ * This replaces "Empezá a comprar", which was written when a signed-out
+ * visitor could not do anything and had to sign in first. They can do
+ * everything now: search, fill a basket, and watch a payment settle, on our
+ * money. So the button is no longer an invitation to start, it is the door
+ * out of the demo, and it has to say what is on the other side of it.
  *
- * `usable` and not `allowed`: being on the list is no use while there is
- * nothing deployed to be on the list *for*.
- *
- * DEFAULT_NETWORK is always in the list, unconditionally — it is the safe
- * mode and the fallback, and a control with nothing in it is a bug in two
- * directions at once. ModeSwitch then hides itself when that is the only
- * one, because a radiogroup with a single option is a label wearing a
- * button's clothes.
+ * It says "modo real" and not "iniciá sesión" because signing in is the
+ * mechanism, not the consequence. The consequence is that the next payment
+ * comes out of their own pocket, and a person who clicks a login button has
+ * not agreed to that — they have agreed to log in.
  */
-export function modesFor(
-  access: Partial<Record<NetworkId, { usable: boolean } | null>> | null | undefined,
-): readonly ModeCopy[] {
-  return MODES.filter((m) => m.network === DEFAULT_NETWORK || access?.[m.network]?.usable === true);
-}
+export const PREVIEW_MASTHEAD = {
+  /** Sits under the badge, where the balance is in the other mode. */
+  hint: 'Probá todo el pago con nuestra plata.',
+  /** The crossing. */
+  action: 'Cambiar a modo real',
+} as const;
 
 /**
  * The one-time step before the first real payment.
@@ -106,6 +103,11 @@ export function modesFor(
  * prueba is still there). "Habilitar los dólares" rather than anything truer,
  * because the true word is on the forbidden list and the effect really is
  * that dollars can now reach the account.
+ *
+ * The way out used to be "seguir en modo prueba". It is not, any more: the
+ * mode is the session (lib/app-mode.ts), so offering preview to somebody who
+ * is signed in would mean signing them out to keep the promise. The way out
+ * is now simply back to the basket, which is where they were.
  */
 export const TRUSTLINE = {
   title: 'Falta un paso, una sola vez',
@@ -113,7 +115,7 @@ export const TRUSTLINE = {
   action: 'Habilitar los dólares',
   working: 'Habilitando…',
   /** Shown when the signature was refused or the network said no. */
-  failed: 'No se pudo habilitar. Podés volver a intentar, o seguir en modo prueba.',
+  failed: 'No se pudo habilitar. Podés volver a intentar, o dejarlo para después.',
   /** The way out, so a refusal is not a dead end. */
-  back: 'Seguir en modo prueba',
+  back: 'Volver al carrito',
 } as const;

@@ -1,6 +1,8 @@
 import type { Cart, Product } from '@changuito/mcp/types';
 import type { SessionSnapshot } from '@changuito/mcp/session';
 
+import type { NetworkId } from './deployments.ts';
+
 /**
  * The wire between the agent and the browser.
  *
@@ -59,6 +61,14 @@ export interface ChatRequest {
   message: string;
   /** What the browser was given by the previous `done`. Absent on the first turn. */
   snapshot?: SessionSnapshot;
+  /**
+   * Which mode the shopper is in. The server has no way to infer it — the
+   * choice lives in NetworkProvider and nothing else on this request carries
+   * it — and `chat.network` is what keeps a prueba conversation out of a real
+   * one's history. Validated on arrival; anything unknown lands on the default,
+   * which is the mode that cannot spend anything.
+   */
+  network?: NetworkId;
 }
 
 export const SSE_HEADERS: Record<string, string> = {

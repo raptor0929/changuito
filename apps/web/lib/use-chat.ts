@@ -17,6 +17,7 @@ import {
   type SendFailure,
 } from './chat-state';
 import type { StoredChat } from './chat-store.ts';
+import type { NetworkId } from './deployments.ts';
 import { notifyHumanRequired, SOLO_HUMANOS } from './human-gate-ui';
 import { LOGIN_REQUIRED, LOGIN_REQUIRED_MESSAGE } from './login-constants';
 import { parseEvents, type ChatRequest } from './protocol';
@@ -37,6 +38,12 @@ import type { WalletSigner } from './wallet-proof.ts';
  */
 export interface UseChatAuth {
   isAuthenticated?: boolean;
+  /**
+   * Which mode the shopper is in. Sent with every turn because the server
+   * cannot infer it — the choice lives in NetworkProvider — and it is what
+   * keeps a prueba conversation out of a real one's archived history.
+   */
+  network?: NetworkId;
   /** Stellar address once Pollar has a session. Used to mint `chg_user`. */
   address?: string | null;
   /** Signs the login proof `chg_user` needs. Absent without Pollar. */
@@ -79,7 +86,12 @@ export function useChat(auth?: UseChatAuth) {
     abort.current = controller;
 
     const post = () => {
-      const body: ChatRequest = { sessionId: sessionId.current, message: text, snapshot: snapshot.current };
+      const body: ChatRequest = {
+        sessionId: sessionId.current,
+        message: text,
+        snapshot: snapshot.current,
+        ...(authRef.current.network ? { network: authRef.current.network } : {}),
+      };
       return fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream, application/json' },

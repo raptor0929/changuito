@@ -1,9 +1,13 @@
 /**
- * The single-use card the shopper types into the súper's own payment form.
+ * The card the shopper types into the súper's own payment form.
  *
  * The shopper can always pay with their own card — the frame is the store's
- * real checkout and nothing here is required. This is the other option: a
- * card funded with exactly this basket, usable once, terminated after.
+ * real checkout and nothing here is required. This is the other option, and
+ * it comes in two shapes, for the two products this bundle is: in preview a
+ * card funded with exactly this basket, usable once, terminated after; in
+ * production one card per customer, topped up by each deposit and kept.
+ * `keepsOneCard` below is the line between them, and the long version is in
+ * app/api/card/route.ts.
  *
  * ## What stops anyone minting one
  *
@@ -12,10 +16,13 @@
  * that actually landed** — never from the request body. A figure sent by a
  * client is a figure a client chose.
  *
- * Then it is claimed exactly once. A deposit that already bought a card
- * cannot buy a second, and the claim is a Redis SETNX rather than a read
- * followed by a write, because two tabs pressing the button together is the
- * ordinary case and not the adversarial one.
+ * Then it is claimed exactly once. A deposit that already bought a card cannot
+ * buy a second, and the claim is a conditional UPDATE — `where card_id is null`
+ * — rather than a read followed by a write, because two tabs pressing the
+ * button together is the ordinary case and not the adversarial one. It was a
+ * Redis SETNX until the card became something the shopper keeps; see the note
+ * above `rememberDepositor` for why a latch with an expiry was the wrong shape
+ * for money.
  *
  * ## What is never written down
  *
@@ -25,9 +32,10 @@
  * reason that matters most. `VyrionClient.cardDetails` registers both with the
  * redactor on arrival, so even a careless `log()` elsewhere cannot print them.
  */
-import { Redis } from '@upstash/redis';
 import { CARD_MAX_CENTS, CARD_MIN_CENTS, VyrionClient } from '@changuito/mcp/pay';
 
+import { modeKeepsRecords } from './app-mode.ts';
+import { claimOrder, hasDatabase, openOrder, orderByMemo } from './db.ts';
 import { depositAsset } from './deposit.ts';
 import { findDeposit } from './deposit-watch.ts';
 import type { NetworkId } from './deployments.ts';
@@ -35,8 +43,6 @@ import type { NetworkId } from './deployments.ts';
 /** Vyrion's own docs put this at 30s; leave room and fail rather than hang. */
 const TIMEOUT_MS = 45_000;
 const RETRIES = 2;
-/** A claim outlives the order by a day, so a refresh cannot re-mint. */
-const CLAIM_TTL_SECONDS = 86_400;
 
 /**
  * `packages/mcp/src/util/http.ts` has a timeout and a backoff, and the plan
@@ -94,12 +100,11 @@ export function cardClient(env: NodeJS.ProcessEnv = process.env): VyrionClient {
 /**
  * What the deposit is worth, read from the ledger rather than from the caller.
  *
- * On mainnet the asset is USDC and one is one dollar. On testnet it is XLM and
- * the figure is the same number of play tokens the quote asked for — see the
- * long note in app/api/deposit/route.ts about why that is deliberately not an
- * XLM price. Either way the arithmetic here is "what arrived", not "what was
- * asked for": a shopper who sent more gets a card for more, and one who sent
- * less does not get a card for the difference.
+ * The asset is USDC on both networks now — testnet's is one we issued, see
+ * scripts/setup-demo-asset.mjs — so one unit is one dollar either way and this
+ * is a plain conversion. The arithmetic is "what arrived", not "what was asked
+ * for": a shopper who sent more gets a card for more, and one who sent less
+ * does not get a card for the difference.
  */
 export function centsFromAmount(amount: string): number | null {
   if (!/^\d+(\.\d{1,7})?$/.test(amount)) return null;
@@ -139,6 +144,35 @@ export async function fundingFor(
   return { txHash: hit.txHash, cents };
 }
 
+/**
+ * Whether this deposit tops up a card the customer keeps, or mints one that
+ * dies with the basket.
+ *
+ * Three terms, and each rules out a different way of getting it wrong.
+ *
+ * `owner` is the wallet the gate proved at deposit time. Without one there is
+ * nobody to bind a card *to*, so there is nothing to keep.
+ *
+ * `modeKeepsRecords` is asked out loud rather than inferred from `owner`,
+ * because the allowlist can put a proven wallet on testnet and preview must
+ * never write a row. It is the same explicit check `archiveChat` makes, for
+ * the same reason: an invariant that holds by coincidence is one refactor
+ * from not holding.
+ *
+ * `hasDatabase` is here because `card_owner` is the binding. With no database
+ * the fallback in this file keeps claims in a per-instance Map and
+ * deliberately binds nothing — a binding a restart forgets would mint a second
+ * card for somebody who already has one, which is the single outcome the
+ * persistent path exists to prevent.
+ */
+export function keepsOneCard(
+  net: NetworkId,
+  owner: string | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return Boolean(owner) && modeKeepsRecords(net) && hasDatabase(env);
+}
+
 export type FundingRefusal = 'too-small' | 'too-large';
 
 export function refuseFunding(cents: number): FundingRefusal | null {
@@ -147,18 +181,86 @@ export function refuseFunding(cents: number): FundingRefusal | null {
   return null;
 }
 
-function credentials(): { url: string; token: string } | undefined {
-  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-  return url && token ? { url, token } : undefined;
+/* ---- the deposit's record ------------------------------------------------ */
+
+/**
+ * All of this used to be two Redis keys with a 24h expiry, and the expiry was
+ * the bug. `chg:depositor:*` recorded who the gate let open a memo; a deposit
+ * that confirmed slowly outlived it and became an unowned memo, which is a 403
+ * to somebody who has already sent real money. `chg:card:*` was the claim
+ * latch; Redis can evict under memory pressure, and an evicted latch mints a
+ * second card against a deposit that already bought one.
+ *
+ * Both are columns on `orders` now. The once-only guarantee that `SET NX` gave
+ * becomes `where card_id is null` in an UPDATE — the same atomicity, because
+ * the first transaction's commit makes the second's predicate false — and it
+ * leaves a row behind, so "which deposit paid for which card" is answerable a
+ * month later rather than a day.
+ *
+ * **The in-process fallback stays.** Not as a second-class path: it is what
+ * lets a fresh clone with no DATABASE_URL still run the demo, the same degrade
+ * turn-store.ts makes, and it is what the unit tests exercise since they run
+ * with no database reachable. A single instance still refuses a second card for
+ * the same deposit; what it cannot do is survive a restart, which is why it is
+ * not what production uses.
+ */
+const localClaims = new Map<string, string>();
+const localOwners = new Map<string, string>();
+const localKey = (net: NetworkId, memo: string) => `${net}:${memo}`;
+
+/**
+ * Record that this memo was issued, and to whom.
+ *
+ * `address` is optional and omitted in `realModeMode() === 'open'`, where
+ * nothing was proven — writing a claimed address down would be recording a
+ * guess and then trusting it later. NULL there means "nobody was checked",
+ * which is precisely what `depositorOf` returning undefined already means.
+ *
+ * `amountCents` is new to this signature and is not negotiable: an order row
+ * without the figure that was quoted is a record of nothing. The deposit route
+ * has it as `usdCents` at the moment it mints the memo.
+ *
+ * **This is not authentication of the caller.** `POST /api/card` still takes
+ * nothing but the memo, because a proof lives five minutes and a deposit can
+ * take longer than that to confirm — refusing a shopper who has already paid is
+ * the worst moment available to fail. What this is: evidence that the memo was
+ * issued to somebody the gate let in. It narrows "anyone who knows a memo can
+ * mint its card" to "anyone who knows a memo an allowed wallet opened", and no
+ * further. The memo's own unguessability carries the rest, which is why
+ * `mintMemo` draws from the CSPRNG.
+ */
+export async function rememberDepositor(
+  net: NetworkId,
+  memo: string,
+  o: {
+    /** Omitted in `open` mode, where no address was proven. */
+    address?: string;
+    /** What the deposit was quoted at, in US cents. */
+    amountCents: number;
+    /** The centavos figure the shopper actually read on screen. */
+    arsQuoted?: number;
+    cartId?: string;
+  },
+): Promise<void> {
+  if (!hasDatabase()) {
+    if (o.address) localOwners.set(localKey(net, memo), o.address);
+    return;
+  }
+  await openOrder({
+    network: net,
+    memo,
+    address: o.address ?? null,
+    amountCents: o.amountCents,
+    arsQuoted: o.arsQuoted ?? null,
+    cartId: o.cartId ?? null,
+  });
 }
 
-/** Bounded, and per-instance. The same degrade turn-store.ts makes, for the
- *  same reason: a fresh clone with no Redis still runs, and a single instance
- *  still refuses a second card for the same deposit. */
-const localClaims = new Map<string, string>();
-
-const claimKey = (net: NetworkId, memo: string) => `chg:card:${net}:${memo}`;
+/** The wallet that opened this deposit, or undefined if nothing recorded one. */
+export async function depositorOf(net: NetworkId, memo: string): Promise<string | undefined> {
+  if (!hasDatabase()) return localOwners.get(localKey(net, memo));
+  return (await orderByMemo(net, memo))?.address ?? undefined;
+}
 
 /**
  * Take the deposit, or find out who already did.
@@ -166,33 +268,33 @@ const claimKey = (net: NetworkId, memo: string) => `chg:card:${net}:${memo}`;
  * Returns the card id on success and the existing one on a second attempt, so
  * a shopper who refreshed sees the card they already have rather than an error
  * about a card they do not remember asking for.
+ *
+ * `cents` is here so the claim can stand up its own row. Normally the deposit
+ * route opened one already, but a database write that failed at quote time must
+ * not become a lost claim at card time — and by this point the funded figure is
+ * known exactly, read off the ledger, which makes it the better number anyway.
  */
 export async function claimDeposit(
   net: NetworkId,
   memo: string,
   cardId: string,
+  cents: number,
 ): Promise<{ claimed: boolean; existing?: string }> {
-  const key = claimKey(net, memo);
-  const creds = credentials();
-  if (!creds) {
+  if (!hasDatabase()) {
+    const key = localKey(net, memo);
     const held = localClaims.get(key);
     if (held) return { claimed: false, existing: held };
     localClaims.set(key, cardId);
     return { claimed: true };
   }
-  const redis = new Redis(creds);
-  // NX is the whole point: a get-then-set loses the race that matters.
-  const ok = await redis.set(key, cardId, { nx: true, ex: CLAIM_TTL_SECONDS });
-  if (ok) return { claimed: true };
-  const existing = await redis.get<string>(key);
-  return { claimed: false, existing: existing ?? undefined };
+  // Idempotent, and it never overwrites a claim: openOrder coalesces rather
+  // than clobbering, and card_id is not one of the columns it touches.
+  await openOrder({ network: net, memo, amountCents: cents });
+  return claimOrder(net, memo, cardId);
 }
 
 /** Who holds this deposit's card, if anyone. Read-only; never claims. */
 export async function heldCard(net: NetworkId, memo: string): Promise<string | undefined> {
-  const key = claimKey(net, memo);
-  const creds = credentials();
-  if (!creds) return localClaims.get(key);
-  const redis = new Redis(creds);
-  return (await redis.get<string>(key)) ?? undefined;
+  if (!hasDatabase()) return localClaims.get(localKey(net, memo));
+  return (await orderByMemo(net, memo))?.cardId ?? undefined;
 }

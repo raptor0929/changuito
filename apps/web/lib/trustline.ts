@@ -4,13 +4,22 @@ import { hasTrustline, type AccountBalance } from './stellar.ts';
 /**
  * Whether this account can be handed the network's USDC at all.
  *
- * The asymmetry that makes this module necessary: contracts/mock_usdc is a
- * pure SEP-41 token with no issuer, so on testnet it reaches anybody who asks.
- * Real USDC is a classic asset behind a SAC, and a classic asset cannot reach
- * an account that has not opted into it — the transfer fails, at payment time,
- * with an XDR code. So modo real needs a step modo prueba has never had, and
- * the whole difference falls out of one field: `usdcIssuer`, which is null on
- * exactly the network that needs no trustline.
+ * A classic asset cannot reach an account that has not opted into it: the
+ * transfer fails at payment time with an XDR code, after the sender pressed
+ * send. So anything that is about to receive USDC needs a trustline first.
+ *
+ * This module was written for an asymmetry that no longer exists. Testnet's
+ * USDC used to be contracts/mock_usdc, a pure SEP-41 token with no issuer,
+ * which reaches anybody who asks — so `usdcIssuer` was null on exactly the
+ * network that needed no trustline, and modo real needed a step modo prueba
+ * had never taken. `scripts/setup-demo-asset.mjs` ended that: testnet now has
+ * a classic USDC of its own and both networks take the same step.
+ *
+ * The null branch is still live and still correct. It is what an undeployed
+ * network reads as, and what a Soroban contract holding a SAC asset reads as —
+ * a contract's balance lives in contract storage and needs no trustline — so
+ * `trustlineFor(…, null)` is tested directly rather than through a config
+ * that happens to produce it.
  */
 
 export interface ClassicAsset {

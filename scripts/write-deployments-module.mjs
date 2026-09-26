@@ -33,12 +33,28 @@ const entry = (name, n) => `  ${name}: {
     resolver: ${q(n.accounts.resolver)},
     /** Where a settled order's USDC ends up. The app never signs for it. */
     treasury: ${q(n.accounts.treasury)},
+    /**
+     * The account that pays for a preview shopper, and the only account this
+     * deployment has a secret for. Empty on every network but testnet, which
+     * is what stops \`DEMO_WALLET_SECRET\` from being usable anywhere real:
+     * lib/server/demo-wallet.ts checks the secret's public key against this,
+     * and an empty string matches nothing.
+     */
+    demoWallet: ${q(n.accounts.demoWallet ?? '')},
     escrowId: ${q(n.contracts.escrow.id)},
     usdcId: ${q(n.contracts.usdc.id)},
     /**
-     * The classic asset the SAC wraps, when it wraps one. \`null\` on testnet,
-     * where contracts/mock_usdc is a pure SEP-41 token with no issuer — which
-     * is exactly why testnet needs no trustline and a public network does.
+     * The issuer of the classic asset this network deposits in.
+     *
+     * It was \`null\` on testnet for as long as testnet's only USDC was
+     * contracts/mock_usdc, a pure SEP-41 Soroban token with no issuer and so
+     * no classic payment record to carry a memo. Preview pays for real, so
+     * scripts/setup-demo-asset.mjs issued a classic one and both networks now
+     * have an issuer, a trustline and the same deposit path.
+     *
+     * \`usdcId\` still points at the Soroban token. It backs the dormant
+     * escrow and is no longer on the deposit rail — the two are separate
+     * assets that share a code.
      */
     usdcIssuer: ${q(n.contracts.usdc.issuer)},
     usdcCode: ${q(n.contracts.usdc.symbol)},

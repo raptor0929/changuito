@@ -131,11 +131,31 @@ opposite way: MCP state rides in a **snapshot the browser holds and sends back**
 because it is a postal code and a cart id — things the user already has. History
 is the conversation itself and grows every hop, so it goes server-side.
 
-**Reload is still a fresh start, by design.** `use-chat.ts` mints the session id
-with `crypto.randomUUID()` into a `useRef` and nothing persists it, so a refresh
-cannot find its own history. Persisting the id *without* rehydrating the
-transcript would be worse than either end state: an empty page backed by a
-server that remembers. If you want reload persistence, do both halves.
+**A reload starts a new chat, and the old one is still there.** The rule that
+got us here was: persisting the session id *without* rehydrating the transcript
+is worse than either end state — an empty page backed by a server that
+remembers — so do both halves or neither. Both halves are now done.
+`chat-store.ts` holds the blocks and the session id in localStorage, the rail
+lists them, and `use-chat.ts`'s `resume` puts one back with `seedIds` so the
+restored blocks do not collide with new ones. A chat the server can no longer
+continue comes back **read-only** rather than pretending, which is what
+`isResumable` is for. Do not re-add the id to storage on its own.
+
+**Three stores hold a conversation, and they are not redundant.** Redis
+(`turn-store.ts`) is the working store the hop loop reads up to twelve times a
+turn, at a one hour TTL. localStorage (`chat-store.ts`) is what the shopper
+sees. Postgres (`chat-archive.ts` → the `chat` table) is the record: it outlives
+the TTL, survives a cleared browser, and is what an order is joined back to.
+
+The archive is one write per turn, in the same place and under the same rule as
+the Redis one — **only after a clean return** — and it matters more there: a
+transcript archived with an assistant `tool_use` that has no matching
+`tool_result` is a permanent copy of a pairing the API rejects. It is also
+**only for a signed-in wallet**. `chat.address` is `not null` and that is the
+enforcement rather than an oversight: a transcript is a list of what somebody
+bought and usually carries their postal code, so moving it from an hour in a
+cache to durable storage is a real change in exposure. Reads are narrowed the
+same way, in the `WHERE` clause — a chat id is a UUID, not a capability.
 
 ### 5. The model is chosen per hop, not per turn
 

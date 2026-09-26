@@ -49,6 +49,17 @@ for arg in "$@"; do
   esac
 done
 
+# The asset code this network quotes, read from deployments.json so that the
+# SAC derived below and the asset the app asks a shopper for are provably the
+# same string. Defined here rather than beside prev() because the mainnet
+# preflight needs it before any contract has been looked at.
+asset_code() {
+  node -e "
+    const d = require('$OUT');
+    process.stdout.write(d.networks?.['$NETWORK']?.contracts?.usdc?.symbol || 'USDC');
+  "
+}
+
 # Separate identities per network, on purpose. The testnet resolver secret has
 # been through a deploy script and a shell history; mainnet money must not
 # depend on that.
@@ -78,10 +89,17 @@ if [[ "$NETWORK" != testnet ]]; then
 MSG
     exit 2
   fi
+  # The code comes from deployments.json, not from a literal here. It is
+  # "USDC" today on every network, and it was a literal in this line until the
+  # asset was nearly swapped — at which point this would have derived the SAC
+  # of a different asset than the app quotes, silently, because both halves
+  # would still have been well-formed.
+  USDC_CODE="$(asset_code)"
+  echo "  USDC code:         $USDC_CODE (from deployments.json)"
   # Derived, not pasted. `stellar contract id asset` is pure arithmetic over
   # the asset and the passphrase — it reaches no network and cannot be wrong
   # about an issuer that is right.
-  USDC_ID="$(stellar contract id asset --asset "USDC:$USDC_ISSUER" --network "$NETWORK")"
+  USDC_ID="$(stellar contract id asset --asset "$USDC_CODE:$USDC_ISSUER" --network "$NETWORK")"
   echo "  USDC contract:     $USDC_ID (derived)"
   read -r -p "  Type the network name to continue: " confirm
   [[ "$confirm" == "$NETWORK" ]] || { echo "  aborted"; exit 1; }
@@ -240,15 +258,23 @@ if [[ "$NETWORK" != testnet ]]; then
   cat <<MSG
 
 Still to do by hand on $NETWORK:
-  1. Add a USDC trustline to the treasury ($TREASURY_ADDR), or the first
-     settle will fail — a classic asset cannot reach an account that has not
-     opted into it. The buyer's own trustline the app now handles itself;
-     the treasury's is manual, because the app never signs for it.
+  1. Add a $USDC_CODE trustline to DEPOSIT_ADDRESS_$(echo "$NETWORK" | tr '[:lower:]' '[:upper:]').
+     That is the account shoppers actually pay on the live rail, and a classic
+     asset cannot reach an account that has not opted into it — without this
+     the payment fails at submit, after they pressed send. It also needs about
+     1.6 XLM of its own (1 base reserve, 0.5 for the trustline, rest fees).
+         stellar tx new change-trust --source-account <deposit-account> \\
+           --line $USDC_CODE:$USDC_ISSUER --network $NETWORK
+     Verify it took, reading the issuer and not just the code — a trustline on
+     the wrong issuer looks identical in a dashboard and fails identically:
+         node scripts/check-deposit-account.mjs $NETWORK
+  2. Add a $USDC_CODE trustline to the treasury ($TREASURY_ADDR) — only if you
+     are reviving the escrow. Nothing on the deposit rail touches it.
          stellar tx new change-trust --source-account $TREASURY \\
-           --line USDC:$USDC_ISSUER --network $NETWORK
-  2. Put the resolver secret in STELLAR_RESOLVER_SECRET_MAINNET:
+           --line $USDC_CODE:$USDC_ISSUER --network $NETWORK
+  3. Put the resolver secret in STELLAR_RESOLVER_SECRET_MAINNET:
          stellar keys show $RESOLVER
-  3. Add the RPC host in deployments.json to the CSP in
+  4. Add the RPC host in deployments.json to the CSP in
      apps/web/lib/security-headers.ts, or the browser blocks every call.
 MSG
 fi

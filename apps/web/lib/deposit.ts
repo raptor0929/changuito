@@ -18,18 +18,27 @@ import type { ClassicAsset } from './trustline.ts';
  * payment here and no Stellar secret in the deployment, so a failed order is
  * refunded by hand. That is a worse product and a much better blast radius.
  *
- * ## Why the asset differs per network, which is not a simplification
+ * ## Why the asset no longer differs per network
  *
- * A memo lives on a classic Stellar transaction. `testnet.usdcIssuer` is null
- * — contracts/mock_usdc is a pure SEP-41 Soroban token, so it has no classic
- * asset, no Horizon payment record and nowhere to put a memo. Asking for mock
- * USDC here would be asking for something that cannot be observed.
+ * A memo lives on a classic Stellar transaction, and for a long time testnet
+ * had nothing to put one on: `testnet.usdcIssuer` was null because
+ * contracts/mock_usdc is a pure SEP-41 Soroban token with no classic asset, no
+ * Horizon payment record and nowhere to write a memo. So the deposit asset was
+ * native XLM there and classic USDC on mainnet, and the seam was real — modo
+ * prueba showed a mock USDC balance while the rehearsal deposit moved lumens.
  *
- * So the deposit asset is native XLM on testnet and classic USDC on mainnet.
- * One field, same code path, and it falls out of exactly the same `usdcIssuer`
- * asymmetry that lib/trustline.ts is built around. The seam it leaves is real
- * and worth knowing: in modo prueba the balance widget shows mock USDC while
- * the rehearsal deposit moves XLM. Both are play money and the copy says so.
+ * Preview pays for real now, which makes that seam expensive: the one path
+ * nobody could rehearse was the one that handles real money.
+ * `scripts/setup-demo-asset.mjs` issued a classic USDC on testnet — locked
+ * issuer, supply fixed at a billion, held by the demo wallet — so both
+ * networks take the same path, with the same trustline step, differing in one
+ * field: which issuer. `contracts.usdc.id` still names the Soroban token; it
+ * backs the dormant escrow and is no longer on this rail.
+ *
+ * The native branch below stays anyway. It is what any network with a falsy
+ * issuer falls back to, including mainnet before its deploy, and reading a
+ * missing issuer as lumens is how the code refuses to quote an asset it cannot
+ * observe. `depositAssetFor('USDC', null)` is tested on its own terms.
  */
 
 /** Native XLM has no issuer. `null` is how the rest of the code tells them apart. */
@@ -95,7 +104,28 @@ export function canDeposit(net: NetworkId, env: NodeJS.ProcessEnv = process.env)
 export const MEMO_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const MEMO_LENGTH = 8;
 
-export function mintMemo(random: () => number = Math.random): string {
+/**
+ * A uniform float in [0, 1), from the CSPRNG rather than from `Math.random`.
+ *
+ * The memo is not only a label. `GET /api/card/3ds` and `POST /api/card/terminate`
+ * take it as a bearer token — they have to, since a shopper polling for a
+ * one-time code every three seconds cannot sign for each poll — so guessing a
+ * live memo is guessing a live card's 3DS feed. `Math.random` is a fast PRNG
+ * whose internal state is recoverable from a handful of outputs, and this
+ * function hands out outputs eight at a time to anyone who opens a checkout.
+ *
+ * Drawn as a 32-bit word rather than a byte with rejection sampling: 2^32 does
+ * not divide 31 either, but the residual bias is about one part in 10^8 rather
+ * than the 3% a byte modulo would cost, and there is no retry loop to get
+ * subtly wrong. 31^8 is ~2^39.6 of keyspace, and now all of it is real.
+ */
+function cryptoRandom(): number {
+  const word = new Uint32Array(1);
+  crypto.getRandomValues(word);
+  return word[0]! / 2 ** 32;
+}
+
+export function mintMemo(random: () => number = cryptoRandom): string {
   let out = '';
   for (let i = 0; i < MEMO_LENGTH; i += 1) {
     out += MEMO_ALPHABET[Math.floor(random() * MEMO_ALPHABET.length)];
