@@ -39,10 +39,28 @@ describe('deposit asset', () => {
     assert.deepEqual(depositAsset('testnet'), { code: 'XLM', issuer: null });
   });
 
+  it('RULE: is Circle USDC on mainnet, never lumens', () => {
+    // This is the assertion that would have caught the live bug. mainnet's
+    // issuer was '' for as long as it had no deploy, and depositAssetFor reads
+    // any falsy issuer as native XLM — the branch that exists for testnet's
+    // issuer-less Soroban token. So mainnet quoted "24.5000000 XLM" for a
+    // $24.50 basket, matchDeposit accepted the native payment, and the card was
+    // funded for the full amount in dollars. Nothing in the flow looked wrong.
+    //
+    // Asserting issuer !== null rather than just deep-equalling the pair is the
+    // point: blanking the field in deployments.json fails here loudly instead
+    // of quietly reverting to lumens.
+    const asset = depositAsset('mainnet');
+    assert.notEqual(asset.issuer, null, 'mainnet must never fall to the XLM branch');
+    assert.deepEqual(asset, {
+      code: 'USDC',
+      issuer: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
+    });
+  });
+
   it('becomes the classic asset the moment an issuer exists', () => {
-    // The branch mainnet will take after a deploy, exercised today through
-    // the pure half. Without this, the USDC path ships untested and is first
-    // run by a shopper sending real money.
+    // The pure half of the rule above: '' and null both mean "this network's
+    // token has no issuer", and only a real string produces a classic asset.
     const issuer = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN';
     assert.deepEqual(depositAssetFor('USDC', issuer), { code: 'USDC', issuer });
     assert.deepEqual(depositAssetFor('USDC', ''), { code: 'XLM', issuer: null });

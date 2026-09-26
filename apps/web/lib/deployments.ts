@@ -60,7 +60,7 @@ export const DEPLOYMENTS = {
      * where contracts/mock_usdc is a pure SEP-41 token with no issuer — which
      * is exactly why testnet needs no trustline and a public network does.
      */
-    usdcIssuer: '',
+    usdcIssuer: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
     usdcCode: 'USDC',
     usdcDecimals: 7,
   },
