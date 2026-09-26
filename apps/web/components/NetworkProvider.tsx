@@ -1,41 +1,45 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
-import { asNetwork, DEFAULT_NETWORK, type NetworkId } from '../lib/deployments.ts';
-import { pollarEnabledOn } from '../lib/pollar.ts';
-
-/**
- * Which mode the app is in — prueba or real — and nothing else.
- *
- * It sits *above* the Pollar provider, because the network decides which
- * Pollar key and which chain that provider is built with, and a provider
- * cannot read a context that lives inside it. That also means this component
- * cannot know who is logged in: permission is decided by whoever is inside
- * (WalletWidget), which calls `setNetwork` and, if the answer turns out to be
- * no, calls it back. See lib/network-access.ts for where the real decision is
- * made, on the server, against a signature.
- *
- * The choice is remembered so a reload does not drop somebody back into the
- * other mode mid-order — but it is remembered as a *hint*, validated on the
- * way in. localStorage is a place a person can type, and an unknown string
- * must land on the mode that cannot spend anything.
- */
+import { DEFAULT_NETWORK, type NetworkId } from '../lib/deployments.ts';
 
 /**
- * A mode with no Pollar key has no wallet, and a wallet is where the mode
- * control lives — so entering one would strand the user in a mode with no
- * way back out of it. The check belongs here rather than in the toggle
- * because a value restored from storage never passes through the toggle.
+ * Which network the app is on — and therefore which mode it is in.
+ *
+ * It used to be a choice: a toggle in the masthead, remembered in
+ * localStorage, validated on the way back in. It is not a choice any more.
+ * The mode follows the Pollar session (lib/app-mode.ts), so the network is
+ * *derived*, and this holds the derived value rather than deciding it.
+ *
+ * The provider still sits above the Pollar provider, because Pollar needs a
+ * key and a chain before it can mount. What changed is that it no longer
+ * *decides*: `ModeSync`, which lives inside Pollar where `isAuthenticated`
+ * can be read, pushes the answer back up here. The layering is the same and
+ * the direction of the arrow is reversed — the precedent for that shape is
+ * WalletWidget, which has always corrected the network from inside.
+ *
+ * ## What was removed, and why it must not come back
+ *
+ * The `changuito:modo` localStorage hint is gone. A remembered mode that
+ * disagrees with the session is not a preference, it is a lie the UI would
+ * then have to keep: a visitor with "modo real" in storage and no session
+ * would be shown real-money copy for money they cannot spend, and every
+ * server route would refuse them on an identity they do not have. The session
+ * is the only authority, and it is re-established on every load anyway.
+ *
+ * `reachable()` is gone with it. It existed because "a mode with no Pollar
+ * key has no wallet, and a wallet is where the mode control lives" — true of
+ * a control that no longer exists.
  */
-function reachable(net: NetworkId): boolean {
-  return net === DEFAULT_NETWORK || pollarEnabledOn(net);
-}
-
-const STORAGE_KEY = 'changuito:modo';
 
 interface NetworkState {
   network: NetworkId;
+  /**
+   * Set by `ModeSync` and by nothing else. It is on the context because the
+   * component that knows the answer is mounted below the one that holds it,
+   * not because callers are invited to pick a mode.
+   */
   setNetwork: (net: NetworkId) => void;
 }
 
@@ -46,28 +50,14 @@ export function useNetwork(): NetworkState {
 }
 
 export function NetworkProvider({ children }: { children: React.ReactNode }) {
-  // Starts at the default on both sides of hydration. Reading storage during
-  // render would make the server's HTML and the browser's first paint
-  // disagree, and React would throw the whole tree away to fix it.
+  // DEFAULT_NETWORK is testnet, which is preview, which is what a visitor
+  // with no session gets — so the first paint is already correct and stays
+  // correct until Pollar says otherwise. Nothing is read from storage during
+  // render, so the server's HTML and the browser's first paint agree.
   const [network, setStored] = useState<NetworkId>(DEFAULT_NETWORK);
 
-  useEffect(() => {
-    try {
-      const saved = asNetwork(window.localStorage.getItem(STORAGE_KEY));
-      if (saved && saved !== DEFAULT_NETWORK && reachable(saved)) setStored(saved);
-    } catch {
-      // Safari in private mode throws on localStorage. The default is right.
-    }
-  }, []);
-
   const setNetwork = useCallback((net: NetworkId) => {
-    if (!reachable(net)) return;
-    setStored(net);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, net);
-    } catch {
-      // Not remembering the choice is survivable; failing to make it is not.
-    }
+    setStored((current) => (current === net ? current : net));
   }, []);
 
   const value = useMemo(() => ({ network, setNetwork }), [network, setNetwork]);

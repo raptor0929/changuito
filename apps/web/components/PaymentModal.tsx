@@ -42,7 +42,7 @@ type Phase = 'review' | 'signing' | 'failed';
 
 function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
   const { wallet, isAuthenticated, verified, openLoginModal, runTx, setTrustline } = usePollar();
-  const { network, setNetwork } = useNetwork();
+  const { network } = useNetwork();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
   const { data: balance, refresh } = useBalances(address, network);
   // Point at "Cargar USDC" only for wallets that actually have the button.
@@ -295,10 +295,13 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
                   : mode.payLabel(quote ? quote.display : '')}
             </button>
           )}
-          {/* A refusal must not be a dead end: the safe mode needs no step
-              and is one click away. */}
+          {/* A refusal must not be a dead end. It used to offer modo prueba,
+              which is no longer somewhere a signed-in visitor can go — the
+              mode is the session now (lib/app-mode.ts), so that button would
+              have had to sign them out to keep its promise. Closing gets them
+              back to the basket, which is what they actually wanted. */}
           {needsTrustline ? (
-            <button type="button" className="btn btn-ghost" onClick={() => setNetwork('testnet')}>
+            <button type="button" className="btn btn-ghost" onClick={onClose}>
               {TRUSTLINE.back}
             </button>
           ) : null}

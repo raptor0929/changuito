@@ -656,47 +656,36 @@ a:hover { color: var(--chg-arcilla); }
 .wallet-muted { color: var(--muted); }
 .wallet-error { margin: 0; font-size: 12px; color: var(--warn); }
 
-/* Modo prueba / modo real.
-   A wrapper div, not a bare <button>, because the phone block at the bottom
+/* Modo prueba / modo real — a label, not a control. See ModeBadge.
+   A wrapper div, not a bare element, because the phone block at the bottom
    of this file branches on `.wallet:has(> .btn)` vs `.wallet:not(:has(> .btn))`
    to tell the logged-out masthead from the connected one. A button added as a
    direct child of .wallet flips that selector and breaks both branches. */
 .wallet-mode { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
-.mode-switch {
+.mode-badge {
   display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: rgba(42, 26, 20, 0.04);
-}
-.mode-option {
-  border: 0;
-  background: none;
-  font: inherit;
+  align-items: center;
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
   padding: 7px 11px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  color: var(--muted);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.mode-option:hover { color: var(--text); }
-.mode-option:focus-visible { outline: 2px solid var(--chg-espresso); outline-offset: 2px; }
-/* Selected, modo prueba: neutral. Nothing is happening, so nothing shouts. */
-.mode-option[aria-checked='true'] {
+  /* Modo prueba: neutral. Nothing is happening, so nothing shouts. */
   background: var(--surface);
   color: var(--text);
-  box-shadow: 0 1px 2px rgba(42, 26, 20, 0.12);
+  white-space: nowrap;
+  /* It is a label. No pointer, no hover, nothing that reads as clickable —
+     the mode follows the session and there is nothing here to press. */
+  cursor: default;
 }
-/* Selected, modo real: the only sunflower outside the primary CTA, because
-   it is the only control that starts spending real money. Ink is espresso —
-   sunflower is a background here, never text. */
-.mode-option[data-mode='mainnet'][aria-checked='true'] {
+/* Modo real: the only sunflower outside the primary CTA, because it is the
+   only thing on screen that says the next payment is real money. Ink is
+   espresso — sunflower is a background here, never text. */
+.mode-badge[data-mode='mainnet'] {
   background: var(--brand);
   color: var(--brand-ink);
+  border-color: transparent;
 }
 /* One label at two widths. Both spans are aria-hidden and the button carries
    an explicit aria-label, so hiding either one never costs it its name. */
@@ -1216,7 +1205,7 @@ a:hover { color: var(--chg-arcilla); }
     line-height: 1.2;
   }
 
-  .shell:has(.chat.is-empty) .mode-option {
+  .shell:has(.chat.is-empty) .mode-badge {
     padding: 6px 9px;
   }
 
