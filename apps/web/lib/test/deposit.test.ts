@@ -25,8 +25,8 @@ const C = 'CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557';
 describe('deposit asset', () => {
   it('RULE: is never an asset Horizon cannot show us', () => {
     // The whole deposit is "a payment arrived carrying this memo", and only a
-    // classic payment has either. testnet USDC is a Soroban token with no
-    // issuer, so asking for it would be asking for something unobservable.
+    // classic payment has either. A token with no issuer has neither, so the
+    // asset falls back to lumens rather than quoting something unobservable.
     for (const net of ['testnet', 'mainnet'] as const) {
       const asset = depositAsset(net);
       const issuerless = asset.issuer === null;
@@ -35,8 +35,29 @@ describe('deposit asset', () => {
     }
   });
 
-  it('is native XLM on the test network today', () => {
-    assert.deepEqual(depositAsset('testnet'), { code: 'XLM', issuer: null });
+  it('RULE: is the classic USDC on testnet too, so preview rehearses mainnet', () => {
+    // This said "is native XLM on the test network today" until preview
+    // started paying for real. Testnet's only USDC was contracts/mock_usdc, a
+    // Soroban token with no classic payment record and nowhere to put a memo,
+    // so the rehearsal moved lumens while the balance widget showed USDC —
+    // a seam the old comment in lib/deposit.ts named and accepted.
+    //
+    // scripts/setup-demo-asset.mjs closed it: a classic USDC with a locked
+    // issuer and a fixed supply of a billion, held by the demo wallet. The
+    // two networks now differ in exactly one thing, which issuer, and that is
+    // what makes the preview payment worth watching.
+    const asset = depositAsset('testnet');
+    assert.notEqual(asset.issuer, null, 'testnet must not fall back to the XLM branch');
+    assert.deepEqual(asset, {
+      code: 'USDC',
+      issuer: 'GCGV3225QTJFJ32KTPJNOR5SYANP4QWNUGKKGKVK7ILMK4QACZHJTGJB',
+    });
+  });
+
+  it('RULE: and it is not the same issuer as mainnet', () => {
+    // Play money and real money must never be one asset. If these ever match,
+    // a preview payment would be indistinguishable from a real one on chain.
+    assert.notEqual(depositAsset('testnet').issuer, depositAsset('mainnet').issuer);
   });
 
   it('RULE: is Circle USDC on mainnet, never lumens', () => {
@@ -59,8 +80,11 @@ describe('deposit asset', () => {
   });
 
   it('becomes the classic asset the moment an issuer exists', () => {
-    // The pure half of the rule above: '' and null both mean "this network's
-    // token has no issuer", and only a real string produces a classic asset.
+    // The pure half of the rule above, and the only place the native branch
+    // is still covered now that both networks have an issuer: '' and null
+    // both mean "this network's token has no issuer", and only a real string
+    // produces a classic asset. Deleting this would leave the fallback live
+    // in lib/deposit.ts and untested.
     const issuer = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN';
     assert.deepEqual(depositAssetFor('USDC', issuer), { code: 'USDC', issuer });
     assert.deepEqual(depositAssetFor('USDC', ''), { code: 'XLM', issuer: null });

@@ -31,11 +31,19 @@ export const DEPLOYMENTS = {
     escrowId: 'CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557',
     usdcId: 'CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF',
     /**
-     * The classic asset the SAC wraps, when it wraps one. `null` on testnet,
-     * where contracts/mock_usdc is a pure SEP-41 token with no issuer — which
-     * is exactly why testnet needs no trustline and a public network does.
+     * The issuer of the classic asset this network deposits in.
+     *
+     * It was `null` on testnet for as long as testnet's only USDC was
+     * contracts/mock_usdc, a pure SEP-41 Soroban token with no issuer and so
+     * no classic payment record to carry a memo. Preview pays for real, so
+     * scripts/setup-demo-asset.mjs issued a classic one and both networks now
+     * have an issuer, a trustline and the same deposit path.
+     *
+     * `usdcId` still points at the Soroban token. It backs the dormant
+     * escrow and is no longer on the deposit rail — the two are separate
+     * assets that share a code.
      */
-    usdcIssuer: null,
+    usdcIssuer: 'GCGV3225QTJFJ32KTPJNOR5SYANP4QWNUGKKGKVK7ILMK4QACZHJTGJB',
     usdcCode: 'USDC',
     usdcDecimals: 7,
   },
@@ -56,9 +64,17 @@ export const DEPLOYMENTS = {
     escrowId: '',
     usdcId: '',
     /**
-     * The classic asset the SAC wraps, when it wraps one. `null` on testnet,
-     * where contracts/mock_usdc is a pure SEP-41 token with no issuer — which
-     * is exactly why testnet needs no trustline and a public network does.
+     * The issuer of the classic asset this network deposits in.
+     *
+     * It was `null` on testnet for as long as testnet's only USDC was
+     * contracts/mock_usdc, a pure SEP-41 Soroban token with no issuer and so
+     * no classic payment record to carry a memo. Preview pays for real, so
+     * scripts/setup-demo-asset.mjs issued a classic one and both networks now
+     * have an issuer, a trustline and the same deposit path.
+     *
+     * `usdcId` still points at the Soroban token. It backs the dormant
+     * escrow and is no longer on the deposit rail — the two are separate
+     * assets that share a code.
      */
     usdcIssuer: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
     usdcCode: 'USDC',

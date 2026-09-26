@@ -16,13 +16,33 @@ const usdc = (issuer: string): AccountBalance => ({
 });
 
 describe('trustlines', () => {
-  it('testnet has no issuer, so it has no trustline step', () => {
-    // contracts/mock_usdc is a pure SEP-41 token. This is the whole reason
-    // the app has worked for months without any of this code.
-    assert.equal(DEPLOYMENTS.testnet.usdcIssuer, null);
-    assert.equal(usdcAsset('testnet'), null);
-    assert.equal(trustlineState([], 'testnet'), 'not-needed');
-    assert.equal(trustlineState(null, 'testnet'), 'not-needed');
+  it('RULE: every network asks for the trustline, so preview rehearses it', () => {
+    // This used to read the other way: testnet's USDC was contracts/mock_usdc,
+    // a pure SEP-41 token with no issuer, so `usdcAsset('testnet')` was null
+    // and the trustline step did not exist there. That was the whole reason
+    // the app worked for months without any of this code — and the whole
+    // reason a first real payment could fail on a step nobody had rehearsed.
+    //
+    // scripts/setup-demo-asset.mjs closed that gap by issuing a classic USDC
+    // on testnet, so preview now walks the same path mainnet does. Asserting
+    // it for *every* network rather than for testnet by name is the point:
+    // a network that quietly loses its issuer is back to the old asymmetry.
+    for (const net of NETWORK_IDS) {
+      const issuer = DEPLOYMENTS[net].usdcIssuer;
+      assert.ok(issuer, `${net} has no classic issuer — the trustline step would vanish there`);
+      assert.deepEqual(usdcAsset(net), { code: 'USDC', issuer });
+      assert.equal(trustlineState([], net), 'needed');
+      assert.equal(trustlineState(null, net), 'needed');
+      assert.equal(trustlineState([usdc(issuer)], net), 'ok');
+    }
+  });
+
+  it('a token with no issuer still needs nothing, on its own terms', () => {
+    // The pure half of the rule above, kept because the branch is still live:
+    // `contracts.usdc.id` is the Soroban token, it backs the dormant escrow,
+    // and a SEP-41 balance really does reach anybody who asks.
+    assert.equal(trustlineFor([], null), 'not-needed');
+    assert.equal(trustlineFor(null, null), 'not-needed');
   });
 
   it('RULE: an unconfigured network never asks for a trustline it cannot name', () => {
