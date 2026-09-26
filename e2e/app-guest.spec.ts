@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import { APP } from './support/app-copy';
 import { collectPageErrors, expectNoPageErrors } from './support/page-errors';
 import { POLLAR } from './support/pollar-copy';
 
@@ -23,7 +24,7 @@ test.describe('app guest', () => {
     // as visually hidden text after it.
     await expect(page.getByRole('heading', { level: 1, name: 'Changuito' })).toBeVisible();
     await expect(page.getByText('Contale a Changuito lo que necesitás')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Empezá a comprar' })).toBeVisible();
+    await expect(page.getByRole('button', { name: APP.loginAction })).toBeVisible();
 
     const composer = page.getByTestId('composer');
     const verification = page.getByRole('heading', {
@@ -83,7 +84,7 @@ test.describe('app guest', () => {
   test('login modal offers email and does not ask for a password', async ({ page }) => {
     const errors = collectPageErrors(page);
     await page.goto('/');
-    await page.getByRole('button', { name: 'Empezá a comprar' }).click();
+    await page.getByRole('button', { name: APP.loginAction }).click();
 
     const modal = page.locator('.pollar-modal');
     await expect(modal.getByText(POLLAR.subtitle)).toBeVisible();
