@@ -17,6 +17,7 @@ import { useChat } from '../lib/use-chat';
 import { useWalletSigner } from '../lib/use-wallet-signer.ts';
 import type { WalletSigner } from '../lib/wallet-proof.ts';
 import { CartCard } from './CartCard';
+import { useNetwork } from './NetworkProvider';
 import { RetryIcon } from './icons';
 import { CheckoutModal } from './CheckoutModal';
 import { ProductGrid } from './ProductGrid';
@@ -110,8 +111,9 @@ function ChatCore({
   /** The wallet's SEP-53 signer. Absent in a build without Pollar. */
   sign?: WalletSigner;
 }) {
+  const { network } = useNetwork();
   const { state, send, retry, stop, loginRequired, clearLoginRequired, resume, reset, currentSessionId } =
-    useChat({ isAuthenticated, address, sign });
+    useChat({ isAuthenticated, address, sign, network });
   const [draft, setDraft] = useState('');
   const placeholder = useComposerPlaceholder();
   // The basket the payment modal is open over. A cart, not a block id: the
