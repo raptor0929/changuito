@@ -8,6 +8,7 @@ import {
   parseWalletProofMessage,
   signWalletProof,
   WALLET_PROOF_TTL_MS,
+  type WalletIntent,
   walletProofMessage,
 } from '../wallet-proof.ts';
 import { verifySep53, verifyWalletProof } from '../wallet-proof-verify.ts';
@@ -16,6 +17,21 @@ const now = 1_790_000_000_000;
 const buyer = Keypair.random();
 const stranger = Keypair.random();
 const ORDER = 'a'.repeat(64);
+/**
+ * Every intent there is. Not a list kept by hand: `Record<WalletIntent, …>`
+ * makes the compiler refuse an incomplete one, so adding an intent to
+ * wallet-proof.ts and not to this file does not typecheck.
+ */
+const INTENTS: Record<WalletIntent, true> = {
+  login: true,
+  faucet: true,
+  deposit: true,
+  settle: true,
+  refund: true,
+  card: true,
+  orders: true,
+};
+const ALL_INTENTS = Object.keys(INTENTS) as WalletIntent[];
 const OTHER = 'b'.repeat(64);
 
 /** What Pollar's custodial signer and Freighter both produce for SEP-53. */
@@ -27,8 +43,22 @@ function sep53(kp: Keypair, message: string): string {
 const proof = (kp: Keypair, message: string) => ({ message, signature: sep53(kp, message) });
 
 describe('walletProofMessage', () => {
+  it('RULE: every intent that exists can be parsed back', () => {
+    // Generated from the type rather than listed, because listing is how the
+    // bug happened: `orders` was added to the intent table and the parser's
+    // alternation was not, so a real signature over a real message came back
+    // `proof_invalid` with nothing to say which half was stale. A test that
+    // enumerates by hand would have been updated in the same breath as the
+    // code and caught nothing.
+    for (const intent of ALL_INTENTS) {
+      const ref = intent === 'settle' || intent === 'refund' ? ORDER : undefined;
+      const parsed = parseWalletProofMessage(walletProofMessage(intent, buyer.publicKey(), now, ref));
+      assert.equal(parsed?.intent, intent, `${intent} did not parse back`);
+    }
+  });
+
   it('round-trips every intent', () => {
-    for (const intent of ['login', 'faucet', 'deposit', 'card'] as const) {
+    for (const intent of ['login', 'faucet', 'deposit', 'card', 'orders'] as const) {
       assert.deepEqual(parseWalletProofMessage(walletProofMessage(intent, buyer.publicKey(), now)), {
         intent,
         address: buyer.publicKey(),

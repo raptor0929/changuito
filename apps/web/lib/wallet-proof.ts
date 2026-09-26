@@ -23,7 +23,7 @@ export const WALLET_PROOF_TTL_MS = 5 * 60_000;
 /** Clocks disagree a little; a proof from slightly in the future is fine. */
 export const WALLET_PROOF_SKEW_MS = 60_000;
 
-export type WalletIntent = 'login' | 'faucet' | 'deposit' | 'settle' | 'refund' | 'card';
+export type WalletIntent = 'login' | 'faucet' | 'deposit' | 'settle' | 'refund' | 'card' | 'orders';
 
 const INTENT_TEXT: Record<WalletIntent, string> = {
   login: 'iniciar sesión',
@@ -32,6 +32,7 @@ const INTENT_TEXT: Record<WalletIntent, string> = {
   settle: 'confirmar la orden',
   refund: 'reembolsar la orden',
   card: 'ver los datos de mi tarjeta',
+  orders: 'ver mis compras',
 };
 
 /** Intents that are about one order, and so carry its id. */
@@ -48,6 +49,8 @@ const NEEDS_REF: Record<WalletIntent, boolean> = {
   // reads in their wallet, which is both meaningless to them and one more
   // place a card id appears.
   card: false,
+  // The list is every order this wallet has, so there is no one order to name.
+  orders: false,
 };
 
 export interface WalletProof {
@@ -71,8 +74,25 @@ export interface ParsedWalletProof {
   ref?: string;
 }
 
-const PATTERN =
-  /^Changuito: (iniciar sesión|cargar USDC de prueba|pagar la compra|confirmar la orden|reembolsar la orden|ver los datos de mi tarjeta)(?: ([0-9a-f]{64}))? con ([A-Z0-9]{56}) \((\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)\)$/;
+/**
+ * Built from `INTENT_TEXT` rather than spelled out.
+ *
+ * It was spelled out, and adding `orders` proved why that was wrong: the new
+ * intent signed and sent perfectly well, and every verifier refused it as
+ * `proof_invalid`, because the alternation here had not grown a sixth branch.
+ * A silent 401 on one intent is the worst shape that bug could take — the
+ * signature is real, the wallet approved it, and nothing says which half is
+ * out of date. Derived, the two cannot disagree.
+ *
+ * The values are Spanish words and spaces today, but escaping them costs one
+ * line and means a future intent with a `.` in it does not quietly become a
+ * wildcard that matches its neighbours.
+ */
+const PATTERN = new RegExp(
+  `^Changuito: (${Object.values(INTENT_TEXT)
+    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|')})(?: ([0-9a-f]{64}))? con ([A-Z0-9]{56}) \\((\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z)\\)$`,
+);
 
 export function parseWalletProofMessage(message: string): ParsedWalletProof | null {
   const m = PATTERN.exec(message);

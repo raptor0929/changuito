@@ -440,6 +440,12 @@ function ChatCore({
         <CheckoutModal
           cart={paying.cart}
           handoffUrl={paying.handoffUrl}
+          // The chat the server knows, which is the one `archiveChat` wrote —
+          // `publish` files the record under the agent's session id, so this
+          // is the same uuid `orders.chat_id` references. Undefined until the
+          // first turn lands, and in preview forever, which is correct: there
+          // is no row to be one order of.
+          chatId={shop?.activeChatId ?? undefined}
           onClose={() => setPaying(null)}
           // settle() closes the chat as well as filing the receipt: one chat
           // is one order, and this is the moment that becomes true.

@@ -138,6 +138,31 @@ try {
     await refuses(tx, 'an invented status is refused', '23514', (sp) =>
       sp`update orders set status = 'refunded' where chat_id = ${CHAT}`);
 
+    // markPaid, which the deposit poll runs every four seconds for as long as
+    // the dialog stays open — so "safe to repeat" is not a nicety here, it is
+    // the normal case. CHAT's order is at 'quoted' and has no hash.
+    const paid = (hash) => tx`update orders
+         set status  = case when status = 'quoted' then 'paid' else status end,
+             tx_hash = coalesce(tx_hash, ${hash})
+       where network='mainnet' and memo='chg-def456'
+         and (status = 'quoted' or tx_hash is null)
+       returning status, tx_hash`;
+    const first = await paid('tx_first');
+    check('the first confirmation marks the order paid',
+      first.length === 1 && first[0].status === 'paid' && first[0].tx_hash === 'tx_first',
+      JSON.stringify(first[0] ?? null));
+    check('the next poll updates nothing at all', (await paid('tx_second')).length === 0);
+
+    // The order moves on while the dialog is still polling. This is the one
+    // that matters: a plain `set status = 'paid'` would walk it backwards.
+    await tx`update orders set status='carded' where network='mainnet' and memo='chg-def456'`;
+    check('a confirmation after the card is issued does not undo it',
+      (await paid('tx_third')).length === 0);
+    const after = (await tx`select status, tx_hash from orders where network='mainnet' and memo='chg-def456'`)[0];
+    check('and the order is still carded, with the first hash on it',
+      after.status === 'carded' && after.tx_hash === 'tx_first',
+      `${after.status}/${after.tx_hash}`);
+
     // 0002 changed this from ON DELETE CASCADE. An order is a financial record
     // and a chat is a conversation: expiring a transcript under a retention
     // policy must orphan the order, never erase the evidence money moved.

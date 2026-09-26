@@ -38,10 +38,27 @@
  * and *not* that it has not already been spent. Issuing a card against a memo
  * is the step that must happen once, and that is where the once-only claim
  * lives — not here.
+ *
+ * ## The order row, which is not state this route reads back
+ *
+ * Both halves write one. POST opens the order the memo belongs to, because
+ * `POST /api/card` needs a row to latch its once-only claim onto; GET marks it
+ * paid when the payment shows up on the ledger, because the poll is the only
+ * place confirmation is ever observed and an order stuck at `quoted` for a
+ * shopper who has paid is a record that lies.
+ *
+ * Neither write changes what either half *answers*. The ledger is still the
+ * authority: GET reports what Horizon says whether or not the UPDATE lands,
+ * and a database that is down costs a record rather than a payment. That is
+ * why both are best-effort and logged, and why `markPaid` is monotonic — the
+ * browser polls every four seconds and keeps confirming long after the card
+ * has been issued.
  */
 import { arsToUsdCents, getArsPerUsd } from '@changuito/mcp/fx';
 
+import { modeKeepsRecords } from '../../../lib/app-mode.ts';
 import { canIssueCard, rememberDepositor } from '../../../lib/card.ts';
+import { hasDatabase, markPaid, openChatOrder } from '../../../lib/db.ts';
 import { DEFAULT_NETWORK, type NetworkId } from '../../../lib/deployments.ts';
 import { depositAddress, depositAsset, isMemo, mintMemo, type DepositAsset } from '../../../lib/deposit.ts';
 import { authorizeRealMode, realModeNeedsProof } from '../../../lib/deposit-gate.ts';
@@ -101,6 +118,10 @@ export interface DepositStatus {
  */
 const BUFFER = 0.15;
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
 function networkFrom(value: string | null): NetworkId {
   return value === 'mainnet' || value === 'testnet' ? value : DEFAULT_NETWORK;
 }
@@ -134,7 +155,12 @@ export async function POST(req: Request): Promise<Response> {
   } catch {
     return Response.json({ error: 'body must be JSON' }, { status: 400 });
   }
-  const input = (body ?? {}) as { centavos?: unknown; network?: unknown; address?: unknown };
+  const input = (body ?? {}) as {
+    centavos?: unknown;
+    network?: unknown;
+    address?: unknown;
+    chatId?: unknown;
+  };
 
   const centavos = Number(input.centavos);
   if (!Number.isInteger(centavos) || centavos <= 0) {
@@ -142,6 +168,19 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const network = networkFrom(typeof input.network === 'string' ? input.network : null);
+
+  // The conversation this basket came out of, when there is one. Absent is
+  // ordinary — preview has no chat to file anything against — but a string
+  // that is not a uuid is a bug in the caller, and `chat.id` is a uuid. Said
+  // out loud rather than dropped: silently ignoring it would open a second
+  // order for a chat that already has one, which is the rule this carries.
+  let chatId: string | undefined;
+  if (input.chatId !== undefined && input.chatId !== null) {
+    if (typeof input.chatId !== 'string' || !UUID.test(input.chatId)) {
+      return Response.json({ error: 'chatId must be a uuid' }, { status: 400 });
+    }
+    chatId = input.chatId;
+  }
 
   // Before anything that costs, and before the operator address is even looked
   // up. A wallet that may not use this network is told so and nothing else.
@@ -168,28 +207,73 @@ export async function POST(req: Request): Promise<Response> {
     const rate = await getArsPerUsd(Number.isFinite(override) && override > 0 ? { override } : {});
     const usdCents = arsToUsdCents(centavos, rate.arsPerUsd, BUFFER);
 
-    const memo = mintMemo();
-
     // The order is opened for every memo, so the claim latch that `POST
     // /api/card` needs always has a row to latch onto. The *address* is written
     // only where the signature above actually proved one: in mode 'open'
     // nothing was proven, so recording the claimed address would be writing
     // down a guess and then trusting it later — and `POST /api/card` skips the
     // ownership check in that mode for exactly the same reason.
+    const depositor = realModeNeedsProof(auth.mode)
+      ? (input.address as string).trim().toUpperCase()
+      : undefined;
+
+    // One chat is one order, and this is where that stops being a rule the
+    // browser keeps. ShopProvider already refuses to let a shopper type a
+    // second basket into a paid chat; this refuses to *quote* one, which is
+    // the half that matters, because a rule about money does not get to live
+    // in a browser.
+    //
+    // The memo comes back from the database rather than from `mintMemo()` when
+    // a chat already has an unclaimed order: a deposit sent against the old
+    // código still matches, so a shopper who paid and then reloaded is not
+    // stranded with real money against a memo nothing will ever look for.
+    const order = chatId && modeKeepsRecords(network) && hasDatabase()
+      ? await openChatOrder({
+          network,
+          chatId,
+          memo: mintMemo(),
+          address: depositor,
+          amountCents: usdCents,
+          arsQuoted: centavos,
+        }).catch((err) => {
+          console.error('[deposit] could not open the chat order:', message(err));
+          return null;
+        })
+      : null;
+
+    if (order?.kind === 'closed') {
+      return Response.json(
+        {
+          error: 'order_closed',
+          message: 'Esta conversación ya tiene una compra. Empezá un chat nuevo para comprar de nuevo.',
+        },
+        { status: 409 },
+      );
+    }
+    if (order && !order.linked) {
+      // The order exists and works; it just is not filed under the chat, so
+      // the one-per-chat rule is not holding it. Worth a line, because the
+      // cause is upstream — a conversation that never got archived.
+      console.warn(`[deposit] ${network}:${order.order.memo} opened without chat ${chatId}`);
+    }
+
+    const memo = order?.order.memo ?? mintMemo();
+
+    // No chat id, or no database to file one against: the old path, which
+    // records the same fact with no conversation attached.
     //
     // A failure here is not the shopper's problem *yet*. It becomes one when
     // they try to mint a card, which refuses rather than let an unowned memo
     // through. Loud, because the recovery is a manual refund.
-    const depositor = realModeNeedsProof(auth.mode)
-      ? (input.address as string).trim().toUpperCase()
-      : undefined;
-    await rememberDepositor(network, memo, {
-      address: depositor,
-      amountCents: usdCents,
-      arsQuoted: centavos,
-    }).catch((err) => {
-      console.error('[deposit] could not record the deposit:', err instanceof Error ? err.message : String(err));
-    });
+    if (!order) {
+      await rememberDepositor(network, memo, {
+        address: depositor,
+        amountCents: usdCents,
+        arsQuoted: centavos,
+      }).catch((err) => {
+        console.error('[deposit] could not record the deposit:', message(err));
+      });
+    }
 
     const intent: DepositIntent = {
       network,
@@ -209,8 +293,7 @@ export async function POST(req: Request): Promise<Response> {
     // assertSaneRate throws rather than returning a bad number. Refusing to
     // quote is correct: the alternative is pricing a basket off a feed that
     // said one peso to the dollar.
-    const message = err instanceof Error ? err.message : String(err);
-    return Response.json({ error: `no pudimos cotizar el carrito: ${message}` }, { status: 502 });
+    return Response.json({ error: `no pudimos cotizar el carrito: ${message(err)}` }, { status: 502 });
   }
 }
 
@@ -236,6 +319,15 @@ export async function GET(req: Request): Promise<Response> {
       memo,
       minAmount: amount,
     });
+    if (hit) {
+      // Best effort, and deliberately not awaited into the answer: the ledger
+      // said the money arrived, and that is true whether or not the row can be
+      // written. Failing the poll over a database would tell a shopper who has
+      // paid that they have not.
+      await markPaid(network, memo, hit.txHash).catch((err) => {
+        console.error(`[deposit] ${network}:${memo} confirmed but not recorded:`, message(err));
+      });
+    }
     const body: DepositStatus = hit
       ? { status: 'confirmed', txHash: hit.txHash, amount: hit.amount, at: hit.at }
       : { status: 'waiting' };
@@ -243,8 +335,7 @@ export async function GET(req: Request): Promise<Response> {
   } catch (err) {
     // Horizon being unreachable is not "no deposit" — saying so would tell a
     // shopper who has already paid that they have not.
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[deposit] horizon read failed:', message);
+    console.error('[deposit] horizon read failed:', message(err));
     return Response.json({ error: 'no pudimos consultar la red en este momento' }, { status: 502 });
   }
 }

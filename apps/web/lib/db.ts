@@ -212,6 +212,126 @@ export async function openOrder(o: {
 }
 
 /**
+ * The chat's order, opened or amended — the "one order per chat" rule, made
+ * useful instead of merely enforced.
+ *
+ * `unique (chat_id)` already says a chat cannot have two orders, but on its own
+ * it says it by throwing 23505 at the second quote, and a second quote is
+ * ordinary: a shopper closes the payment dialog, changes the basket and opens
+ * it again. So the rule is read forwards here. A chat that already has an order
+ * nobody has paid a card out of gets **that order amended and its memo handed
+ * back**, which is better than a fresh memo for three reasons:
+ *
+ * - a deposit already sent against the old memo still matches, so a shopper who
+ *   paid and then reloaded is not stranded with money against a dead código;
+ * - the row keeps its `created_at`, so the record says when the shopper started
+ *   rather than when they last changed their mind;
+ * - there is only ever one row per chat to reconcile against the ledger.
+ *
+ * `closed` is the other answer: the order already bought a card, or it finished.
+ * That chat is over — one chat is one order — and the caller refuses rather than
+ * opening a second the shopper could not pay for anyway.
+ *
+ * `select … for update` locks the chat's row for the amend. It cannot lock a row
+ * that is not there yet, so two first quotes in one chat can both reach the
+ * insert and one loses on `orders_one_per_chat`; that loser re-reads and
+ * amends, which is the same answer it would have got by arriving a moment later.
+ *
+ * ## `linked: false`, and why it is not a failure
+ *
+ * `orders.chat_id` references `chat (id)`, and the chat row is written by
+ * `archiveChat` after a clean turn. That is nearly always already true by the
+ * time anyone reaches checkout — a shopper has to talk to the agent to get a
+ * basket — but "nearly always" is not a constraint, and the gap is real: an
+ * archive write that failed, or a signed-in shopper on a deployment where the
+ * archive is off. The insert then raises 23503 and the honest answer is to open
+ * the order **without** the link rather than refuse to quote, because the row
+ * is what `POST /api/card` reads to decide whether a memo has an owner, and a
+ * shopper who cannot get a memo cannot pay at all.
+ *
+ * What is lost is the one-order-per-chat rule for that order, which is what
+ * `linked` reports so the caller can say so in the log. The insert runs in a
+ * savepoint because in Postgres one error aborts the whole transaction: without
+ * it the retry would die at 25P02 rather than inserting.
+ */
+export type ChatOrder =
+  | { kind: 'open'; order: OrderRow; linked: boolean }
+  | { kind: 'closed'; order: OrderRow };
+
+export interface ChatOrderInput {
+  network: NetworkId;
+  chatId: string;
+  /** The memo to use only if this chat has no order yet. */
+  memo: string;
+  amountCents: number;
+  address?: string | null;
+  arsQuoted?: number | null;
+  cartId?: string | null;
+}
+
+/** Spoken for: a card was bought against it, or it is over. */
+const settled = (o: OrderRow): boolean => Boolean(o.cardId) || o.status === 'done' || o.status === 'failed';
+
+/**
+ * A transaction, structurally. `Sql` is the top-level client type and does not
+ * carry `savepoint`, and postgres.js's own `TransactionSql` is not exported
+ * from the shape this file imports — so the one method that is actually needed
+ * is named here rather than casting the whole thing to `any` at the call site.
+ */
+type Tx = Sql & { savepoint: <T>(fn: (sp: Sql) => Promise<T>) => Promise<T> };
+
+export async function openChatOrder(o: ChatOrderInput): Promise<ChatOrder> {
+  const insert = async (tx: Sql, chatId: string | null) => {
+    const rows = await tx`
+      insert into orders (network, memo, address, chat_id, amount_cents, ars_quoted, cart_id)
+      values (${o.network}, ${o.memo}, ${o.address ?? null}, ${chatId},
+              ${o.amountCents}, ${o.arsQuoted ?? null}, ${o.cartId ?? null})
+      on conflict (network, memo) do update
+         set amount_cents = excluded.amount_cents,
+             ars_quoted   = coalesce(excluded.ars_quoted, orders.ars_quoted),
+             cart_id      = coalesce(excluded.cart_id, orders.cart_id),
+             address      = coalesce(orders.address, excluded.address),
+             chat_id      = coalesce(orders.chat_id, excluded.chat_id)
+      returning *`;
+    return toOrder(rows[0]!);
+  };
+
+  const run = async (tx: Tx): Promise<ChatOrder> => {
+    const held = await tx`select * from orders where chat_id = ${o.chatId} for update`;
+    if (held[0]) {
+      const prior = toOrder(held[0]);
+      if (settled(prior)) return { kind: 'closed', order: prior };
+      const rows = await tx`
+        update orders
+           set amount_cents = ${o.amountCents},
+               ars_quoted   = coalesce(${o.arsQuoted ?? null}, ars_quoted),
+               cart_id      = coalesce(${o.cartId ?? null}, cart_id),
+               address      = coalesce(address, ${o.address ?? null})
+         where network = ${prior.network} and memo = ${prior.memo}
+         returning *`;
+      return { kind: 'open', order: toOrder(rows[0]!), linked: true };
+    }
+    try {
+      return { kind: 'open', order: await tx.savepoint((sp) => insert(sp, o.chatId)), linked: true };
+    } catch (err) {
+      // No chat row to point at yet. Quote anyway — see the header.
+      if ((err as { code?: string }).code !== '23503') throw err;
+      return { kind: 'open', order: await insert(tx, null), linked: false };
+    }
+  };
+
+  try {
+    return (await db().begin((tx) => run(tx as unknown as Tx))) as unknown as ChatOrder;
+  } catch (err) {
+    // Lost the race to be this chat's first order. The winner's row is the
+    // answer, so read it and amend it — one more round-trip on a path that
+    // happens when a shopper double-taps, and never otherwise.
+    if ((err as { code?: string }).code !== '23505') throw err;
+    return (await db().begin((tx) => run(tx as unknown as Tx))) as unknown as ChatOrder;
+  }
+}
+
+/**
  * Link an order to the conversation that produced it.
  *
  * Separate from `openOrder` because the chat id arrives later and from a
@@ -282,6 +402,33 @@ export async function markOrder(
            tx_hash     = coalesce(${extra.txHash ?? null}, tx_hash),
            handoff_url = coalesce(${extra.handoffUrl ?? null}, handoff_url)
      where network = ${net} and memo = ${memo}`;
+}
+
+/**
+ * The deposit landed, and the order says so from now on.
+ *
+ * Monotonic, and that is the whole design. The browser polls `GET /api/deposit`
+ * every four seconds and keeps confirming the same payment for as long as the
+ * dialog is open — including after `claimOrder` has moved the order to
+ * `carded` — so a plain `set status = 'paid'` would walk a carded order
+ * backwards once every four seconds. `case when status = 'quoted'` is what
+ * makes the write safe to repeat.
+ *
+ * The hash is recorded either way: it is evidence that this memo was paid by
+ * that transaction, and that stays true whatever the status has moved on to.
+ *
+ * The WHERE clause excludes the rows that would not change, rather than
+ * updating them to themselves. `orders_touch` fires on every UPDATE, so
+ * without it a dialog left open would bump `updated_at` every four seconds and
+ * the order's own record of when anything last happened to it would be a clock.
+ */
+export async function markPaid(net: NetworkId, memo: string, txHash: string): Promise<void> {
+  await db()`
+    update orders
+       set status  = case when status = 'quoted' then 'paid' else status end,
+           tx_hash = coalesce(tx_hash, ${txHash})
+     where network = ${net} and memo = ${memo}
+       and (status = 'quoted' or tx_hash is null)`;
 }
 
 /** A customer's orders, newest first, for /mis-compras. */

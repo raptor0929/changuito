@@ -88,6 +88,14 @@ import { useNetwork } from './NetworkProvider';
 interface Props {
   cart: Cart;
   handoffUrl?: string;
+  /**
+   * The conversation this basket came out of, when it has one and the server
+   * could have filed it. One chat is one order, and the server is where that
+   * is actually held — ShopProvider refuses to let a shopper *type* a second
+   * basket into a paid chat, and `POST /api/deposit` refuses to quote one.
+   * Absent in preview, where nothing is recorded at all.
+   */
+  chatId?: string;
   onClose: () => void;
   onPaid: (receipt: Receipt) => void;
 }
@@ -132,7 +140,7 @@ const IDENTIFY_PATIENCE = 4;
 /** Stop asking eventually; the manual button is always there. */
 const IDENTIFY_MAX = 12;
 
-function CheckoutDialog({ cart, handoffUrl, onClose, onPaid, address, sign }: DialogProps) {
+function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, sign }: DialogProps) {
   const { network } = useNetwork();
   const copy = checkoutCopy(network);
 
@@ -253,7 +261,7 @@ function CheckoutDialog({ cart, handoffUrl, onClose, onPaid, address, sign }: Di
         const res = await fetch('/api/deposit', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ centavos: cart.total.centavos, network, address, proof }),
+          body: JSON.stringify({ centavos: cart.total.centavos, network, address, proof, chatId }),
         });
         const body = await res.json();
         if (!res.ok) {
@@ -268,7 +276,7 @@ function CheckoutDialog({ cart, handoffUrl, onClose, onPaid, address, sign }: Di
         setMintError('No pudimos preparar el pago. Revisá la conexión y volvé a intentar.');
       }
     })();
-  }, [cart.total.centavos, network, mode, address, sign]);
+  }, [cart.total.centavos, network, mode, address, sign, chatId]);
 
   // Poll until it lands. A 502 is the network being unreadable, not a missing
   // importe, so it leaves the screen saying "esperando" rather than "no llegó".
