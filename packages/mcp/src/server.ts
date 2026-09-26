@@ -200,7 +200,8 @@ export function registerCatalogTools(
       title: 'Add products to the cart',
       description:
         'Add one or more SKUs to the cart, creating it on first use. Use the sku and seller from ' +
-        'search_products. This does not buy anything.',
+        'search_products. This does not buy anything. Returns the cart as it now stands, so the ' +
+        'caller never has to re-read it to know what changed.',
       inputSchema: {
         items: z
           .array(
@@ -212,6 +213,7 @@ export function registerCatalogTools(
           )
           .min(1),
       },
+      outputSchema: CartOutput,
     },
     async ({ items }) => {
       try {
@@ -223,7 +225,7 @@ export function registerCatalogTools(
           ctx,
         );
         session.rememberCart(ctx.retailer, cart.cartId);
-        return text(renderCart(cart));
+        return { ...text(renderCart(cart)), structuredContent: { cart } };
       } catch (e) {
         return fail(e instanceof Error ? e.message : String(e));
       }
@@ -234,17 +236,20 @@ export function registerCatalogTools(
     'update_cart_item',
     {
       title: 'Change quantity or remove a line',
-      description: 'Set the quantity of a cart line by its index. Quantity 0 removes it.',
+      description:
+        'Set the quantity of a cart line by its index. Quantity 0 removes it. Returns the ' +
+        'cart as it now stands, so the caller never has to re-read it to know what changed.',
       inputSchema: {
         index: z.number().int().min(0).describe('Line index shown by view_cart.'),
         quantity: z.number().int().min(0).describe('New quantity; 0 removes the line.'),
       },
+      outputSchema: CartOutput,
     },
     async ({ index, quantity }) => {
       try {
         const { cart: current, ctx } = await session.ensureCart();
         const cart = await getAdapter(ctx.retailer).setQuantity(current.cartId, index, quantity, ctx);
-        return text(renderCart(cart));
+        return { ...text(renderCart(cart)), structuredContent: { cart } };
       } catch (e) {
         return fail(e instanceof Error ? e.message : String(e));
       }

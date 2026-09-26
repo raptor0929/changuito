@@ -144,7 +144,18 @@ describe('over a real MCP transport', () => {
     const structured = tools.filter((t) => t.outputSchema).map((t) => t.name).sort();
     // Anything else is read by the model, not rendered, and a schema it does
     // not need is a schema that can drift.
-    assert.deepEqual(structured, ['get_cart_link', 'search_products', 'view_cart']);
+    //
+    // add_to_cart and update_cart_item are on this list because they change
+    // what a UI is drawing. Leaving them off meant a renderer's cart went
+    // stale on the one call that made it stale, and the model had to know to
+    // re-read it before showing the basket again.
+    assert.deepEqual(structured, [
+      'add_to_cart',
+      'get_cart_link',
+      'search_products',
+      'update_cart_item',
+      'view_cart',
+    ]);
     await c.close();
   });
 

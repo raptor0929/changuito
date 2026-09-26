@@ -8,6 +8,7 @@ import { CHANGUITO_PROMPT, stateBanner } from './prompt';
 import { selectBrains } from './provider';
 import type { HopResult } from './providers/types';
 import {
+  autoRenderCart,
   emptyCache,
   RENDER_TOOLS,
   RENDER_TOOL_NAMES,
@@ -269,6 +270,14 @@ export async function runTurn(
         }
 
         if (traced) emit({ t: 'tool_end', id: use.id, ok: result.is_error !== true, ms: Date.now() - t });
+
+        // After the trail row closes, so the card lands under a finished line
+        // rather than beside a spinner. The basket is the one thing on screen
+        // that is not a recommendation — there is exactly one and the user
+        // built it — so a change to it draws itself instead of waiting for the
+        // model to call render_cart. See autoRenderCart in render-tools.ts.
+        autoRenderCart(turn.cache, emit);
+
         results.push(result);
       }
 

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Machine-readable shapes for the three tools a UI draws.
+ * Machine-readable shapes for the tools a UI draws.
  *
  * The text a tool returns is written for a model to read: padded columns, an
  * "(was $4.200,00)" suffix, "$3.150,00" in AR locale. A grid that regexes that
@@ -59,7 +59,16 @@ export const CartSchema = z.object({
 /** search_products */
 export const ProductsOutput = { products: z.array(ProductSchema) };
 
-/** view_cart */
+/**
+ * view_cart, and the two tools that change the cart.
+ *
+ * `add_to_cart` and `update_cart_item` used to return text only. They are the
+ * only two tools that *change* the basket, and they were the only two that did
+ * not say so structurally — so a renderer holding the cart had a stale copy the
+ * moment either was called, and drawing it showed the old lines, the old total
+ * and a link to a basket that no longer matched. The fix is for the tool that
+ * made the change to report it, not for the caller to remember to look again.
+ */
 export const CartOutput = { cart: CartSchema };
 
 /** get_cart_link — the cart plus where the user finishes the job. */

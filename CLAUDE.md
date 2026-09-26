@@ -51,36 +51,81 @@ put it in. That matters most directly above a button that spends money.
 If you add a render tool, keep the property. The moment an input carries a
 value rather than a reference, the grid can be wrong.
 
-### 2. The cart is drawn once per turn
+### 2. The cart draws itself, and §1 does not apply to it
 
-*Today. The bug: two cart cards in one reply, the first without a link.*
+*First the bug: two cart cards in one reply, the first without a link. Then the
+opposite bug, which the fix for the first one caused.*
 
 `render_cart` used to be called twice on purpose — once when the basket was
 built, once after `get_cart_link` so the card carried the link. Both appended,
 so the user read a cart, then the same cart again. It looks like the order went
-through twice, which is an alarming thing to show someone mid-payment.
+through twice, which is an alarming thing to show someone mid-payment. So the
+prompt and the tool description were tightened to *once*, and `chat-state.ts`
+learned to dedupe as well, because a prompt is a request and not a guarantee.
 
-Fixed in three places at once, because one alone would have been a patch:
+Once cost the shopper the other half. Asked to change something, the model
+changed it and then pointed at the card already on screen — the old lines, the
+old total, "usá el mismo link". Which was **true**: `handoffUrl` is derived from
+the cart id (`?orderFormId=…#/cart`) and does not move when lines change. And
+useless, because the products and the amount above the pay button were the ones
+from before.
 
-- **`prompt.ts`** now orders the flow `add_to_cart` → `get_cart_link` →
-  `render_cart` *once*. Rendering before the link exists draws a card the user
-  cannot act on.
-- **`render-tools.ts`**'s `render_cart` description used to say "call this after
-  any change to the cart", which actively asked for the second call. It now says
-  the same thing as the prompt. When these two disagree the tool description
-  wins, so they must not disagree.
-- **`chat-state.ts`** dedupes anyway. A prompt is a request, not a guarantee —
-  the model will render twice again eventually, and the UI should survive it.
+**The cart is not the kind of thing §1 is about.** §1 is a set of twelve search
+results and three recommendations — *which* to surface is a decision, so it is a
+call. There is exactly one cart, the user built it, and its current contents are
+not a choice anybody is making. Making the model ask to show them meant the
+screen was right only when it remembered to.
 
-The reducer's rule: a `cart` event for a cartId already shown **in the current
-turn** replaces that block in place, keeping its `id` (React keys off it, and a
-fresh id unmounts and re-animates the card — which looks exactly like the
-duplicate it replaced) and never dropping a `handoffUrl` it already had.
+So the basket draws itself. `autoRenderCart` in `render-tools.ts` runs from the
+loop after **every** tool, and emits a `cart` event when the basket's
+fingerprint has changed since the last card. Four parts hold it up:
+
+- **The tools that change the cart now say so.** `add_to_cart` and
+  `update_cart_item` returned text only — no `outputSchema`, no
+  `structuredContent` — so `RenderCache.cart` went stale on the one call that
+  made it stale, and even an explicit `render_cart` would have drawn the old
+  lines. They declare `CartOutput` and return the cart they produced. If you add
+  a tool that touches the basket, it reports the basket.
+- **The fingerprint is the card, not the total.** `cardPrint` covers the cart id,
+  the total, the link and every line's index, sku, quantity, line total and
+  availability. A swap for another item at the same price changes the card and
+  not the total.
+- **Nothing is drawn without a link that opens *this* cart.** `handoffFor`
+  records which cartId `handoffUrl` belongs to, at `get_cart_link`, the one
+  moment the pairing is known. A card whose only actionable control is missing
+  is the first bug again; a link carried onto a different basket opens somebody
+  else's.
+- **`drawn` and `handoffFor` ride in `turn-store.ts` as optional fields**, not a
+  `v: 2`. A version bump resets every conversation in flight at deploy time,
+  which is a worse trade than one redundant card.
+
+`render_cart` survives for the one job left to it: bringing an *unchanged*
+basket back after a question about it. Its description says so, and says never
+to answer a change by pointing at a card already on screen. When the description
+and the prompt disagree the description wins, so they must not disagree.
+
+`chat-state.ts`'s dedupe is now load-bearing rather than a backstop, because the
+automatic render is what mostly draws. Its rule: a `cart` event for a cartId
+already shown **in the current turn** replaces that block in place, keeping its
+`id` (React keys off it, and a fresh id unmounts and re-animates the card —
+which looks exactly like the duplicate it replaced) and never dropping a
+`handoffUrl` it already had.
 
 Scoped to the current turn deliberately. A cart shown three messages ago is a
 record of what the basket was *then*; merging across turns would rewrite history
-the user has already scrolled past. `lib/test/chat-state.test.ts` pins all of
-this, including the not-merging case.
+the user has already scrolled past. `lib/test/chat-state.test.ts` pins that, and
+`lib/test/render-tools.test.ts` pins the automatic render — including the cases
+where it must *not* fire.
+
+**Product grids are the other half of the same complaint** and got the opposite
+treatment, because §1 does apply to them. The images only ever appeared for the
+first search: nothing asked for a `render_products` after a second one, so a
+shopper who said "mostrame más" got names in prose and had to ask for the
+pictures. The lever there is the prompt and the tool description, since
+auto-rendering search results would surface twelve items the model did not
+recommend. Both now require a call for **every** search whose results the model
+mentions — a later page, another brand, a replacement for something out of
+stock.
 
 ### 3. The tool trail shows work, not drawing
 

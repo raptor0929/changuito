@@ -51,6 +51,15 @@ interface StoredTurn {
   products: [string, Product][];
   cart?: Cart;
   handoffUrl?: string;
+  /**
+   * Which cart the link opens, and what the last cart card showed. Both are
+   * new, and both are optional rather than a `v: 2` — a version bump resets
+   * the history of every conversation in flight at deploy time, which is a
+   * worse trade than one turn without a link on a card that already had one.
+   * See autoRenderCart in render-tools.ts.
+   */
+  handoffFor?: string;
+  drawn?: string;
 }
 
 export function encodeTurn(turn: Turn): StoredTurn {
@@ -60,6 +69,8 @@ export function encodeTurn(turn: Turn): StoredTurn {
     products: [...turn.cache.products],
     cart: turn.cache.cart,
     handoffUrl: turn.cache.handoffUrl,
+    handoffFor: turn.cache.handoffFor,
+    drawn: turn.cache.drawn,
   };
 }
 
@@ -76,7 +87,13 @@ export function decodeTurn(raw: unknown): Turn | undefined {
 
   return {
     messages: s.messages,
-    cache: { products: new Map(s.products), cart: s.cart, handoffUrl: s.handoffUrl },
+    cache: {
+      products: new Map(s.products),
+      cart: s.cart,
+      handoffUrl: s.handoffUrl,
+      handoffFor: s.handoffFor,
+      drawn: s.drawn,
+    },
   };
 }
 
