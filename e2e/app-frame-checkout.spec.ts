@@ -32,8 +32,13 @@ import { collectPageErrors, expectNoPageErrors } from './support/page-errors';
  * the reasons `support/checkout-fixtures.ts` sets out. They have been
  * exercised for real elsewhere and separately:
  *
- * - the deposit, against real testnet Horizon — a 4.6600000 XLM payment
- *   carrying its código, read back and matched by `/api/deposit`;
+ * - the deposit, against real testnet Horizon. This used to carry the caveat
+ *   that it exercised neither the trustline nor the classic-asset match,
+ *   because testnet quoted native XLM: mock USDC there was a Soroban token
+ *   with no classic payment record to put a memo on. That caveat is gone.
+ *   Preview now pays a classic USDC issued for it, so the leg rehearsed is
+ *   the one production runs — trustline, asset code and issuer matched,
+ *   código in the memo — with play money;
  * - the card issue path, against the real Vyrion API with a deliberately
  *   invalid `sk_test_` key, which proved the ordering and the redaction of the
  *   provider's error and nothing beyond it. **The mint itself has never run
@@ -149,6 +154,13 @@ test.describe('frame checkout', () => {
     expect(calls.verify).toBe(1);
     // And the card was given back in the same breath as the receipt: a card
     // left alive is money sitting somewhere nobody is watching.
+    //
+    // This spec runs in preview, where the card is minted per código and dies
+    // with the basket, so one call is right. In production it would be zero —
+    // there the card is the customer's, `release()` does not fire, and
+    // `POST /api/card/terminate` refuses it anyway. That asymmetry is the
+    // whole of commit H, and this line only pins the half this project can
+    // reach: the other half is in lib/test/card-terminate-route.test.ts.
     await expect.poll(() => calls.terminate, { timeout: 10_000 }).toBe(1);
 
     const receipt = page.getByTestId('receipt');
