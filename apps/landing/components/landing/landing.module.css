@@ -565,7 +565,7 @@
 
 .compareRow {
   display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr) auto;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
   gap: 10px;
   align-items: center;
 }
@@ -598,16 +598,6 @@
 
 .barLong {
   width: 100%;
-}
-
-.savePill {
-  background: var(--sun);
-  color: var(--ink);
-  font-weight: 800;
-  font-size: 0.875rem;
-  line-height: 1;
-  border-radius: 999px;
-  padding: 6px 10px;
 }
 
 /* Product demo. Final frame is the default so reduced motion, print and

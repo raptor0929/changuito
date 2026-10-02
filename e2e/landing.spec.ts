@@ -10,7 +10,14 @@ test.describe('landing', () => {
     await expect(page.getByRole('heading', { level: 1, name: /Decile qué querés cocinar/ })).toBeVisible();
     await expect(page.getByText('Compara precios entre supermercados').first()).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: 'Le hablás como a alguien de tu casa' })).toBeVisible();
-    await expect(page.getByText(/AquePrecio/)).toBeVisible();
+    await expect(
+      page.getByText('El mismo producto no cuesta igual en cada cadena. Changuito los pone juntos y te muestra la diferencia.'),
+    ).toBeVisible();
+    await expect(page.getByText(/AquePrecio/)).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Changuito en LinkedIn' })).toHaveAttribute(
+      'href',
+      'https://www.linkedin.com/company/appchanguito/',
+    );
 
     const nav = page.getByRole('navigation', { name: 'Principal' });
     await expect(nav.getByRole('link', { name: 'Cómo funciona' })).toBeVisible();

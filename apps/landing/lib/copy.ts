@@ -46,7 +46,7 @@ export const STEPS = [
 
 export const COMPARE = {
   title: 'Compara entre súper y te muestra cuánto ahorrás',
-  body: 'Según la cadena, el mismo producto puede costar más de 40% más (AquePrecio).',
+  body: 'El mismo producto no cuesta igual en cada cadena. Changuito los pone juntos y te muestra la diferencia.',
 } as const;
 
 export const USES_TITLE = 'Para la semana, el asado o el plan de tu nutricionista';
@@ -128,6 +128,12 @@ export const SOCIAL = [
     label: 'Instagram',
     ariaLabel: 'Changuito en Instagram',
     icon: 'instagram',
+  },
+  {
+    href: 'https://www.linkedin.com/company/appchanguito/',
+    label: 'LinkedIn',
+    ariaLabel: 'Changuito en LinkedIn',
+    icon: 'linkedin',
   },
 ] as const;
 
