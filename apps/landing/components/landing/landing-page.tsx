@@ -1,7 +1,6 @@
 import {
-  BENEFITS,
-  BENEFITS_TITLE,
   BOFU,
+  COMPARE,
   FAQ_TITLE,
   FOOTER,
   HERO,
@@ -10,10 +9,13 @@ import {
   SOCIAL,
   STEPS,
   STEPS_TITLE,
+  USES,
+  USES_TITLE,
 } from '../../lib/copy';
 import { FounderTrust } from '@changuito/trust/ui';
 import { BrandLockup } from './brand-lockup';
 import { FaqList } from './faq-list';
+import { HeroDemo } from './hero-demo';
 import { CheckIcon, InstagramIcon, StepIcon } from './icons';
 import { SiteHeader } from './site-header';
 import { TryLink } from './try-link';
@@ -37,29 +39,11 @@ export function LandingPage() {
                 {HERO.h1Rest}
               </h1>
               <p className={styles.sub}>{HERO.sub}</p>
-              <p className={styles.payLine}>{HERO.pay}</p>
               <div className={styles.heroActions}>
                 <TryLink testId="landing-cta-hero" />
               </div>
             </div>
-            <div className={styles.mascotFrame}>
-              {/* GIF plays by default. Reduced motion swaps to the locked still via CSS. */}
-              <img
-                className={`${styles.mascot} ${styles.mascotMotion}`}
-                src="/brand/animacion-cargando.gif"
-                alt="Le caen los productos al carrito de Changuito"
-                width={480}
-                height={360}
-                fetchPriority="high"
-              />
-              <img
-                className={`${styles.mascot} ${styles.mascotStill}`}
-                src="/brand/mascot-idle.png"
-                alt="Mascota de Changuito, un carrito sonriente con el súper"
-                width={397}
-                height={583}
-              />
-            </div>
+            <HeroDemo />
           </div>
         </section>
 
@@ -91,17 +75,50 @@ export function LandingPage() {
         </section>
 
         <section
+          id="ahorro"
           className={`${styles.section} ${styles.anchor}`}
-          aria-labelledby="beneficios-titulo"
-          data-testid="landing-benefits"
+          aria-labelledby="ahorro-titulo"
+          data-testid="landing-compare"
         >
           <div className={styles.sectionInner}>
-            <h2 id="beneficios-titulo" className={styles.h2}>
-              {BENEFITS_TITLE}
+            <h2 id="ahorro-titulo" className={styles.h2}>
+              {COMPARE.title}
             </h2>
-            <ul className={styles.benefits}>
-              {BENEFITS.map((item) => (
-                <li key={item.title} className={`${styles.card} ${styles.benefitCard}`}>
+            <div className={styles.compareLayout}>
+              <p className={styles.fact}>{COMPARE.body}</p>
+              <div className={styles.compareCard} aria-hidden="true">
+                <p className={styles.compareLabel}>Mismo producto</p>
+                <div className={styles.compareRow}>
+                  <span className={styles.compareChain}>Cadena A</span>
+                  <span className={styles.barTrack}>
+                    <span className={styles.barShort} />
+                  </span>
+                </div>
+                <div className={styles.compareRow}>
+                  <span className={styles.compareChain}>Cadena B</span>
+                  <span className={styles.barTrack}>
+                    <span className={styles.barLong} />
+                  </span>
+                  <span className={styles.savePill}>+40%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="ocasiones"
+          className={`${styles.section} ${styles.anchor}`}
+          aria-labelledby="usos-titulo"
+          data-testid="landing-uses"
+        >
+          <div className={styles.sectionInner}>
+            <h2 id="usos-titulo" className={styles.h2}>
+              {USES_TITLE}
+            </h2>
+            <ul className={styles.uses}>
+              {USES.map((item) => (
+                <li key={item.title} className={styles.card}>
                   <h3 className={styles.cardTitle}>{item.title}</h3>
                   <p className={styles.cardBody}>{item.body}</p>
                 </li>
@@ -120,15 +137,6 @@ export function LandingPage() {
             <h2 id="pagos-titulo" className={styles.h2}>
               {PAYMENTS.title}
             </h2>
-            <p className={styles.lead}>{PAYMENTS.lead}</p>
-            <ul className={styles.payGrid}>
-              {PAYMENTS.methods.map((method) => (
-                <li key={method.title} className={styles.card}>
-                  <h3 className={styles.cardTitle}>{method.title}</h3>
-                  <p className={styles.cardBody}>{method.body}</p>
-                </li>
-              ))}
-            </ul>
             <p className={styles.assurance}>
               <CheckIcon className={styles.assuranceIcon} />
               <span>{PAYMENTS.assurance}</span>
@@ -158,7 +166,7 @@ export function LandingPage() {
             </h2>
             <p className={styles.lead}>{BOFU.lead}</p>
             <div className={styles.bofuCta}>
-              <TryLink testId="landing-cta-bofu" />
+              <TryLink testId="landing-cta-bofu" label={BOFU.cta} />
             </div>
           </div>
         </section>

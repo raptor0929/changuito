@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { test } from 'node:test';
@@ -13,9 +12,8 @@ import {
 } from '../../../../packages/trust/src/copy.ts';
 import {
   APP_URL,
-  BENEFITS,
-  BENEFITS_TITLE,
   BOFU,
+  COMPARE,
   DESCRIPTION,
   FAQ,
   FOOTER,
@@ -26,6 +24,8 @@ import {
   SOCIAL,
   STEPS,
   STEPS_TITLE,
+  USES,
+  USES_TITLE,
 } from '../copy.ts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -75,14 +75,19 @@ test('footer social profiles point at @appchanguito', () => {
 });
 
 test('hero copy matches the locked brief', () => {
-  assert.equal(`${HERO.h1Lead} ${HERO.h1Rest}`, 'Pedí el súper inteligente');
+  assert.equal(
+    `${HERO.h1Lead} ${HERO.h1Rest}`,
+    'Decile qué querés cocinar. Changuito te arma el carrito.',
+  );
   assert.equal(
     HERO.sub,
-    'Changuito compara productos, arma el carrito y te deja listo para pagar.',
+    'Compara precios entre supermercados y te deja el carrito listo para pagar con tarjeta o USDC.',
   );
-  assert.equal(HERO.pay, 'Pagá con tarjeta o USDC.');
+  assert.equal('pay' in HERO, false);
   assert.equal(HERO.cta, 'Probar Changuito');
+  assert.equal(BOFU.cta, 'Sumate a la beta');
   assert.equal('secondary' in HERO, false);
+  assert.equal(PAYMENTS.title, 'Pagá con tarjeta o USDC');
   assert.equal(PAYMENTS.assurance, NO_CHARGE);
   const page = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
   const css = readFileSync(join(root, 'components/landing/landing.module.css'), 'utf8');
@@ -90,7 +95,8 @@ test('hero copy matches the locked brief', () => {
   assert.equal(page.includes('textLink'), false);
   assert.equal(css.includes('.textLink'), false);
   assert.equal(page.includes('id="como-funciona"'), true);
-  assert.equal(page.includes('/brand/animacion-cargando.gif'), true);
+  assert.equal(page.includes('/brand/animacion-cargando.gif'), false);
+  assert.equal(page.includes('<HeroDemo />'), true);
 });
 
 test('landing copy stays free of jargon and a refund promise', () => {
@@ -98,8 +104,9 @@ test('landing copy stays free of jargon and a refund promise', () => {
     HERO,
     STEPS,
     STEPS_TITLE,
-    BENEFITS,
-    BENEFITS_TITLE,
+    COMPARE,
+    USES,
+    USES_TITLE,
     PAYMENTS,
     FAQ,
     BOFU,
@@ -116,79 +123,90 @@ test('landing copy stays free of jargon and a refund promise', () => {
     'crypto',
     'web3',
     'stellar',
+    'soroban',
     'escrow',
     'mcp',
     'baloo',
     'devolvemos',
     'no inventados',
+    'más simple',
   ]) {
     assert.equal(blob.includes(word), false, word);
   }
   const withoutNoCharge = blob.split(NO_CHARGE.toLowerCase()).join('');
   assert.equal(withoutNoCharge.includes('no se completa'), false);
-  assert.equal(blob.split(NO_CHARGE.toLowerCase()).length - 1, 2);
-  assert.equal(STEPS.length, 4);
-  assert.equal(BENEFITS.length, 3);
+  assert.equal(blob.split(NO_CHARGE.toLowerCase()).length - 1, 1);
+  assert.equal(STEPS_TITLE, 'Le hablás como a alguien de tu casa');
+  assert.equal(STEPS.length, 3);
   assert.deepEqual(
-    BENEFITS.map((item) => item.title),
-    ['Simple', 'Sin pensar mucho', 'Local'],
+    STEPS.map((item) => item.title),
+    ['Pedís en tus palabras', 'Compara precios en vivo', 'Confirmás y pagás'],
   );
-  assert.equal(BENEFITS[0].body, 'Armá el súper sin pensar. Changuito empuja el carrito con vos.');
+  assert.equal(STEPS[1].body, 'Jumbo, Disco, Carrefour y Día, en el momento.');
+  assert.equal(COMPARE.title, 'Compara entre súper y te muestra cuánto ahorrás');
   assert.equal(
-    BENEFITS[1].body,
-    'Contale para qué ocasión preparás la comida y para cuántas personas, y Changuito se encarga de cada detalle por vos.',
+    COMPARE.body,
+    'Según la cadena, el mismo producto puede costar más de 40% más (AquePrecio).',
   );
-  assert.equal(
-    BENEFITS[2].body,
-    'Changuito te ayuda a ahorrar comparando precios entre varios supermercados y armándote el carrito como más te convenga.',
+  assert.equal(USES_TITLE, 'Para la semana, el asado o el plan de tu nutricionista');
+  assert.deepEqual(
+    USES.map((item) => item.title),
+    ['Asado para 12', 'Plan del nutricionista', 'Presupuesto semanal $40.000', 'Viandas para los chicos'],
   );
   assert.equal(FAQ.length, 4);
-  assert.equal(FAQ[2].q, '¿Qué pasa si falla la compra?');
-  assert.equal(FAQ[2].a, NO_CHARGE);
+  assert.equal(BOFU.title, 'Sumate a la beta');
   assert.equal(
-    STEPS[0].body,
-    'En lenguaje natural: la lista, una receta o lo de la juntada. Changuito busca y calcula con IA.',
-  );
-  assert.equal(
-    FAQ[0].a,
-    'No. Es un asistente de IA para el súper: le pedís en tu idioma lo que necesitás — una receta, una juntada, la lista de la semana — y Changuito busca, calcula y te arma el carrito.',
+    FAQ.map((item) => item.a).includes(NO_CHARGE),
+    false,
   );
 });
 
-test('the landing serves the loading GIF and not the éxito pose', () => {
+test('the hero is a coded product demo, not the loading GIF', () => {
   const page = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
+  const demo = readFileSync(join(root, 'components/landing/hero-demo.tsx'), 'utf8');
   const css = readFileSync(join(root, 'components/landing/landing.module.css'), 'utf8');
-  assert.equal(page.split('/brand/animacion-cargando.gif').length - 1, 1);
-  assert.equal(page.split('Le caen los productos al carrito de Changuito').length - 1, 1);
+  assert.equal(page.includes('/brand/animacion-cargando.gif'), false);
+  assert.equal(page.includes('animacion-busqueda'), false);
+  assert.equal(page.includes('mascot-exito'), false);
+  assert.equal(page.includes('landing-benefits'), false);
+  assert.equal(demo.includes('app.changuito.me'), false);
+  assert.match(demo, /Asado para 12 el sábado/);
+  assert.match(demo, /Buscando en Jumbo, Disco, Carrefour y Día…/);
+  assert.match(demo, /Pagá con USDC/);
+  assert.match(demo, /Pagar con tarjeta/);
+  assert.match(demo, /\$19\.340/);
+  assert.equal(demo.includes('<input'), false);
+  assert.equal(demo.includes('<button'), false);
   const payments = page.slice(
     page.indexOf('data-testid="landing-payments"'),
     page.indexOf('data-testid="landing-faq"'),
   );
   assert.equal(payments.includes('<img'), false);
-  assert.equal(payments.includes('payMascot'), false);
   assert.equal(payments.includes('animacion-'), false);
-  assert.equal(payments.includes('mascot-'), false);
-  assert.equal(css.includes('.payLayout'), false);
-  assert.equal(css.includes('.payMascot'), false);
-  assert.equal(page.includes('animacion-busqueda'), false);
-  assert.equal(page.includes('mascot-exito'), false);
-  assert.equal(page.includes('mascot-idle.png'), true);
+  assert.equal(payments.includes(NO_CHARGE), false);
+  assert.match(payments, /\{PAYMENTS\.assurance\}/);
   assert.equal(existsSync(join(root, 'public/brand/animacion-busqueda.gif')), false);
-  assert.equal(existsSync(join(root, 'public/brand/mascot-idle.png')), true);
   assert.equal(existsSync(join(root, 'public/brand/mascot-exito.png')), false);
-  const served = readFileSync(join(root, 'public/brand/animacion-cargando.gif'));
-  const branding = join(root, '../branding');
-  const master = readFileSync(join(branding, 'motion/animacion-cargando.gif'));
-  assert.equal(createHash('md5').update(served).digest('hex'), '662fec0a1f1102d26f8fd85c06b24c4f');
-  assert.equal(createHash('md5').update(master).digest('hex'), '662fec0a1f1102d26f8fd85c06b24c4f');
-  assert.equal(served.readUInt16LE(6), 480);
-  assert.equal(served.readUInt16LE(8), 360);
-  assert.equal(existsSync(join(branding, 'mascot/mascota-exito.png')), false);
-  assert.equal(existsSync(join(branding, '_discarded/mascota-exito.png')), true);
-  assert.equal(existsSync(join(branding, 'motion/animacion-busqueda.gif')), true);
+  const motion = css.slice(css.indexOf('@media (prefers-reduced-motion: no-preference)'));
+  assert.match(motion, /animation-duration:\s*20s/);
   const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
-  assert.match(reduced, /\.mascotMotion\s*\{[^}]*display:\s*none/);
-  assert.match(reduced, /\.mascotStill\s*\{[^}]*display:\s*block/);
+  assert.match(reduced, /\.beatStatus\s*\{[^}]*display:\s*none/);
+  assert.match(reduced, /\.beatHold[\s\S]*opacity:\s*1/);
+  const headings = [
+    'STEPS_TITLE',
+    'COMPARE.title',
+    'USES_TITLE',
+    'PAYMENTS.title',
+    'FAQ_TITLE',
+    'BOFU.title',
+  ];
+  let at = page.indexOf('HERO.h1Lead');
+  assert.notEqual(at, -1);
+  for (const token of headings) {
+    const next = page.indexOf(token, at);
+    assert.notEqual(next, -1, token);
+    at = next + token.length;
+  }
 });
 
 test('source does not reintroduce the refund line or a tiled pattern', () => {
