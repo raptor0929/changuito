@@ -155,10 +155,7 @@ test('landing copy stays free of jargon and a refund promise', () => {
   );
   assert.equal(FAQ.length, 4);
   assert.equal(BOFU.title, 'Sumate a la beta');
-  assert.equal(
-    FAQ.map((item) => item.a).includes(NO_CHARGE),
-    false,
-  );
+  assert.equal(JSON.stringify(FAQ).includes(NO_CHARGE), false);
 });
 
 test('the hero is a coded product demo, not the loading GIF', () => {
