@@ -61,13 +61,17 @@ test('footer social profiles point at @appchanguito', () => {
   assert.equal(SOCIAL.filter((link) => link.href === 'https://x.com/appchanguito').length, 1);
   assert.equal(SOCIAL.filter((link) => link.href.includes('twitter.com')).length, 0);
   const page = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
-  assert.equal(page.includes('SOCIAL'), true);
-  assert.equal(page.includes('landing-social'), true);
-  assert.equal(page.includes('target="_blank"'), true);
-  assert.equal(page.includes('noopener noreferrer'), true);
-  assert.equal(page.includes('XIcon'), false);
-  assert.equal(page.includes('https://x.com/appchanguito'), false);
-  assert.equal(page.split('SOCIAL.map').length - 1, 1);
+  const footer = readFileSync(join(root, 'components/landing/site-footer.tsx'), 'utf8');
+  assert.match(page, /<SiteFooter \/>/);
+  assert.equal(footer.includes('SOCIAL'), true);
+  assert.equal(footer.includes('landing-social'), true);
+  assert.equal(footer.includes('target="_blank"'), true);
+  assert.equal(footer.includes('noopener noreferrer'), true);
+  assert.equal(footer.includes('XIcon'), false);
+  assert.equal(footer.includes('https://x.com/appchanguito'), false);
+  assert.equal(footer.split('SOCIAL.map').length - 1, 1);
+  assert.equal(footer.includes('landing-footer-app'), false);
+  assert.equal(footer.includes('FOOTER.appLabel'), false);
   assert.equal(page.includes('landing-footer-app'), false);
   assert.equal(page.includes('FOOTER.appLabel'), false);
   const css = readFileSync(join(root, 'components/landing/landing.module.css'), 'utf8');
@@ -228,7 +232,9 @@ test('founder trust is one shared line, with the mark, and not a second copyrigh
   assert.equal('copyright' in FOOTER, false);
 
   const home = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
-  const footer = home.slice(home.indexOf('<footer'));
+  const footerSrc = readFileSync(join(root, 'components/landing/site-footer.tsx'), 'utf8');
+  assert.match(home, /<SiteFooter \/>/);
+  const footer = footerSrc.slice(footerSrc.indexOf('<footer'));
   const legalAt = footer.indexOf('{FOOTER.legal}');
   const trustAt = footer.indexOf('<FounderTrust');
   const navClose = footer.indexOf('</nav>');
@@ -238,6 +244,7 @@ test('founder trust is one shared line, with the mark, and not a second copyrigh
   assert.equal(footer.includes('©'), false);
   assert.equal(footer.slice(0, navClose).includes('FounderTrust'), false);
   assert.equal(footer.split('FounderTrust').length - 1, 1);
+  assert.match(footer, /trust \? <FounderTrust/);
 
   const whitelist = readFileSync(join(root, 'app/whitelist/page.tsx'), 'utf8');
   const cardAt = whitelist.indexOf('styles.card');
@@ -245,6 +252,7 @@ test('founder trust is one shared line, with the mark, and not a second copyrigh
   const mainClose = whitelist.indexOf('</main>');
   assert.ok(cardAt !== -1 && cardAt < whitelistTrust && whitelistTrust < mainClose);
   assert.equal(whitelist.split('FounderTrust').length - 1, 2);
+  assert.match(whitelist, /<SiteFooter navBase="\/" trust=\{false\} \/>/);
 
   const bug = readFileSync(join(root, 'app/reportarbug/page.tsx'), 'utf8');
   const panel = readFileSync(join(root, 'components/bug-report/bug-report-panel.tsx'), 'utf8');

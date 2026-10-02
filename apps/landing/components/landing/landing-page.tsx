@@ -3,18 +3,16 @@ import {
   BENEFITS_TITLE,
   BOFU,
   FAQ_TITLE,
-  FOOTER,
   HERO,
   NAV,
   PAYMENTS,
-  SOCIAL,
   STEPS,
   STEPS_TITLE,
 } from '../../lib/copy';
-import { FounderTrust } from '@changuito/trust/ui';
 import { BrandLockup } from './brand-lockup';
 import { FaqList } from './faq-list';
-import { CheckIcon, InstagramIcon, StepIcon } from './icons';
+import { CheckIcon, StepIcon } from './icons';
+import { SiteFooter } from './site-footer';
 import { SiteHeader } from './site-header';
 import { TryLink } from './try-link';
 
@@ -163,60 +161,7 @@ export function LandingPage() {
           </div>
         </section>
       </main>
-      <footer className={styles.footer} data-testid="landing-footer">
-        <div className={styles.footerInner}>
-          <a className={styles.logoLink} href="/">
-            <BrandLockup className={styles.footerBrand} />
-          </a>
-          <div className={styles.footerMeta}>
-            <nav aria-label="Pie" className={styles.footerNavWrap}>
-              <ul className={styles.footerNav}>
-                {NAV.map((link) => (
-                  <li key={link.href}>
-                    <a className={styles.footerLink} href={link.href}>
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-                <li>
-                  <a className={styles.footerLink} href="/reportarbug" data-testid="landing-report-bug">
-                    Reportar un bug
-                  </a>
-                </li>
-                <li>
-                  <a className={styles.footerLink} href="/">
-                    {FOOTER.siteLabel}
-                  </a>
-                </li>
-              </ul>
-            </nav>
-            <ul className={styles.footerSocial} data-testid="landing-social">
-              {SOCIAL.map((link) => {
-                // The X glyph sits before the label "X" and reads as a second link.
-                const showInstagram = link.icon === 'instagram';
-                return (
-                  <li key={link.href}>
-                    <a
-                      className={
-                        showInstagram ? styles.socialLink : `${styles.socialLink} ${styles.socialText}`
-                      }
-                      href={link.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={link.ariaLabel}
-                    >
-                      {showInstagram ? <InstagramIcon className={styles.socialIcon} /> : null}
-                      <span>{link.label}</span>
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </div>
-        <p className={styles.fine}>{FOOTER.legal}</p>
-        <FounderTrust className={styles.fine} />
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
