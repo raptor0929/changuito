@@ -375,5 +375,6 @@ deployments.json     what is deployed, and where — committed on purpose
 | [docs/stellar.md](docs/stellar.md) | every Stellar technology used and what each is doing |
 | [docs/tech-stack.md](docs/tech-stack.md) | the dependency list with versions, and why each one is there |
 | [docs/e2e.md](docs/e2e.md) | Playwright, and the mainnet checks the e2e cannot cover |
+| [docs/testing-strategy.md](docs/testing-strategy.md) | unit / integration / E2E, test-data rules, Testcontainers vs Compose |
 | [DEPLOY.md](DEPLOY.md) | the contracts, then Vercel, then the database |
 | [CLAUDE.md](CLAUDE.md) | how the agent's behaviour was arrived at, and which decisions not to undo |

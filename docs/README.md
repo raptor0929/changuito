@@ -14,6 +14,7 @@ shopper pays the súper with.
 | [stellar.md](stellar.md) | every Stellar technology used, and what each one is doing here |
 | [tech-stack.md](tech-stack.md) | the dependency list with versions, the data stores, and every environment variable |
 | [e2e.md](e2e.md) | Playwright smoke against the live sites, and the GitHub Actions secrets |
+| [testing-strategy.md](testing-strategy.md) | unit / integration / E2E pyramid, test-data rules, Testcontainers vs Compose |
 
 Elsewhere in the repo:
 
