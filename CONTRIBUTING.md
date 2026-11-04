@@ -20,6 +20,9 @@ Never commit secrets, keys, or `.env` files. `.env.example` lists variable names
 
 ```bash
 npm test
+npm run test:integration:escrow   # needs Docker + Stellar CLI
 npm run typecheck -w @changuito/web
 npm run build
 ```
+
+Testing levels and CI layout: [docs/testing-strategy.md](docs/testing-strategy.md).
