@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { appMode, modeForSession, modeKeepsRecords, networkFor, type AppMode } from '../app-mode.ts';
-import { DEFAULT_NETWORK, NETWORK_IDS } from '../deployments.ts';
+import { modeForSession, modeKeepsRecords, sessionNetwork, type AppMode } from '../app-mode.ts';
+import { DEFAULT_NETWORK } from '../deployments.ts';
 
 const MODES: readonly AppMode[] = ['preview', 'production'];
 
@@ -15,17 +15,26 @@ describe('app mode', () => {
     assert.equal(modeForSession(true), 'production');
   });
 
-  it('maps every network to a mode and back again', () => {
-    for (const mode of MODES) assert.equal(appMode(networkFor(mode)), mode);
-    for (const net of NETWORK_IDS) assert.equal(networkFor(appMode(net)), net);
+  it('RULE: mode and network are independent — there is no bijection', () => {
+    // Replaces the old mode↔network round trip. Production on testnet is a
+    // valid state: the session decides who pays, the Pollar key decides which
+    // chain. There is nothing to round-trip.
+    assert.equal(modeForSession(true), 'production');
+    assert.equal(sessionNetwork(true, 'testnet', DEFAULT_NETWORK), 'testnet');
+    assert.equal(sessionNetwork(true, 'mainnet', DEFAULT_NETWORK), 'mainnet');
+    assert.equal(sessionNetwork(false, 'mainnet', DEFAULT_NETWORK), DEFAULT_NETWORK);
+    for (const mode of MODES) assert.equal(typeof mode, 'string');
   });
 
   it('RULE: a visitor with no session lands on the network that cannot spend', () => {
     // The first paint happens before Pollar has answered, so whatever
     // DEFAULT_NETWORK is has to already be the safe mode. If these ever
     // disagree, every page load starts in real mode for a moment.
-    assert.equal(networkFor('preview'), DEFAULT_NETWORK);
-    assert.equal(appMode(DEFAULT_NETWORK), 'preview');
+    //
+    // Call sites updated from the removed networkFor/appMode bijection to
+    // sessionNetwork / modeForSession — same rule, new facts.
+    assert.equal(sessionNetwork(false, null, DEFAULT_NETWORK), DEFAULT_NETWORK);
+    assert.equal(modeForSession(false), 'preview');
   });
 
   it('RULE: preview keeps no records', () => {
@@ -33,15 +42,20 @@ describe('app mode', () => {
     // being no identity to key a row on — `archiveChat` refuses a guest,
     // `card_owner` wants a proven address — and an invariant that holds by
     // coincidence is one refactor from not holding.
-    assert.equal(modeKeepsRecords(networkFor('preview')), false);
-    assert.equal(modeKeepsRecords(networkFor('production')), true);
+    //
+    // modeKeepsRecords now takes an AppMode (not a NetworkId). Same rule.
+    assert.equal(modeKeepsRecords('preview'), false);
+    assert.equal(modeKeepsRecords('production'), true);
   });
 
-  it('RULE: preview is testnet and production is mainnet, stated once', () => {
-    // Pinned because a great deal reads it the other way round by
-    // implication: which asset carries the memo, which Pollar key exists,
-    // whether a secret key is allowed in the deployment at all.
-    assert.equal(networkFor('preview'), 'testnet');
-    assert.equal(networkFor('production'), 'mainnet');
+  it('RULE: a guest is on the default network; a session is on the login network', () => {
+    // Replaces "preview is testnet and production is mainnet". Network follows
+    // the Pollar key; mode follows the session. They are not a fixed pair.
+    assert.equal(sessionNetwork(false, 'testnet', DEFAULT_NETWORK), DEFAULT_NETWORK);
+    assert.equal(sessionNetwork(false, 'mainnet', DEFAULT_NETWORK), DEFAULT_NETWORK);
+    assert.equal(sessionNetwork(true, 'testnet', DEFAULT_NETWORK), 'testnet');
+    assert.equal(sessionNetwork(true, 'mainnet', DEFAULT_NETWORK), 'mainnet');
+    assert.equal(modeForSession(false), 'preview');
+    assert.equal(modeForSession(true), 'production');
   });
 });
