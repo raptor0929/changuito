@@ -39,7 +39,7 @@ Las duraciones están en `src/timeline.json`.
 | 3 | `Promesa` | 8 s | Te arma el súper. No es un exchange ni un comparador |
 | 4 | `Demo` | 28 s | El producto en movimiento: chat, precios, carrito. Sin slides de «cómo funciona» |
 | 5 | `Pago` | 25 s | «Pagás con USDC en Stellar. Nosotros nos encargamos de que lo acepte el supermercado.» Billetera Pollar, fondeo, tarjeta temporal, cobro y descarte, o la tarjeta que ya tenés |
-| 6 | `Cta` | 11 s | Sumate a la beta · www.changuito.me/whitelist · app.changuito.me |
+| 6 | `Cta` | 11 s | Sumate a la beta · www.changuito.me/whitelist · ste.changuito.me |
 
 Los cortes van cubiertos por un panel (`src/components/Swipe.tsx`) como overlay
 de `TransitionSeries`, así la duración es la suma de las escenas. El que entra

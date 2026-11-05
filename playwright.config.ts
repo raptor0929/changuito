@@ -5,7 +5,7 @@ import { loadLocalEnv } from './e2e/support/env';
 loadLocalEnv();
 
 const landingBaseURL = process.env.LANDING_BASE_URL?.trim() || 'https://www.changuito.me';
-const appBaseURL = process.env.APP_BASE_URL?.trim() || 'https://app.changuito.me';
+const appBaseURL = process.env.APP_BASE_URL?.trim() || 'https://ste.changuito.me';
 
 /**
  * The checkout spec is the one that cannot run against a deployment.

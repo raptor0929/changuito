@@ -148,7 +148,7 @@ set rather than a variable of its own. In the dashboard, on that testnet app:
 | Setting | Value |
 |---|---|
 | Network | **testnet** |
-| Allowed domains | `app.changuito.me` and the Vercel preview domain |
+| Allowed domains | `ste.changuito.me` and the Stellar Worker `*.workers.dev` URL |
 | Login methods | Freighter enabled, plus the existing email and Google |
 | Fee sponsorship | **off** — OZ Channels pays fees |
 | Reserve sponsorship | **off** — Changuito's sponsor account pays reserves |
@@ -517,7 +517,7 @@ console, which is how you check the second one is working rather than assuming.
 
 The marketing site is a second Vercel project. It is `apps/landing`
 (`@changuito/landing`), not a route inside `apps/web`. Do not point
-`www.changuito.me` at the shopper project, and do not point `app.changuito.me`
+`www.changuito.me` at the shopper project, and do not point `ste.changuito.me`
 at the landing.
 
 | Setting | Value |

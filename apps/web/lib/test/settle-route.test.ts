@@ -50,7 +50,7 @@ describe('POST /api/settle', () => {
 
   const call = (action: 'settle' | 'refund', kp = buyer, extra: Record<string, unknown> = {}) =>
     POST(
-      new Request('https://app.changuito.me/api/settle', {
+      new Request('https://ste.changuito.me/api/settle', {
         method: 'POST',
         headers: { 'content-type': 'application/json', cookie: human },
         body: JSON.stringify({

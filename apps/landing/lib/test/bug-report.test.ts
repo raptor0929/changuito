@@ -44,14 +44,14 @@ test('optional context and severity are kept when they are real', () => {
   const result = validateBugReport(
     {
       ...valid,
-      context: 'https://app.changuito.me después de buscar leche',
+      context: 'https://ste.changuito.me después de buscar leche',
       severity: 'No puedo seguir',
     },
     CREATED,
   );
   assert.equal(result.ok, true);
   if (!result.ok) return;
-  assert.equal(result.entry.context, 'https://app.changuito.me después de buscar leche');
+  assert.equal(result.entry.context, 'https://ste.changuito.me después de buscar leche');
   assert.equal(result.entry.severity, 'No puedo seguir');
   assert.deepEqual([...SEVERITIES], ['Molesta un poco', 'Me frena', 'No puedo seguir']);
 });

@@ -357,7 +357,7 @@ export async function takeQuota(
 /**
  * The caller's IP, from a header the edge sets rather than the client.
  *
- * `cf-connecting-ip` is written by Cloudflare, which fronts app.changuito.me.
+ * `cf-connecting-ip` is written by Cloudflare, which fronts ste.changuito.me.
  * `x-real-ip` is Vercel's own, from the TCP peer. The first X-Forwarded-For
  * value is whatever the client typed, so it is never read.
  */

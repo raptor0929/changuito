@@ -1,7 +1,7 @@
 # Manual de marca — Changuito
 
 **Versión:** 1.5 · Septiembre 2026  
-**Dominios:** www.changuito.me (landing) · app.changuito.me (producto)  
+**Dominios:** www.changuito.me (landing) · ste.changuito.me (producto)  
 **Idioma de marca (AR):** español rioplatense natural (voseo)  
 **Documentación / deck:** inglés  
 

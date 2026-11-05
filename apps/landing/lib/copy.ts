@@ -8,7 +8,7 @@
  * Headings carry the story. Each section says one thing, once.
  */
 
-export const APP_URL = 'https://app.changuito.me';
+export const APP_URL = 'https://ste.changuito.me';
 export const SITE_URL = 'https://www.changuito.me';
 
 export const HERO = {

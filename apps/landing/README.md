@@ -1,8 +1,8 @@
 # @changuito/landing
 
-Landing de marketing para **www.changuito.me**. Es un proyecto Next.js aparte de `apps/web` (el shopper, en app.changuito.me).
+Landing de marketing para **www.changuito.me**. Es un proyecto Next.js aparte de `apps/web` (el shopper, en ste.changuito.me).
 
-No comparte rutas con el shopper. Durante la beta controlada, los botones «Probar Changuito» van a `/whitelist`. `APP_URL` (`https://app.changuito.me`) queda para SEO y docs, sin navegación desde la landing.
+No comparte rutas con el shopper. Durante la beta controlada, los botones «Probar Changuito» van a `/whitelist`. `APP_URL` (`https://ste.changuito.me`) queda para SEO y docs, sin navegación desde la landing.
 
 ## Vercel
 
@@ -17,13 +17,13 @@ Crear un **proyecto nuevo**, no reusar el de `apps/web`.
 | Build command | default — corre `next build` de este paquete |
 | Environment variables | el sitio se construye sin ellas. `/whitelist` en producción no anota a nadie si faltan Turnstile o un destino. `/reportarbug` funciona sin variables (ver abajo). |
 
-Dominio de producción: `www.changuito.me`. `app.changuito.me` sigue en el proyecto de `apps/web`.
+Dominio de producción: `www.changuito.me`. `ste.changuito.me` sigue en el proyecto de `apps/web`.
 
 La lista de espera vive en `/whitelist`. No hace falta login de Vercel para mergear el código: el próximo deploy toma la ruta. Sin un destino configurado, producción responde que no pudo anotar a la persona (no finge el alta). En `next dev` / `next start` local, si no hay variables, el alta se agrega a `apps/landing/.data/waitlist.jsonl` (gitignored).
 
 ### Variables que el proyecto de Vercel de la landing tiene que tener
 
-El proyecto de `apps/web` (`app.changuito.me`) no comparte env con este. Las keys de Turnstile que ya usa el shopper hay que copiarlas al proyecto de la landing. Si falta alguna, `/whitelist` responde 503: «No pudimos anotarte por un problema nuestro. Probá de nuevo en un rato.» Producción no saltea el CAPTCHA.
+El proyecto de `apps/web` (`ste.changuito.me`) no comparte env con este. Las keys de Turnstile que ya usa el shopper hay que copiarlas al proyecto de la landing. Si falta alguna, `/whitelist` responde 503: «No pudimos anotarte por un problema nuestro. Probá de nuevo en un rato.» Producción no saltea el CAPTCHA.
 
 En el proyecto de Vercel de **landing**, Production (y Preview si se prueba el alta ahí):
 
@@ -73,7 +73,7 @@ El formulario de `/whitelist` manda un token de Turnstile con el alta. El servid
 - **Producción:** si faltan `NEXT_PUBLIC_TURNSTILE_SITE_KEY` o `TURNSTILE_SECRET_KEY` en el proyecto de Vercel de la landing, el alta se rechaza (mismo espíritu que un sink sin configurar). No se saltea la verificación.
 - **Local / no-production:** si las keys no están, el submit se acepta sin widget (se loguea un aviso una vez) para que `next dev` siga funcionando.
 
-Creá un widget en el [dashboard de Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) (o reusá el de `app.changuito.me` si el hostname `www.changuito.me` está permitido) y pegá las dos keys en el proyecto de Vercel de la landing.
+Creá un widget en el [dashboard de Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) (o reusá el de `ste.changuito.me` si el hostname `www.changuito.me` está permitido) y pegá las dos keys en el proyecto de Vercel de la landing.
 
 ## Reportar un bug
 
@@ -141,7 +141,7 @@ No hace falta ninguna variable de entorno. El HTML sale en `es-AR`. Next genera,
 | `/llms.txt` | resumen en texto, armado con el copy público |
 | `/manifest.webmanifest` | nombre, idioma e íconos |
 
-El shopper (`app.changuito.me`) tiene su propio `robots.txt` y no se toca desde acá. `?estado=` en la lista y en el reporte de bug no se indexa; el canonical queda en la URL limpia.
+El shopper (`ste.changuito.me`) tiene su propio `robots.txt` y no se toca desde acá. `?estado=` en la lista y en el reporte de bug no se indexa; el canonical queda en la URL limpia.
 
 ## Public stats (`/stats`, stats.changuito.me)
 

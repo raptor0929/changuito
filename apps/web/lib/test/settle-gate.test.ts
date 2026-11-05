@@ -34,7 +34,7 @@ function signed(kp: Keypair, intent: WalletIntent, ref: string, address = kp.pub
 async function post(body: unknown, { human = true } = {}): Promise<Request> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (human) headers.cookie = `${HUMAN_COOKIE}=${encodeURIComponent(await mintHumanToken(SECRET))}`;
-  return new Request('https://app.changuito.me/api/settle', { method: 'POST', headers, body: JSON.stringify(body) });
+  return new Request('https://ste.changuito.me/api/settle', { method: 'POST', headers, body: JSON.stringify(body) });
 }
 
 async function refusal(res: unknown): Promise<{ status: number; error: string }> {

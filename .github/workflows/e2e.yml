@@ -136,7 +136,7 @@ jobs:
         env:
           CI: true
           LANDING_BASE_URL: https://www.changuito.me
-          APP_BASE_URL: https://app.changuito.me
+          APP_BASE_URL: https://ste.changuito.me
           CHANGUTO_E2E_EMAIL: ${{ secrets.CHANGUTO_E2E_EMAIL }}
           CHANGUTO_E2E_PASSWORD: ${{ secrets.CHANGUTO_E2E_PASSWORD }}
           CHANGUTO_E2E_OTP: ${{ secrets.CHANGUTO_E2E_OTP }}

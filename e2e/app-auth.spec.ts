@@ -5,7 +5,7 @@ import { collectPageErrors, expectNoPageErrors } from './support/page-errors';
 import { POLLAR } from './support/pollar-copy';
 
 /**
- * Pollar 0.11 (the widget on app.changuito.me) has no password field.
+ * Pollar 0.11 (the widget on ste.changuito.me) has no password field.
  * Email login sends a 6-digit code. `CHANGUTO_E2E_PASSWORD` is only typed
  * when it is exactly six digits (or `CHANGUTO_E2E_OTP` is set). Otherwise
  * the test still opens the email path and stops at the code step.

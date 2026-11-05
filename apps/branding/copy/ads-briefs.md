@@ -22,7 +22,7 @@ No usar microcopy de devolución en consumer (no plantar ideas raras).
 - Primary text: Armá el súper sin pensar. Compará precios reales y pagá con tarjeta o USDC.
 - Headline: Probar Changuito
 - Description: Pagá con tarjeta o USDC.
-- Destination: https://app.changuito.me
+- Destination: https://ste.changuito.me
 - Creative priority: IgReel.mp4 → IgStory.png → IgFeed.png
 
 ## Organic posting order (sugerido)

@@ -15,7 +15,7 @@ automated is stated by us, before you find it.
 
 | | |
 |---|---|
-| **Live app** | [app.changuito.me](https://app.changuito.me) — signed out is testnet and costs the visitor nothing |
+| **Live app** | [ste.changuito.me](https://ste.changuito.me) — signed out is testnet and costs the visitor nothing |
 | **Marketing site** | [www.changuito.me](https://www.changuito.me) |
 | **Repository** | [github.com/tote-hq/stellar](https://github.com/tote-hq/stellar) — MIT. The Solana port lives in [tote-hq/solana](https://github.com/tote-hq/solana); only Stellar work lands here, and PRs labeled `shared` are mirrored between the two |
 | **Built by** | [SimonethG](https://www.linkedin.com/in/simonethg/) and [Fabio](https://www.linkedin.com/in/fabio-laura-yavi/), in Argentina |
@@ -45,7 +45,7 @@ deposit account.
 
 | Minutes | Do this | What it shows |
 |---|---|---|
-| 0–3 | Open [app.changuito.me](https://app.changuito.me) signed out and ask for a basket in Spanish — *"armá un desayuno por menos de $10.000"* | The agent is driving a real store. Prices and stock are Día's, live. This is **preview**: testnet, and we pay |
+| 0–3 | Open [ste.changuito.me](https://ste.changuito.me) signed out and ask for a basket in Spanish — *"armá un desayuno por menos de $10.000"* | The agent is driving a real store. Prices and stock are Día's, live. This is **preview**: testnet, and we pay |
 | 3–6 | Press *Pagar* and watch the three-step rail: **entrá a tu cuenta → elegí el envío → pagá el importe** | The store's real checkout, in an iframe. No amount is quoted until the store has one |
 | 6–9 | Read [`apps/web/lib/order-check.ts`](../apps/web/lib/order-check.ts) and [`apps/web/lib/test/order-check.test.ts`](../apps/web/lib/test/order-check.test.ts) | How the app reads a cart it cannot see, cookie-free — and the test that pins that no profile data crosses back out |
 | 9–12 | Read [`apps/web/lib/ledger/`](../apps/web/lib/ledger/) and [`apps/web/lib/pay/`](../apps/web/lib/pay/) | The money half. Quote and card go through a ledger port; Horizon is today's adapter; the matcher is pure and tested separately from the fetch |

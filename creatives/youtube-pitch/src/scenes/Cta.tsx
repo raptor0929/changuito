@@ -112,7 +112,7 @@ export const Cta: React.FC = () => {
             opacity: app,
           }}
         >
-          app.changuito.me
+          ste.changuito.me
         </div>
       </div>
 

@@ -13,7 +13,7 @@ test('the trust sentence stays registered, and the shopper footer prints only th
   assert.equal(TRUST_LINE.includes('\u2014'), false);
   assert.equal(TRUST_LINE.includes('\u2013'), false);
   assert.equal(TRUST_LINE.includes('(R)'), false);
-  assert.equal(TRUST_LINE.includes('app.changuito.me'), false);
+  assert.equal(TRUST_LINE.includes('ste.changuito.me'), false);
   assert.deepEqual(
     FOUNDERS.map((person) => ({ name: person.name, href: person.href })),
     [
@@ -36,12 +36,12 @@ test('the trust sentence stays registered, and the shopper footer prints only th
   assert.equal(footer.includes('SimonethG'), false);
   assert.equal(footer.split('COPYRIGHT_LINE').length - 1, 1);
   assert.equal(page.includes('©'), false);
-  assert.equal(page.includes('app.changuito.me'), false);
+  assert.equal(page.includes('ste.changuito.me'), false);
   assert.match(css, /\.app-footer\s*\{/);
   assert.match(css, /safe-area-inset-bottom/);
   assert.equal(ui.includes('target="_blank"'), true);
   assert.equal(ui.includes('rel="noopener noreferrer"'), true);
-  assert.equal(ui.includes('app.changuito.me'), false);
+  assert.equal(ui.includes('ste.changuito.me'), false);
   assert.equal(ui.includes('(R)'), false);
   assert.equal(ui.includes('©'), false);
 

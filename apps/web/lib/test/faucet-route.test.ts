@@ -74,7 +74,7 @@ describe('/api/faucet', () => {
 
   const post = (kp: Keypair, { proof = true, cookie = human } = {}) =>
     POST(
-      new Request('https://app.changuito.me/api/faucet', {
+      new Request('https://ste.changuito.me/api/faucet', {
         method: 'POST',
         headers: { 'content-type': 'application/json', cookie },
         body: JSON.stringify({ address: kp.publicKey(), ...(proof ? { proof: signedProof(kp, 'faucet') } : {}) }),
@@ -82,7 +82,7 @@ describe('/api/faucet', () => {
     );
 
   it('GET says who may use it, behind the human check', async () => {
-    const url = (a: string) => `https://app.changuito.me/api/faucet?address=${a}`;
+    const url = (a: string) => `https://ste.changuito.me/api/faucet?address=${a}`;
     assert.equal((await GET(new Request(url(testers[0]!.publicKey())))).status, 403);
     const mine = await (await GET(new Request(url(testers[0]!.publicKey()), { headers: { cookie: human } }))).json();
     assert.deepEqual(mine, { mode: 'allowlist', allowed: true });

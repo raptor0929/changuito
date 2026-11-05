@@ -117,7 +117,7 @@ test('sitemap lists only the public marketing routes', () => {
     'https://www.changuito.me/stats',
   ]);
   assert.equal(urls.some((url) => url.includes('/api/')), false);
-  assert.equal(urls.some((url) => url.includes('app.changuito.me')), false);
+  assert.equal(urls.some((url) => url.includes('ste.changuito.me')), false);
   const src = readFileSync(join(root, 'app/sitemap.ts'), 'utf8');
   assert.match(src, /sitemapEntries/);
 });
