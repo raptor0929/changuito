@@ -1,0 +1,26 @@
+# gitleaks config: the default rules, a rule for Stellar secret keys, and an
+# allowlist for known fake fixtures. Never allowlist a real value. Prefer fixing
+# the file to adding a path here; a single accepted finding goes in
+# .gitleaksignore by fingerprint instead.
+title = "changuito gitleaks config"
+
+[extend]
+useDefault = true
+
+# The default rules don't know Stellar. A secret seed is "S" + 55 base32
+# characters; it is the key that signs for the resolver, the sponsor and every
+# wallet, so it is the one leak that matters most in this repo.
+[[rules]]
+id = "stellar-secret-key"
+description = "Stellar secret key (ed25519 seed, S…)"
+regex = '''\b(S[A-Z2-7]{55})\b'''
+entropy = 3.5
+
+[allowlist]
+description = "Fake test fixtures"
+paths = [
+  # Unit-test fixtures: sk_test_/sk_live_ placeholders and Hardhat's public test key.
+  '''^packages/mcp/src/test/''',
+  # Templates with empty values.
+  '''(^|/)\.env\.example$''',
+]

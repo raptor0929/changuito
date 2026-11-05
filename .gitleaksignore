@@ -1,0 +1,7 @@
+# Accepted findings, by fingerprint (history: commit:file:rule:line; working tree: file:rule:line).
+# Each was reviewed; never add a real value here — rotate it instead.
+
+# A test asserting that a secret-key-shaped string is rejected as an address.
+# The value fails the Stellar checksum, so it cannot be a real account.
+ab24772ec11bd2088500f71ee242d1c9090cb19e:apps/web/lib/test/pollar.test.ts:stellar-secret-key:44
+apps/web/lib/test/pollar.test.ts:stellar-secret-key:44
