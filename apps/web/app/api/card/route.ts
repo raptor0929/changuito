@@ -5,7 +5,9 @@
  * them into the súper's form. They are `no-store`. The issuance, the ledger
  * read and the once-only claim live in `lib/pay/issue-card.ts`.
  */
+import { modeForSession } from '../../../lib/app-mode.ts';
 import { requireHuman } from '../../../lib/human-gate.ts';
+import { readLoggedInUser } from '../../../lib/login-gate.ts';
 import { issueCard, type IssuedCard } from '../../../lib/pay/issue-card.ts';
 
 export type { IssuedCard };
@@ -24,7 +26,10 @@ export async function POST(req: Request): Promise<Response> {
     return json({ error: 'body must be JSON' }, 400);
   }
 
-  const result = await issueCard(body);
+  // Mode is verified here and passed down — `keepsOneCard` must not infer it
+  // from the presence of an owner string alone.
+  const user = await readLoggedInUser(req);
+  const result = await issueCard(body, modeForSession(user.ok));
   return json(result.body, result.status);
 }
 

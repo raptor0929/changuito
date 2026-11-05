@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { LOGIN_NETWORK, pollarEnabled, pollarEnabledOn, pollarNetwork, shortAddress } from '../pollar.ts';
-import { DEFAULT_NETWORK, DEPLOYMENTS, NETWORK_IDS } from '../deployments.ts';
+import { LOGIN_NETWORK, loginNetwork, pollarEnabled, pollarEnabledOn, pollarNetwork, shortAddress } from '../pollar.ts';
+import { DEPLOYMENTS, NETWORK_IDS } from '../deployments.ts';
 import { addressKind } from '../stellar.ts';
 
 describe('shortAddress', () => {
@@ -57,20 +57,34 @@ describe('pollarNetwork', () => {
     }
   });
 
-  it('RULE: defaults to the network a session can exist on, not the app default', () => {
-    // These used to be the same value and the difference is the whole
-    // preview/production split. DEFAULT_NETWORK is testnet, which is
-    // preview, which has no wallet at all — a Pollar call defaulting there
-    // would ask for a chain no key exists for.
-    assert.equal(pollarNetwork(), pollarNetwork(LOGIN_NETWORK));
-    assert.notEqual(LOGIN_NETWORK, DEFAULT_NETWORK);
+  it('RULE: the login network follows the Pollar key, not a hard-coded chain', () => {
+    // Derived from which key is set (testnet wins when both are). With neither
+    // key set — the unit-test default — there is no login network at all, and
+    // that is not the same as asking Pollar for DEFAULT_NETWORK.
+    assert.equal(
+      LOGIN_NETWORK,
+      loginNetwork({
+        testnet: process.env.NEXT_PUBLIC_POLLAR_API_KEY ?? '',
+        mainnet: process.env.NEXT_PUBLIC_POLLAR_API_KEY_MAINNET ?? '',
+      }),
+    );
+    if (LOGIN_NETWORK === null) {
+      assert.equal(pollarEnabled, false);
+    } else {
+      assert.equal(pollarNetwork(LOGIN_NETWORK), LOGIN_NETWORK);
+      assert.equal(pollarEnabled, pollarEnabledOn(LOGIN_NETWORK));
+    }
   });
 
-  it('RULE: signing in means mainnet, because that is the only key there is', () => {
-    // If this ever needs relaxing, lib/app-mode.ts is the thing to change
-    // first: a logged-in testnet would be a third mode, not a new key.
-    assert.equal(LOGIN_NETWORK, 'mainnet');
-    assert.equal(pollarEnabled, pollarEnabledOn(LOGIN_NETWORK));
+  it('RULE: signing in does not mean mainnet — the key decides the network', () => {
+    // Mode follows the session; network follows the key. LOGIN_NETWORK is
+    // whatever loginNetwork returns from the env keys — null, testnet, or
+    // mainnet — never a hard-coded 'mainnet'. pollarEnabled is exactly
+    // "is there a login network".
+    assert.equal(pollarEnabled, LOGIN_NETWORK !== null);
+    assert.ok(
+      LOGIN_NETWORK === null || LOGIN_NETWORK === 'testnet' || LOGIN_NETWORK === 'mainnet',
+    );
   });
 
   it('reports per-network whether a key was configured', () => {

@@ -2,22 +2,16 @@
 
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
+import { modeForSession, type AppMode } from '../lib/app-mode.ts';
 import { DEFAULT_NETWORK, type NetworkId } from '../lib/deployments.ts';
 
 /**
- * Which network the app is on — and therefore which mode it is in.
+ * Which network the app is on, and which mode it is in.
  *
- * It used to be a choice: a toggle in the masthead, remembered in
- * localStorage, validated on the way back in. It is not a choice any more.
- * The mode follows the Pollar session (lib/app-mode.ts), so the network is
- * *derived*, and this holds the derived value rather than deciding it.
- *
- * The provider still sits above the Pollar provider, because Pollar needs a
- * key and a chain before it can mount. What changed is that it no longer
- * *decides*: `ModeSync`, which lives inside Pollar where `isAuthenticated`
- * can be read, pushes the answer back up here. The layering is the same and
- * the direction of the arrow is reversed — the precedent for that shape is
- * WalletWidget, which has always corrected the network from inside.
+ * Mode and network are two separate facts (lib/app-mode.ts). Mode = who pays,
+ * derived from the Pollar session. Network = which chain the Pollar key was
+ * created for. `ModeSync`, mounted inside Pollar where `isAuthenticated` can
+ * be read, pushes both answers back up here.
  *
  * ## What was removed, and why it must not come back
  *
@@ -28,22 +22,30 @@ import { DEFAULT_NETWORK, type NetworkId } from '../lib/deployments.ts';
  * server route would refuse them on an identity they do not have. The session
  * is the only authority, and it is re-established on every load anyway.
  *
- * `reachable()` is gone with it. It existed because "a mode with no Pollar
- * key has no wallet, and a wallet is where the mode control lives" — true of
- * a control that no longer exists.
+ * Inferring mode from the network is gone with it. A signed-in session on
+ * testnet is production — callers that ask "who pays" read `mode` from this
+ * context, never `appMode(network)`.
  */
 
 interface NetworkState {
   network: NetworkId;
+  /** Who pays. Derived from the session; never from the network. */
+  mode: AppMode;
   /**
    * Set by `ModeSync` and by nothing else. It is on the context because the
    * component that knows the answer is mounted below the one that holds it,
    * not because callers are invited to pick a mode.
    */
   setNetwork: (net: NetworkId) => void;
+  setMode: (mode: AppMode) => void;
 }
 
-const Ctx = createContext<NetworkState>({ network: DEFAULT_NETWORK, setNetwork: () => {} });
+const Ctx = createContext<NetworkState>({
+  network: DEFAULT_NETWORK,
+  mode: modeForSession(false),
+  setNetwork: () => {},
+  setMode: () => {},
+});
 
 export function useNetwork(): NetworkState {
   return useContext(Ctx);
@@ -55,11 +57,19 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
   // correct until Pollar says otherwise. Nothing is read from storage during
   // render, so the server's HTML and the browser's first paint agree.
   const [network, setStored] = useState<NetworkId>(DEFAULT_NETWORK);
+  const [mode, setStoredMode] = useState<AppMode>(modeForSession(false));
 
   const setNetwork = useCallback((net: NetworkId) => {
     setStored((current) => (current === net ? current : net));
   }, []);
 
-  const value = useMemo(() => ({ network, setNetwork }), [network, setNetwork]);
+  const setMode = useCallback((next: AppMode) => {
+    setStoredMode((current) => (current === next ? current : next));
+  }, []);
+
+  const value = useMemo(
+    () => ({ network, mode, setNetwork, setMode }),
+    [network, mode, setNetwork, setMode],
+  );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

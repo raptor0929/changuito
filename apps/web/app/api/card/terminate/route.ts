@@ -37,15 +37,13 @@
  */
 import { canIssueCard, cardClient, depositorOf, heldCard, keepsOneCard } from '../../../../lib/card.ts';
 import { isMemo } from '../../../../lib/deposit.ts';
-import { DEFAULT_NETWORK, type NetworkId } from '../../../../lib/deployments.ts';
 import { requireHuman } from '../../../../lib/human-gate.ts';
+import { modeForSession } from '../../../../lib/app-mode.ts';
+import { readLoggedInUser } from '../../../../lib/login-gate.ts';
+import { networkNotServedPrivate, requestNetwork } from '../../../../lib/server-network.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-function networkFrom(value: unknown): NetworkId {
-  return value === 'mainnet' || value === 'testnet' ? value : DEFAULT_NETWORK;
-}
 
 export async function POST(req: Request): Promise<Response> {
   const gated = await requireHuman(req);
@@ -59,7 +57,9 @@ export async function POST(req: Request): Promise<Response> {
   }
   const input = (body ?? {}) as { memo?: unknown; network?: unknown };
   if (!isMemo(input.memo)) return json({ error: 'código inválido' }, 400);
-  const network = networkFrom(input.network);
+  const asked = requestNetwork(input.network, undefined, undefined, 'default');
+  if (!asked.ok) return networkNotServedPrivate();
+  const network = asked.network;
 
   if (!canIssueCard()) return json({ terminated: false }, 200);
 
@@ -75,6 +75,8 @@ export async function POST(req: Request): Promise<Response> {
   // ephemeral card left alive for a few minutes — which the log below already
   // shouts about, and which the shopper can do nothing with, because its
   // memo is spent. The other direction does not come back.
+  const user = await readLoggedInUser(req);
+  const mode = modeForSession(user.ok);
   let owner: string | undefined;
   try {
     owner = await depositorOf(network, input.memo);
@@ -85,7 +87,9 @@ export async function POST(req: Request): Promise<Response> {
     );
     return json({ terminated: false, kept: true }, 200);
   }
-  if (keepsOneCard(network, owner)) return json({ terminated: false, kept: true }, 200);
+  if (keepsOneCard(network, owner, process.env, mode)) {
+    return json({ terminated: false, kept: true }, 200);
+  }
 
   const cardId = await heldCard(network, input.memo).catch(() => undefined);
   if (!cardId) return json({ terminated: false }, 200);

@@ -8,9 +8,9 @@ import type { Cart } from '@changuito/mcp/types';
 import { track, trackLoginStart } from '../lib/analytics';
 import type { QuoteResponse } from '../app/api/quote/route.ts';
 import { deployment } from '../lib/deployments.ts';
-import { modeCopy, trustlineCopy } from '../lib/mode-copy.ts';
+import { modeCopyFor, trustlineCopy } from '../lib/mode-copy.ts';
 import { basketHash, newOrderId, openArgs, toHex, type OpenedOrder } from '../lib/order.ts';
-import { pollarEnabledOn, shortAddress } from '../lib/pollar.ts';
+import { LOGIN_NETWORK, pollarEnabled, shortAddress } from '../lib/pollar.ts';
 import { usdcAsset } from '../lib/trustline.ts';
 import { useBalances } from '../lib/use-balances.ts';
 import { useFaucetAccess } from '../lib/use-faucet-access.ts';
@@ -30,7 +30,9 @@ export function PaymentModal(props: Props) {
   // Same split as WalletWidget, and the same condition as WalletProvider, so
   // `usePollar()` never runs outside a provider that exists.
   const { network } = useNetwork();
-  return pollarEnabledOn(network) ? <PayWithPollar {...props} /> : null;
+  return pollarEnabled && LOGIN_NETWORK !== null && network === LOGIN_NETWORK ? (
+    <PayWithPollar {...props} />
+  ) : null;
 }
 
 interface Props {
@@ -44,14 +46,14 @@ type Phase = 'review' | 'signing' | 'failed';
 
 function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
   const { wallet, isAuthenticated, verified, openLoginModal, runTx, setTrustline } = usePollar();
-  const { network } = useNetwork();
+  const { network, mode: appMode } = useNetwork();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
   const { data: balance, refresh } = useBalances(address, network);
   // Point at "Cargar USDC" only for wallets that actually have the button.
   const canFund = useFaucetAccess(address, network)?.allowed === true;
   const lang = useLang();
   const copy = uiCopy(lang).payment;
-  const mode = modeCopy(network, lang);
+  const mode = modeCopyFor(appMode, network, lang);
   const trustlineText = trustlineCopy(lang);
 
   // The one-time step before the first real payment. `not-needed` in modo

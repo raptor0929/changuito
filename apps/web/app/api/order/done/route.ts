@@ -32,18 +32,15 @@
  * one it is in — nor should it. An error here would be reporting a failure
  * that did not happen, on a request nothing is waiting for.
  */
-import { modeKeepsRecords } from '../../../../lib/app-mode.ts';
+import { modeForSession, modeKeepsRecords } from '../../../../lib/app-mode.ts';
 import { hasDatabase, markDone } from '../../../../lib/db.ts';
-import { DEFAULT_NETWORK, type NetworkId } from '../../../../lib/deployments.ts';
 import { isMemo } from '../../../../lib/deposit.ts';
 import { requireHuman } from '../../../../lib/human-gate.ts';
+import { readLoggedInUser } from '../../../../lib/login-gate.ts';
+import { networkNotServed, requestNetwork } from '../../../../lib/server-network.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-function networkFrom(value: unknown): NetworkId {
-  return value === 'mainnet' || value === 'testnet' ? value : DEFAULT_NETWORK;
-}
 
 export async function POST(req: Request): Promise<Response> {
   const gated = await requireHuman(req);
@@ -58,13 +55,16 @@ export async function POST(req: Request): Promise<Response> {
   const input = (body ?? {}) as { memo?: unknown; network?: unknown };
 
   if (!isMemo(input.memo)) return Response.json({ error: 'código inválido' }, { status: 400 });
-  const network = networkFrom(input.network);
+  const asked = requestNetwork(input.network, undefined, undefined, 'default');
+  if (!asked.ok) return networkNotServed();
+  const network = asked.network;
   const memo = input.memo;
 
-  // Both terms, out loud, the same way `keepsOneCard` asks them. `hasDatabase`
-  // alone would write a preview order into a deployment that happens to have
-  // DATABASE_URL set, which is every deployment.
-  if (!modeKeepsRecords(network) || !hasDatabase()) return ok();
+  // Mode from what the server can verify: a valid chg_user cookie means
+  // production. Network alone cannot decide who pays — a signed-in session
+  // on testnet still keeps records.
+  const user = await readLoggedInUser(req);
+  if (!modeKeepsRecords(modeForSession(user.ok)) || !hasDatabase()) return ok();
 
   try {
     const closed = await markDone(network, memo);

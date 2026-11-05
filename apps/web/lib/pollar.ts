@@ -7,20 +7,18 @@
  * paying" rather than breaking the page, which is also what a fresh clone gets
  * before anyone has signed up for a Pollar dashboard.
  *
- * ## One key, and why it is the mainnet one
+ * ## The login network follows the key
  *
  * A Pollar dashboard key is network-scoped, so the two networks are two
- * different clients holding two different sessions. We only have the mainnet
- * one, and that is not a gap to be filled later — it is the shape of the
- * product. Signing in means production means mainnet (lib/app-mode.ts), so the
- * only login there could be is the mainnet login. Preview has no wallet
- * because preview has nobody: we pay for it ourselves.
+ * different clients holding two different sessions. Which network a session
+ * belongs to is derived from which key is set — never from a second variable
+ * that names the network (CLAUDE.md §5). The testnet key takes precedence on
+ * purpose: a mainnet key left behind can never turn a deployment into a
+ * mainnet one while D1 runs on testnet.
  *
- * `LOGIN_NETWORK` is therefore not `DEFAULT_NETWORK`. They used to be the same
- * value and the difference is load-bearing now: DEFAULT_NETWORK is testnet, so
- * `pollarEnabledOn(DEFAULT_NETWORK)` asks "is there a testnet key", the answer
- * is permanently no, and anything gating a login on it would render an app
- * nobody can ever sign into.
+ * Mode (who pays) is a separate fact from network. Mode follows the session
+ * (lib/app-mode.ts); network follows the key. A signed-in shopper on testnet
+ * is production on testnet — their wallet pays, on play money.
  *
  * They are separate `NEXT_PUBLIC_` variables rather than one variable read at
  * runtime because Next inlines these at build time: a name assembled from a
@@ -28,15 +26,30 @@
  */
 import { type NetworkId } from './deployments.ts';
 
-/** The network a session belongs to. See the header: this is not the default. */
-export const LOGIN_NETWORK: NetworkId = 'mainnet';
+export type PollarKeys = Record<NetworkId, string>;
 
-const KEYS: Record<NetworkId, string> = {
+/**
+ * Which network a session can exist on, given the key map.
+ *
+ * Pure so it can be tested. Testnet wins when both are set. `null` means no
+ * login at all.
+ */
+export function loginNetwork(keys: PollarKeys): NetworkId | null {
+  if (keys.testnet.length > 0) return 'testnet';
+  if (keys.mainnet.length > 0) return 'mainnet';
+  return null;
+}
+
+const KEYS: PollarKeys = {
+  // Literals — Next inlines these at build time.
   testnet: process.env.NEXT_PUBLIC_POLLAR_API_KEY ?? '',
   mainnet: process.env.NEXT_PUBLIC_POLLAR_API_KEY_MAINNET ?? '',
 };
 
-export function pollarApiKey(net: NetworkId = LOGIN_NETWORK): string {
+/** The network a session belongs to, or null when this build cannot sign anyone in. */
+export const LOGIN_NETWORK: NetworkId | null = loginNetwork(KEYS);
+
+export function pollarApiKey(net: NetworkId): string {
   return KEYS[net];
 }
 
@@ -52,10 +65,10 @@ export function pollarEnabledOn(net: NetworkId): boolean {
  * with-wallet / without-wallet split is a build-time constant and hook order
  * can never change — see the note in WalletProvider. It asks about
  * LOGIN_NETWORK and not about whichever network the app happens to be showing,
- * because the network follows the session and the session cannot exist before
+ * because the network follows the key and the session cannot exist before
  * the key does.
  */
-export const pollarEnabled = pollarEnabledOn(LOGIN_NETWORK);
+export const pollarEnabled = LOGIN_NETWORK !== null;
 
 /**
  * Our network ids and Pollar's happen to be the same two words. The map exists
@@ -66,7 +79,7 @@ const POLLAR_NETWORKS: Record<NetworkId, 'testnet' | 'mainnet'> = {
   mainnet: 'mainnet',
 };
 
-export function pollarNetwork(net: NetworkId = LOGIN_NETWORK): 'testnet' | 'mainnet' {
+export function pollarNetwork(net: NetworkId): 'testnet' | 'mainnet' {
   return POLLAR_NETWORKS[net];
 }
 

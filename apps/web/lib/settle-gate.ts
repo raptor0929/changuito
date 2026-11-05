@@ -1,7 +1,8 @@
-import { asNetwork, DEFAULT_NETWORK, type NetworkId } from './deployments.ts';
+import type { NetworkId } from './deployments.ts';
 import { requireHuman } from './human-gate.ts';
 import { denyNetwork } from './network-access.ts';
 import type { SettleAction } from './order.ts';
+import { requestNetwork } from './server-network.ts';
 import { proofFromBody, verifyWalletProof } from './wallet-proof-verify.ts';
 
 /**
@@ -65,12 +66,13 @@ export async function gateSettle(
   const basketHash = typeof body.basketHash === 'string' ? body.basketHash.toLowerCase() : '';
   const address = typeof body.address === 'string' ? body.address.trim() : '';
 
-  // Absent is the default; present-but-unknown is a mistake worth naming,
-  // because silently falling back would settle on a chain nobody asked for.
-  const network = body.network === undefined ? DEFAULT_NETWORK : asNetwork(body.network);
-  if (network === null) {
-    return Response.json({ error: 'network no reconocida' }, { status: 400 });
+  // Absent is the default; present-but-unserved is refused, never coerced —
+  // silently falling back would settle on a chain nobody asked for.
+  const asked = requestNetwork(body.network);
+  if (!asked.ok) {
+    return Response.json({ error: 'network_not_served' }, { status: 400 });
   }
+  const network = asked.network;
 
   if (!HEX32.test(orderId)) {
     return Response.json({ error: 'orderId must be 32 bytes of hex' }, { status: 400 });

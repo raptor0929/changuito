@@ -1,8 +1,9 @@
-import { asNetwork, DEFAULT_NETWORK, type NetworkId } from './deployments.ts';
+import type { NetworkId } from './deployments.ts';
 import { authorizeFaucet } from './faucet-auth.ts';
 import type { FaucetProof } from './faucet-proof.ts';
 import { requireHuman } from './human-gate.ts';
 import { guestTurnCounter, limiterUnavailableResponse, takeQuota, type TurnCounter } from './login-gate.ts';
+import { requestNetwork } from './server-network.ts';
 import { addressKind } from './stellar.ts';
 
 /**
@@ -36,19 +37,20 @@ export async function gateFaucet(
 
   let address: string;
   let proof: Partial<FaucetProof> | null = null;
-  let network: NetworkId | null = DEFAULT_NETWORK;
+  let networkParam: unknown = undefined;
   try {
     const body = (await req.json()) as { address?: unknown; proof?: unknown; network?: unknown };
     address = typeof body.address === 'string' ? body.address : '';
     if (body.proof && typeof body.proof === 'object') proof = body.proof as Partial<FaucetProof>;
-    // Absent means the default; present-but-unknown is named rather than
-    // quietly coerced, so a typo cannot look like it worked.
-    if (body.network !== undefined) network = asNetwork(body.network);
+    networkParam = body.network;
   } catch {
     return Response.json({ error: 'expected a JSON body' }, { status: 400 });
   }
 
-  if (network === null) return Response.json({ error: 'network no reconocida' }, { status: 400 });
+  // Absent means the default; present-but-unserved is refused, never coerced.
+  const asked = requestNetwork(networkParam);
+  if (!asked.ok) return Response.json({ error: 'network_not_served' }, { status: 400 });
+  const network = asked.network;
 
   const kind = addressKind(address);
   if (!kind) return Response.json({ error: 'not a Stellar address' }, { status: 400 });

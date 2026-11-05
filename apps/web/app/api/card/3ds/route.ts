@@ -19,7 +19,7 @@
  */
 import { canIssueCard, cardClient, heldCard } from '../../../../lib/card.ts';
 import { isMemo } from '../../../../lib/deposit.ts';
-import { DEFAULT_NETWORK, type NetworkId } from '../../../../lib/deployments.ts';
+import { networkNotServedPrivate, requestNetwork } from '../../../../lib/server-network.ts';
 import { requireHuman } from '../../../../lib/human-gate.ts';
 
 export const runtime = 'nodejs';
@@ -38,10 +38,6 @@ export interface ThreeDsCode {
   expiresAt: number | null;
 }
 
-function networkFrom(value: string | null): NetworkId {
-  return value === 'mainnet' || value === 'testnet' ? value : DEFAULT_NETWORK;
-}
-
 export async function GET(req: Request): Promise<Response> {
   const gated = await requireHuman(req);
   if (gated) return gated;
@@ -49,7 +45,9 @@ export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const memo = url.searchParams.get('memo');
   if (!isMemo(memo)) return json({ error: 'código inválido' }, 400);
-  const network = networkFrom(url.searchParams.get('network'));
+  const asked = requestNetwork(url.searchParams.get('network'), undefined, undefined, 'default');
+  if (!asked.ok) return networkNotServedPrivate();
+  const network = asked.network;
 
   if (!canIssueCard()) return json({ code: null }, 200);
 

@@ -138,12 +138,23 @@ escrow; it is simply no longer on the deposit rail.
 - **Anthropic** — [console.anthropic.com](https://console.anthropic.com) → API
   keys. This is what runs the shopping agent.
 - **Pollar** — the [Pollar dashboard](https://pollar.xyz) → your application →
-  API key, with the network set to **mainnet**. This one is publishable and
+  API key, with the network set to **testnet**. This one is publishable and
   ships in the browser bundle by design.
 
-Mainnet, and only mainnet. A Pollar dashboard key is network-scoped, this
-project holds one, and [2.3](#23-preview-and-production) is why that is a
-design rather than a gap.
+Testnet, while D1 runs. A Pollar dashboard key is network-scoped — the key is
+the network, and the login network in `lib/pollar.ts` follows whichever key is
+set rather than a variable of its own. In the dashboard, on that testnet app:
+
+| Setting | Value |
+|---|---|
+| Network | **testnet** |
+| Allowed domains | `app.changuito.me`, `ste.changuito.me`, and the Stellar Worker `*.workers.dev` URL |
+| Login methods | Freighter enabled, plus the existing email and Google |
+| Fee sponsorship | **off** — OZ Channels pays fees |
+| Reserve sponsorship | **off** — Changuito's sponsor account pays reserves |
+
+The mainnet key (`NEXT_PUBLIC_POLLAR_API_KEY_MAINNET`) stays empty on a
+testnet deployment; with the testnet key set it is not read for sign-in.
 
 ### 2.2 Import the repository
 
@@ -172,9 +183,9 @@ by whether Pollar has a session**, evaluated in the browser (`lib/app-mode.ts`).
 | | **preview** | **production** |
 |---|---|---|
 | who is it | nobody signed in | a Pollar session |
-| network | testnet | mainnet |
+| network | testnet | the network of the Pollar key — **testnet** while D1 runs |
 | who pays | **the demo wallet, server-signed** | their own wallet |
-| money | the USDC issued in [1.6](#16-issue-the-testnet-usdc-preview-pays-with) | real Circle USDC |
+| money | the USDC issued in [1.6](#16-issue-the-testnet-usdc-preview-pays-with) | testnet USDC while D1 runs; real Circle USDC on mainnet |
 | Postgres | **never touched** | chat, orders, the card binding |
 | the card | one per código, given back with the basket | one per customer, kept |
 
@@ -226,7 +237,8 @@ Grouped by which of the two apps needs them.
 
 | Name | Value | Exposed to |
 |---|---|---|
-| `NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` | the Pollar key from [2.1](#21-get-the-two-api-keys) | the browser, by design |
+| `NEXT_PUBLIC_POLLAR_API_KEY` | the **testnet** Pollar key from [2.1](#21-get-the-two-api-keys) | the browser, by design |
+| `NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` | empty while D1 runs on testnet | the browser, by design |
 | `CHG_SESSION_SECRET` | **required**, `openssl rand -base64 32` | server only |
 | `DEPOSIT_ADDRESS_MAINNET` | the `G…` operator account real deposits are paid into | server only |
 | `VYRION_API_KEY` | `sk_test_…`, or `sk_live_…` with `ALLOW_LIVE=1` | server only |

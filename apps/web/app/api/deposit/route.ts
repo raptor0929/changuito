@@ -9,7 +9,9 @@
  * The mainnet rail holds no key. Preview is the only thing that pays for
  * anybody, and that payment is `POST /api/deposit/demo`, not this route.
  */
+import { modeForSession } from '../../../lib/app-mode.ts';
 import { requireHuman } from '../../../lib/human-gate.ts';
+import { readLoggedInUser } from '../../../lib/login-gate.ts';
 import {
   confirmDeposit,
   quoteDeposit,
@@ -34,7 +36,14 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: 'body must be JSON' }, { status: 400 });
   }
 
-  const result = await quoteDeposit(body);
+  // Mode and the cookie address are read here — the only place the server can
+  // verify them — and handed to the rail. A signed-in testnet shopper owns
+  // their deposit even though the gate needs no proof on that network.
+  const user = await readLoggedInUser(req);
+  const result = await quoteDeposit(body, {
+    mode: modeForSession(user.ok),
+    address: user.ok ? user.address : null,
+  });
   return Response.json(result.body, { status: result.status });
 }
 

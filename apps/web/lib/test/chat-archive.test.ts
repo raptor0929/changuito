@@ -64,27 +64,35 @@ describe('archiving a conversation', () => {
     assert.deepEqual(deps.calls, [], 'a guest transcript reached the database');
   });
 
-  it('RULE: preview is never written down either, address or no address', async () => {
-    // The allowlist can put a proven wallet on testnet, so "no session" does
-    // not cover this on its own. `modeKeepsRecords` is asked out loud, and
-    // this is the case that would otherwise hold only by coincidence.
+  it('RULE: a signed-in session on testnet is archived', async () => {
+    // `address` comes from the `chg_user` cookie — a signed-in session.
+    // Production keeps records; the DB is keyed `(network, address)`, so a
+    // testnet transcript cannot collide with a mainnet one.
     const deps = spy();
     const outcome = await archiveChat(
       { id: 'c1', network: 'testnet', address: WALLET, turn: turnWith('hola'), title: 'hola' },
       deps,
     );
-    assert.equal(outcome, 'preview');
-    assert.deepEqual(deps.calls, [], 'a preview transcript reached the database');
+    assert.equal(outcome, 'saved');
+    assert.equal(deps.calls.length, 1);
   });
 
   it('RULE: the mode is checked before the database, so preview never dials one', async () => {
     // Ordering, not pedantry: a deployment always has DATABASE_URL set, so
     // asking `hasDatabase` first would answer 'no-database' for nobody and
-    // hide the reason preview writes nothing.
+    // hide the reason preview writes nothing. Mode is passed explicitly —
+    // an address alone is now a signed-in session and would keep records.
     const deps = { ...spy(), hasDatabase: () => false };
     assert.equal(
       await archiveChat(
-        { id: 'c1', network: 'testnet', address: WALLET, turn: turnWith('hola'), title: 'hola' },
+        {
+          id: 'c1',
+          network: 'testnet',
+          address: WALLET,
+          mode: 'preview',
+          turn: turnWith('hola'),
+          title: 'hola',
+        },
         deps,
       ),
       'preview',

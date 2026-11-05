@@ -44,10 +44,11 @@
 import { CARD_MAX_CENTS } from '@changuito/mcp/pay';
 import { Asset, BASE_FEE, Memo, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
 
-import { asNetwork, DEFAULT_NETWORK, DEPLOYMENTS, type NetworkId } from '../../../../lib/deployments.ts';
+import { DEPLOYMENTS, type NetworkId } from '../../../../lib/deployments.ts';
 import { depositAddress, depositAsset, isMemo } from '../../../../lib/deposit.ts';
 import { stroops } from '../../../../lib/deposit-watch.ts';
 import { requireHuman } from '../../../../lib/human-gate.ts';
+import { networkNotServed, requestNetwork } from '../../../../lib/server-network.ts';
 import {
   clientIp,
   guestTurnCounter,
@@ -91,11 +92,10 @@ export async function POST(req: Request): Promise<Response> {
   }
   const input = (body ?? {}) as { memo?: unknown; amount?: unknown; network?: unknown };
 
-  // Absent means the default; present-but-unknown is named rather than
-  // quietly coerced, the same way gateFaucet reads it.
-  const network: NetworkId | null =
-    input.network === undefined ? DEFAULT_NETWORK : asNetwork(input.network);
-  if (network === null) return Response.json({ error: 'network no reconocida' }, { status: 400 });
+  // Absent means the default; present-but-unserved is refused, never coerced.
+  const asked = requestNetwork(input.network);
+  if (!asked.ok) return networkNotServed();
+  const network = asked.network;
 
   if (!demoWalletAddress(network)) {
     // Deliberately not 404. The route exists; this network has nobody to pay

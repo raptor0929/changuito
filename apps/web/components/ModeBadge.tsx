@@ -1,11 +1,12 @@
 'use client';
 
+import type { AppMode } from '../lib/app-mode.ts';
 import type { NetworkId } from '../lib/deployments.ts';
-import { modeCopy } from '../lib/mode-copy.ts';
+import { modeCopyFor, NETWORK_BADGE } from '../lib/mode-copy.ts';
 import { useLang } from './LangProvider';
 
 /**
- * Modo prueba / modo real, stated rather than offered.
+ * Mode + network, stated rather than offered.
  *
  * This was a radiogroup with two positions. It is a label now, because the
  * mode stopped being a choice: it follows the Pollar session
@@ -18,25 +19,42 @@ import { useLang } from './LangProvider';
  * in a footnote, so somebody looking at a balance knows whether it is money.
  * That is why this renders at all rather than the element simply going away.
  *
+ * On testnet a second badge names the network, so a signed-in session is not
+ * mistaken for mainnet just because the mode says "tu billetera".
+ *
  * Still a wrapper div and not a bare element: the phone block in globals.css
  * branches on `.wallet:has(> .btn)` to tell the logged-out masthead from the
  * connected one, and a new direct child of `.wallet` flips that selector.
  */
-export function ModeBadge({ network }: { network: NetworkId }) {
-  const mode = modeCopy(network, useLang());
+export function ModeBadge({ network, mode }: { network: NetworkId; mode: AppMode }) {
+  const lang = useLang();
+  const copy = modeCopyFor(mode, network, lang);
+  const netBadge = network === 'testnet' ? NETWORK_BADGE.testnet : null;
+  // data-mode stays the network for the existing contrast rules (mainnet =
+  // sunflower). Production on testnet keeps the neutral surface.
+  const tone = mode === 'production' && network === 'mainnet' ? 'mainnet' : 'testnet';
   return (
     <div className="wallet-mode">
-      <span className="mode-badge" data-mode={network} data-testid="mode-badge">
-        {/* One label at two widths; CSS hides one. Both are aria-hidden and
-            the span carries the name, so hiding either never costs it. */}
+      <span className="mode-badge" data-mode={tone} data-testid="mode-badge">
         <span className="mode-long" aria-hidden="true">
-          {mode.label}
+          {copy.label}
         </span>
         <span className="mode-short" aria-hidden="true">
-          {mode.short}
+          {copy.short}
         </span>
-        <span className="sr-only">{mode.label}</span>
+        <span className="sr-only">{copy.label}</span>
       </span>
+      {netBadge ? (
+        <span className="network-badge" data-network="testnet" data-testid="network-badge">
+          <span className="mode-long" aria-hidden="true">
+            {netBadge.label}
+          </span>
+          <span className="mode-short" aria-hidden="true">
+            {netBadge.short}
+          </span>
+          <span className="sr-only">{netBadge.label}</span>
+        </span>
+      ) : null}
     </div>
   );
 }

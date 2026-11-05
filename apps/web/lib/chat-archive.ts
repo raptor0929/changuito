@@ -38,7 +38,7 @@
  * reply.
  */
 import { encodeTurn } from './agent/turn-store.ts';
-import { modeKeepsRecords } from './app-mode.ts';
+import { modeForSession, modeKeepsRecords, type AppMode } from './app-mode.ts';
 import { hasDatabase, saveChat } from './db.ts';
 import type { NetworkId } from './deployments.ts';
 
@@ -67,6 +67,13 @@ export interface ArchiveInput {
   network: NetworkId;
   /** The wallet behind `chg_user`, or null for a guest. */
   address: string | null;
+  /**
+   * Who pays, as verified by the caller via `readLoggedInUser`. Optional so
+   * existing callers keep compiling; when absent it is derived from whether
+   * an address was handed in — which is the same bit the cookie already
+   * proved for callers that pass one.
+   */
+  mode?: AppMode;
   turn: Turn;
   /** The first message of the conversation, or null on every later turn. */
   title: string | null;
@@ -88,13 +95,14 @@ const REAL: ArchiveDeps = { hasDatabase, saveChat };
 
 export async function archiveChat(i: ArchiveInput, deps: ArchiveDeps = REAL): Promise<ArchiveOutcome> {
   if (!i.address) return 'guest';
-  // Asked out loud, not inferred from the address. Preview has no session so
-  // it cannot get past the line above — today. That is a coincidence of two
-  // unrelated facts (Pollar sells one key, and it is the mainnet one) rather
-  // than a rule, and "no Supabase in preview" is a rule. `keepsOneCard` asks
-  // the same question the same way for the same reason; this is the check its
-  // comment already claims is here.
-  if (!modeKeepsRecords(i.network)) return 'preview';
+  // Asked out loud from the session, not from the network. A signed-in
+  // shopper on testnet is production and keeps records — the DB is keyed on
+  // (network, address), so testnet rows cannot collide with mainnet ones.
+  // `keepsOneCard` asks the same question the same way for the same reason.
+  // Prefer the mode the caller verified; falling back to the address bit
+  // keeps un-updated callers compiling without reintroducing a network check.
+  const mode = i.mode ?? modeForSession(Boolean(i.address));
+  if (!modeKeepsRecords(mode)) return 'preview';
   if (!deps.hasDatabase()) return 'no-database';
   try {
     await deps.saveChat({

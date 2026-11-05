@@ -6,8 +6,8 @@ import { useEffect, useRef, useState } from 'react';
 import { track, trackLoginStart } from '../lib/analytics';
 import { GRANT_UNITS } from '../lib/faucet-policy.ts';
 import { usdcAmount } from '../lib/faucet-copy.ts';
-import { modeCopy, previewMasthead, trustlineCopy } from '../lib/mode-copy.ts';
-import { pollarEnabled } from '../lib/pollar.ts';
+import { modeCopyFor, previewMastheadFor, trustlineCopy } from '../lib/mode-copy.ts';
+import { LOGIN_NETWORK, pollarEnabled } from '../lib/pollar.ts';
 import { ensureUserCookie, forgetUserCookie } from '../lib/session-login.ts';
 import { usdcAsset } from '../lib/trustline.ts';
 import type { FaucetProof } from '../lib/faucet-proof.ts';
@@ -51,7 +51,7 @@ function NoWallet() {
     track('payment_view', { state: 'unconfigured' });
   }, []);
   return (
-    <div className="wallet wallet-off" title="Falta NEXT_PUBLIC_POLLAR_API_KEY_MAINNET. Ver DEPLOY.md">
+    <div className="wallet wallet-off" title="Falta NEXT_PUBLIC_POLLAR_API_KEY. Ver DEPLOY.md">
       <span className="wallet-label">{copy.label}</span>
       <span className="wallet-muted">{copy.unconfigured}</span>
     </div>
@@ -60,7 +60,7 @@ function NoWallet() {
 
 function ConnectedWallet() {
   const { wallet, isAuthenticated, verified, openLoginModal, logout, setTrustline } = usePollar();
-  const { network } = useNetwork();
+  const { network, mode: appMode } = useNetwork();
   const sign = useWalletSigner();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
   const { data, loading, error, refresh } = useBalances(address, network);
@@ -70,9 +70,9 @@ function ConnectedWallet() {
   const faucet = useFaucetAccess(address, network);
   const lang = useLang();
   const copy = uiCopy(lang).wallet;
-  const mode = modeCopy(network, lang);
+  const mode = modeCopyFor(appMode, network, lang);
   const trustline = trustlineCopy(lang);
-  const masthead = previewMasthead(lang);
+  const masthead = previewMastheadFor(LOGIN_NETWORK, lang);
 
   // There is no "put them back in the safe mode" correction any more, and
   // there must not be one. The mode is the session (lib/app-mode.ts), so
@@ -207,7 +207,7 @@ function ConnectedWallet() {
   if (!address) {
     return (
       <div className="wallet">
-        <ModeBadge network={network} />
+        <ModeBadge network={network} mode={appMode} />
         <span className="wallet-muted">{masthead.hint}</span>
         <button type="button" className="btn" onClick={() => trackLoginStart(openLoginModal)}>
           {masthead.action}
@@ -247,7 +247,7 @@ function ConnectedWallet() {
             else: this is the line that says whether the money is real. */}
         <span className="wallet-unit">{mode.balanceUnit}</span>
         {/* Beside the number it qualifies, not a row below it. */}
-        <ModeBadge network={network} />
+        <ModeBadge network={network} mode={appMode} />
         {loading && <span className="wallet-muted">{copy.refreshing}</span>}
       </div>
 

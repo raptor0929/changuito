@@ -144,7 +144,8 @@ export type HumanCookieOptions = {
 };
 
 /**
- * Host-only cookie (no Domain): it must stick to app.changuito.me and must
+ * Host-only cookie (no Domain): it must stick to the shopper host
+ * (app.changuito.me or ste.changuito.me — same Stellar app) and must
  * not be shared with www. SameSite=Lax is sent on same-origin fetch, which
  * is how /api/chat is called. Secure only in production so http://localhost
  * can still store it.

@@ -40,15 +40,15 @@
  * very much alive: it is the house pattern for "we are about to spend
  * something on your behalf", and POST /api/deposit/demo follows it.
  */
-import { networkOrDefault } from '../../../lib/deployments.ts';
 import { faucetAccess } from '../../../lib/faucet-auth.ts';
 import { gateFaucet } from '../../../lib/faucet-gate.ts';
 import { faucetVerdict } from '../../../lib/faucet-policy.ts';
 import type { FaucetAccess } from '../../../lib/faucet-proof.ts';
+import { requireHuman } from '../../../lib/human-gate.ts';
+import { networkNotServed, requestNetwork } from '../../../lib/server-network.ts';
 import { usdcAsAdmin } from '../../../lib/server/resolver.ts';
 import { addressKind, ensureFunded, formatUsdc } from '../../../lib/stellar.ts';
 import { usdcBalance } from '../../../lib/token.ts';
-import { requireHuman } from '../../../lib/human-gate.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -71,7 +71,9 @@ export async function GET(req: Request): Promise<Response> {
 
   const params = new URL(req.url).searchParams;
   const address = params.get('address') ?? '';
-  const network = networkOrDefault(params.get('network'));
+  const asked = requestNetwork(params.get('network'));
+  if (!asked.ok) return networkNotServed();
+  const network = asked.network;
   const access: FaucetAccess = addressKind(address)
     ? faucetAccess(address, process.env, network)
     : { mode: faucetAccess('', process.env, network).mode, allowed: false };

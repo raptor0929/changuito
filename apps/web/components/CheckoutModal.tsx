@@ -10,11 +10,10 @@ import type { Cart } from '@changuito/mcp/types';
 import type { DepositIntent, DepositStatus } from '../app/api/deposit/route.ts';
 import type { VerifyResponse } from '../app/api/order/verify/route.ts';
 import { track } from '../lib/analytics';
-import { appMode } from '../lib/app-mode.ts';
 import type { Receipt } from '../lib/chat-store.ts';
 import { checkoutCopy } from '../lib/checkout-copy.ts';
 import { DEFAULT_NETWORK } from '../lib/deployments.ts';
-import { pollarEnabled, pollarEnabledOn } from '../lib/pollar.ts';
+import { LOGIN_NETWORK, pollarEnabled } from '../lib/pollar.ts';
 import { realModeNeedsProof } from '../lib/real-mode.ts';
 import { isFramableCheckout, STOREFRONT_HOSTS } from '../lib/storefront.ts';
 import { uiCopy } from '../lib/ui-copy.ts';
@@ -26,6 +25,7 @@ import { signWalletProof, type WalletProof, type WalletSigner } from '../lib/wal
 import { CardPanel } from './CardPanel';
 import { CopyField } from './CopyField';
 import { useLang } from './LangProvider';
+import { ModeBadge } from './ModeBadge';
 import { useNetwork } from './NetworkProvider';
 
 /**
@@ -178,18 +178,14 @@ interface Props {
  *
  * **Both halves of the gate, and the first one is the one that bites.**
  * `pollarEnabled` is the question `WalletProvider` answered when it decided
- * whether to mount — it asks about LOGIN_NETWORK, i.e. the mainnet key — and a
- * consumer that asks a *different* question can find itself inside the branch
- * with no provider above it. That is not hypothetical: a build with a testnet
- * key and no mainnet key has `pollarEnabledOn('testnet')` true and no provider,
- * which is `usePollar must be used inside <PollarProvider>` on the first render
- * of this dialog. So: is there a provider, *and* can a wallet pay on the
- * network being shown. `PaymentModal` gates on the second alone and has the
- * same hole.
+ * whether to mount — it asks about LOGIN_NETWORK — and a consumer that asks a
+ * *different* question can find itself inside the branch with no provider
+ * above it. So: is there a provider, *and* is the network being shown the
+ * login network. `PaymentModal` uses the same gate.
  */
 export function CheckoutModal(props: Props) {
   const { network } = useNetwork();
-  return pollarEnabled && pollarEnabledOn(network) ? (
+  return pollarEnabled && LOGIN_NETWORK !== null && network === LOGIN_NETWORK ? (
     <CheckoutWithWallet {...props} />
   ) : (
     <CheckoutDialog {...props} address={null} sign={null} pay={null} />
@@ -255,14 +251,15 @@ const WATCH_MAX = IDENTIFY_MAX + 54;
 const SLOT_PATIENCE_MS = 90_000;
 
 function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, sign, pay }: DialogProps) {
-  const { network } = useNetwork();
+  const { network, mode: appMode } = useNetwork();
   const lang = useLang();
   const copy = checkoutCopy(network, lang);
   const ui = uiCopy(lang).checkout;
 
   // Null until the server answers, and null forever for a guest with no
   // address — which is right, because a guest cannot be in a gated mode.
-  const mode = useNetworkAccess(address)?.[network].mode ?? null;
+  // This is the allowlist answer (`open` / `allowlist` / …), not AppMode.
+  const mode = useNetworkAccess(address)?.[network]?.mode ?? null;
 
   const [intent, setIntent] = useState<DepositIntent | null>(null);
   const [mintError, setMintError] = useState<string | null>(null);
@@ -369,7 +366,7 @@ function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, si
     // it holds whatever any browser asks for. This is here so the browser does
     // not ask, and so the next person reading `release` sees which of the two
     // cards it is about.
-    if (appMode(network) !== 'preview') return;
+    if (appMode !== 'preview') return;
     if (!cardLive.current || !intent) return;
     cardLive.current = false;
     // `keepalive` so it survives the unload this is sometimes called during.
@@ -382,7 +379,7 @@ function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, si
       body: JSON.stringify({ memo: intent.memo, network }),
       keepalive: true,
     }).catch(() => {});
-  }, [intent, network]);
+  }, [intent, network, appMode]);
 
   // The tab closing is the one exit that does not go through a button of ours.
   useEffect(() => {
@@ -811,12 +808,12 @@ function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, si
   const showSplit = totalLines.length >= 2;
   // Preview *and* a deployment that can actually sign. Both, because the mode
   // alone would render a button that 503s on a checkout with no secret set.
-  const demoPays = Boolean(intent) && appMode(network) === 'preview' && intent!.demoPayable;
+  const demoPays = Boolean(intent) && appMode === 'preview' && intent!.demoPayable;
   // Production's equivalent. `address.startsWith('G')` is the smart-wallet
   // guard described in the header: a C-address pays by SAC transfer, which
   // leaves no classic payment for the poll to find.
   const walletPays =
-    intent !== null && appMode(network) === 'production' && pay !== null && Boolean(address?.startsWith('G'));
+    intent !== null && appMode === 'production' && pay !== null && Boolean(address?.startsWith('G'));
   // Only comparable when the importe is in the asset the balance is of. A
   // network with no USDC issuer quotes native XLM (lib/deposit.ts) and
   // `balance.usdc` is not that number, so there this abstains rather than
@@ -851,6 +848,7 @@ function CheckoutDialog({ cart, handoffUrl, chatId, onClose, onPaid, address, si
       >
         <header className="modal-head">
           <h2>{copy.title}</h2>
+          <ModeBadge network={network} mode={appMode} />
           <button type="button" className="modal-x" onClick={close} aria-label={ui.close}>
             ×
           </button>

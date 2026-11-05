@@ -1,6 +1,6 @@
 # @changuito/landing
 
-Landing de marketing para **www.changuito.me**. Es un proyecto Next.js aparte de `apps/web` (el shopper, en app.changuito.me).
+Landing de marketing para **www.changuito.me**. Es un proyecto Next.js aparte de `apps/web` (el shopper Stellar, en app.changuito.me / ste.changuito.me).
 
 No comparte rutas con el shopper. Durante la beta controlada, los botones «Probar Changuito» van a `/whitelist`. `APP_URL` (`https://app.changuito.me`) queda para SEO y docs, sin navegación desde la landing.
 
@@ -17,7 +17,7 @@ Crear un **proyecto nuevo**, no reusar el de `apps/web`.
 | Build command | default — corre `next build` de este paquete |
 | Environment variables | el sitio se construye sin ellas. `/whitelist` en producción no anota a nadie si faltan Turnstile o un destino. `/reportarbug` funciona sin variables (ver abajo). |
 
-Dominio de producción: `www.changuito.me`. `app.changuito.me` sigue en el proyecto de `apps/web`.
+Dominio de producción: `www.changuito.me`. El shopper Stellar (`app.changuito.me` / `ste.changuito.me`) sigue en el proyecto de `apps/web`.
 
 La lista de espera vive en `/whitelist`. No hace falta login de Vercel para mergear el código: el próximo deploy toma la ruta. Sin un destino configurado, producción responde que no pudo anotar a la persona (no finge el alta). En `next dev` / `next start` local, si no hay variables, el alta se agrega a `apps/landing/.data/waitlist.jsonl` (gitignored).
 

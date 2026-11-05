@@ -86,8 +86,9 @@ import { CARD_MIN_CENTS, formatUsd, type VyrionClient } from '@changuito/mcp/pay
 
 import { canIssueCard, cardClient, keepsOneCard, mintKeptCard } from '../../../../lib/card.ts';
 import { cardOf, hasDatabase, unbindCard } from '../../../../lib/db.ts';
-import { DEFAULT_NETWORK, type NetworkId } from '../../../../lib/deployments.ts';
 import { requireHuman } from '../../../../lib/human-gate.ts';
+import { modeForSession } from '../../../../lib/app-mode.ts';
+import { networkNotServedPrivate, requestNetwork } from '../../../../lib/server-network.ts';
 import { readLoggedInUser } from '../../../../lib/login-gate.ts';
 import { networkAccess } from '../../../../lib/network-access.ts';
 import { sharedCardIfMember } from '../../../../lib/shared-card.ts';
@@ -97,10 +98,6 @@ import type { IssuedCard } from '../route.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-function networkFrom(value: unknown): NetworkId {
-  return value === 'mainnet' || value === 'testnet' ? value : DEFAULT_NETWORK;
-}
 
 /**
  * Nothing thrown gets out of here as an empty body.
@@ -150,7 +147,9 @@ async function handle(req: Request): Promise<Response> {
   const claimed = typeof input.address === 'string' ? input.address.trim().toUpperCase() : '';
   const address = signedIn || claimed;
   if (!/^G[A-Z2-7]{55}$/.test(address)) return json({ error: 'dirección inválida' }, 400);
-  const network = networkFrom(input.network);
+  const asked = requestNetwork(input.network, undefined, undefined, 'default');
+  if (!asked.ok) return networkNotServedPrivate();
+  const network = asked.network;
 
   // Same gate the deposit route puts in front of a real network, and asked
   // before the credential is checked, so a wallet that may not use this
@@ -232,7 +231,7 @@ async function handle(req: Request): Promise<Response> {
 
   let cardId = cardId0;
   if (!cardId) {
-    if (!keepsOneCard(network, address)) {
+    if (!keepsOneCard(network, address, process.env, modeForSession(Boolean(signedIn)))) {
       return json({ error: 'en modo prueba la tarjeta se crea con cada compra' }, 400);
     }
 

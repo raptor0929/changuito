@@ -1,13 +1,14 @@
 import { newTurnState, runTurn } from '@/lib/agent/loop';
+import { modeForSession } from '@/lib/app-mode';
 import { isChatImage } from '@/lib/chat-image';
 import { turnStore } from '@/lib/agent/turn-store';
 import { archiveChat, chatTitle } from '@/lib/chat-archive';
-import { asNetwork, DEFAULT_NETWORK } from '@/lib/deployments';
 import { langFrom } from '@/lib/lang';
 import { withSession } from '@/lib/mcp/session';
 import { encodeEvent, HEARTBEAT, SSE_HEADERS, type ChatRequest, type UiEvent } from '@/lib/protocol';
 import { requireHuman } from '@/lib/human-gate';
 import { readLoggedInUser, requireLoginOrFreeTurn } from '@/lib/login-gate';
+import { networkNotServed, requestNetwork } from '@/lib/server-network';
 
 /**
  * Node, not edge: the MCP server reads `node:url` and the Stellar SDK needs
@@ -74,7 +75,9 @@ export async function POST(req: Request): Promise<Response> {
   // A guest is `null` here, and `archiveChat` writes nothing for a guest.
   const user = await readLoggedInUser(req);
   const owner = user.ok ? user.address : null;
-  const network = asNetwork(body.network) ?? DEFAULT_NETWORK;
+  const asked = requestNetwork(body.network, undefined, undefined, 'default');
+  if (!asked.ok) return networkNotServed();
+  const network = asked.network;
   // Which language the agent answers in, and nothing else. This route's own
   // refusals stay Spanish: they are shared with the MCP server and with the
   // agent, neither of which reads a cookie from this browser, so the client
@@ -152,6 +155,9 @@ export async function POST(req: Request): Promise<Response> {
             id: body.sessionId,
             network,
             address: owner,
+            // Same cookie `owner` came from — pass the mode out loud so the
+            // archive does not re-derive it from the address bit alone.
+            mode: modeForSession(user.ok),
             turn,
             // Every turn offers a title and `saveChat` coalesces, so the
             // first one to land wins and the rest are no-ops. Sending it only

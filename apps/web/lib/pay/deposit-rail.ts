@@ -33,10 +33,11 @@
 import { arsToUsdCents, getArsPerUsd } from '@changuito/mcp/fx';
 import { CARD_MIN_CENTS, formatUsd } from '@changuito/mcp/pay';
 
-import { modeKeepsRecords } from '../app-mode.ts';
+import { modeForSession, modeKeepsRecords, type AppMode } from '../app-mode.ts';
 import { canIssueCard, rememberDepositor } from '../card.ts';
 import { hasDatabase, markPaid, openChatOrder } from '../db.ts';
-import { DEFAULT_NETWORK, type NetworkId } from '../deployments.ts';
+import type { NetworkId } from '../deployments.ts';
+import { requestNetwork } from '../server-network.ts';
 import { isMemo, mintMemo, type DepositAsset } from '../deposit.ts';
 import { authorizeRealMode, realModeNeedsProof } from '../deposit-gate.ts';
 import { activeLedger } from '../ledger/index.ts';
@@ -44,6 +45,13 @@ import { orderFormIdFrom, readOrderForm } from '../order-check.ts';
 import { sharedCardCeilingCents } from '../shared-card.ts';
 import { canDemoPay } from '../server/demo-wallet.ts';
 import { proofFromBody } from '../wallet-proof-verify.ts';
+
+/** Session facts the HTTP layer verified via `readLoggedInUser`. */
+export interface DepositSession {
+  mode: AppMode;
+  /** Cookie address when signed in; owns a testnet deposit that needs no proof. */
+  address: string | null;
+}
 
 export interface DepositIntent {
   network: NetworkId;
@@ -101,8 +109,12 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
-function networkFrom(value: string | null): NetworkId {
-  return value === 'mainnet' || value === 'testnet' ? value : DEFAULT_NETWORK;
+function networkFrom(value: string | null): NetworkId | null {
+  // Coerce unrecognized values the way this rail always did — a typo must not
+  // 400 a quote whose contract is to answer. Recognized-but-unserved still
+  // refuses.
+  const asked = requestNetwork(value, undefined, undefined, 'default');
+  return asked.ok ? asked.network : null;
 }
 
 /**
@@ -124,7 +136,10 @@ export function depositAmount(usdCents: number): string {
   return (usdCents / 100).toFixed(7);
 }
 
-export async function quoteDeposit(body: unknown): Promise<DepositReply> {
+export async function quoteDeposit(
+  body: unknown,
+  session: DepositSession = { mode: modeForSession(false), address: null },
+): Promise<DepositReply> {
   const input = (body ?? {}) as {
     centavos?: unknown;
     network?: unknown;
@@ -141,6 +156,9 @@ export async function quoteDeposit(body: unknown): Promise<DepositReply> {
   }
 
   const network = networkFrom(typeof input.network === 'string' ? input.network : null);
+  if (!network) {
+    return { status: 400, body: { error: 'network_not_served' } };
+  }
 
   // The conversation this basket came out of, when there is one. Absent is
   // ordinary — preview has no chat to file anything against — but a string
@@ -233,14 +251,16 @@ export async function quoteDeposit(body: unknown): Promise<DepositReply> {
     }
 
     // The order is opened for every memo, so the claim latch that the card
-    // needs always has a row to latch onto. The *address* is written only
-    // where the signature above actually proved one: in mode 'open' nothing
-    // was proven, so recording the claimed address would be writing down a
-    // guess and then trusting it later — and the card skips the ownership
-    // check in that mode for exactly the same reason.
+    // needs always has a row to latch onto. The *address* is written when the
+    // signature above proved one, or — on a signed-in testnet session where
+    // the gate needs no proof — when the cookie named one. Recording a body
+    // address with no proof would be writing down a guess; the cookie is
+    // the identity the server already verified.
     const depositor = realModeNeedsProof(auth.mode)
       ? (input.address as string).trim().toUpperCase()
-      : undefined;
+      : session.address
+        ? session.address.trim().toUpperCase()
+        : undefined;
 
     // One chat is one order, and this is where that stops being a rule the
     // browser keeps. ShopProvider already refuses to let a shopper type a
@@ -252,7 +272,11 @@ export async function quoteDeposit(body: unknown): Promise<DepositReply> {
     // a chat already has an unclaimed order: a deposit sent against the old
     // código still matches, so a shopper who paid and then reloaded is not
     // stranded with real money against a memo nothing will ever look for.
-    const order = chatId && modeKeepsRecords(network) && hasDatabase()
+    //
+    // Mode comes from the cookie the HTTP layer verified — not from whether
+    // a depositor string happened to be set (that used to be a tautology on
+    // mainnet and a silent no-op on signed-in testnet).
+    const order = chatId && modeKeepsRecords(session.mode) && hasDatabase()
       ? await openChatOrder({
           network,
           chatId,
@@ -328,6 +352,7 @@ export async function confirmDeposit(q: {
   network: string | null;
 }): Promise<DepositReply> {
   const network = networkFrom(q.network);
+  if (!network) return { status: 400, body: { error: 'network_not_served' } };
 
   if (!isMemo(q.memo)) return { status: 400, body: { error: 'memo inválido' } };
   if (!/^\d+(\.\d{1,7})?$/.test(q.amount)) return { status: 400, body: { error: 'monto inválido' } };
