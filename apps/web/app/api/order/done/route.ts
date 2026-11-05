@@ -55,7 +55,7 @@ export async function POST(req: Request): Promise<Response> {
   const input = (body ?? {}) as { memo?: unknown; network?: unknown };
 
   if (!isMemo(input.memo)) return Response.json({ error: 'código inválido' }, { status: 400 });
-  const asked = requestNetwork(input.network);
+  const asked = requestNetwork(input.network, undefined, undefined, 'default');
   if (!asked.ok) return networkNotServed();
   const network = asked.network;
   const memo = input.memo;

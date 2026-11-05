@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { modeForSession, modeKeepsRecords, sessionNetwork, type AppMode } from '../app-mode.ts';
+import { modeForSession, modeKeepsRecords, sessionNetwork } from '../app-mode.ts';
 import { DEFAULT_NETWORK } from '../deployments.ts';
-
-const MODES: readonly AppMode[] = ['preview', 'production'];
 
 describe('app mode', () => {
   it('RULE: the mode is the session, and nothing else', () => {
@@ -23,7 +21,6 @@ describe('app mode', () => {
     assert.equal(sessionNetwork(true, 'testnet', DEFAULT_NETWORK), 'testnet');
     assert.equal(sessionNetwork(true, 'mainnet', DEFAULT_NETWORK), 'mainnet');
     assert.equal(sessionNetwork(false, 'mainnet', DEFAULT_NETWORK), DEFAULT_NETWORK);
-    for (const mode of MODES) assert.equal(typeof mode, 'string');
   });
 
   it('RULE: a visitor with no session lands on the network that cannot spend', () => {

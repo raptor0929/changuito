@@ -87,7 +87,8 @@ import { CARD_MIN_CENTS, formatUsd, type VyrionClient } from '@changuito/mcp/pay
 import { canIssueCard, cardClient, keepsOneCard, mintKeptCard } from '../../../../lib/card.ts';
 import { cardOf, hasDatabase, unbindCard } from '../../../../lib/db.ts';
 import { requireHuman } from '../../../../lib/human-gate.ts';
-import { networkNotServed, requestNetwork } from '../../../../lib/server-network.ts';
+import { modeForSession } from '../../../../lib/app-mode.ts';
+import { networkNotServedPrivate, requestNetwork } from '../../../../lib/server-network.ts';
 import { readLoggedInUser } from '../../../../lib/login-gate.ts';
 import { networkAccess } from '../../../../lib/network-access.ts';
 import { sharedCardIfMember } from '../../../../lib/shared-card.ts';
@@ -146,8 +147,8 @@ async function handle(req: Request): Promise<Response> {
   const claimed = typeof input.address === 'string' ? input.address.trim().toUpperCase() : '';
   const address = signedIn || claimed;
   if (!/^G[A-Z2-7]{55}$/.test(address)) return json({ error: 'dirección inválida' }, 400);
-  const asked = requestNetwork(input.network);
-  if (!asked.ok) return networkNotServed();
+  const asked = requestNetwork(input.network, undefined, undefined, 'default');
+  if (!asked.ok) return networkNotServedPrivate();
   const network = asked.network;
 
   // Same gate the deposit route puts in front of a real network, and asked
@@ -230,7 +231,7 @@ async function handle(req: Request): Promise<Response> {
 
   let cardId = cardId0;
   if (!cardId) {
-    if (!keepsOneCard(network, address)) {
+    if (!keepsOneCard(network, address, process.env, modeForSession(Boolean(signedIn)))) {
       return json({ error: 'en modo prueba la tarjeta se crea con cada compra' }, 400);
     }
 

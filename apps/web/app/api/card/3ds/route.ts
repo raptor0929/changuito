@@ -19,7 +19,7 @@
  */
 import { canIssueCard, cardClient, heldCard } from '../../../../lib/card.ts';
 import { isMemo } from '../../../../lib/deposit.ts';
-import { networkNotServed, requestNetwork } from '../../../../lib/server-network.ts';
+import { networkNotServedPrivate, requestNetwork } from '../../../../lib/server-network.ts';
 import { requireHuman } from '../../../../lib/human-gate.ts';
 
 export const runtime = 'nodejs';
@@ -45,8 +45,8 @@ export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const memo = url.searchParams.get('memo');
   if (!isMemo(memo)) return json({ error: 'código inválido' }, 400);
-  const asked = requestNetwork(url.searchParams.get('network'));
-  if (!asked.ok) return networkNotServed();
+  const asked = requestNetwork(url.searchParams.get('network'), undefined, undefined, 'default');
+  if (!asked.ok) return networkNotServedPrivate();
   const network = asked.network;
 
   if (!canIssueCard()) return json({ code: null }, 200);

@@ -37,7 +37,7 @@
 import { canIssueCard, cardClient } from '../../../../lib/card.ts';
 import { cardOf, hasDatabase, unbindCard } from '../../../../lib/db.ts';
 import { requireHuman } from '../../../../lib/human-gate.ts';
-import { networkNotServed, requestNetwork } from '../../../../lib/server-network.ts';
+import { networkNotServedPrivate, requestNetwork } from '../../../../lib/server-network.ts';
 import { networkAccess } from '../../../../lib/network-access.ts';
 import { isSharedMember } from '../../../../lib/shared-card.ts';
 import { proofFromBody, verifyWalletProof } from '../../../../lib/wallet-proof-verify.ts';
@@ -64,8 +64,8 @@ export async function POST(req: Request): Promise<Response> {
 
   const address = typeof input.address === 'string' ? input.address.trim().toUpperCase() : '';
   if (!/^G[A-Z2-7]{55}$/.test(address)) return json({ error: 'dirección inválida' }, 400);
-  const asked = requestNetwork(input.network);
-  if (!asked.ok) return networkNotServed();
+  const asked = requestNetwork(input.network, undefined, undefined, 'default');
+  if (!asked.ok) return networkNotServedPrivate();
   const network = asked.network;
 
   // Before the proof, so a wallet that may not use this network learns that

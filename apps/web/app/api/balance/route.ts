@@ -92,7 +92,7 @@ export async function GET(req: Request): Promise<Response> {
 
   const params = new URL(req.url).searchParams;
   const address = params.get('address') ?? '';
-  const asked = requestNetwork(params.get('network'));
+  const asked = requestNetwork(params.get('network'), undefined, undefined, 'default');
   if (!asked.ok) return networkNotServed();
   const network = asked.network;
   const kind = addressKind(address);

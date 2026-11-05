@@ -75,7 +75,7 @@
  */
 import { CARD_MAX_CENTS, CARD_MIN_CENTS, formatUsd } from '@changuito/mcp/pay';
 
-import { modeForSession, modeKeepsRecords } from '../app-mode.ts';
+import { modeForSession, modeKeepsRecords, type AppMode } from '../app-mode.ts';
 import {
   canIssueCard,
   cardClient,
@@ -120,7 +120,7 @@ export interface CardReply {
 }
 
 function networkFrom(value: unknown): NetworkId | null {
-  const asked = requestNetwork(value);
+  const asked = requestNetwork(value, undefined, undefined, 'default');
   return asked.ok ? asked.network : null;
 }
 
@@ -128,7 +128,11 @@ const message = (err: unknown) => (err instanceof Error ? err.message : String(e
 
 const reply = (body: CardReply['body'], status: number): CardReply => ({ status, body });
 
-export async function issueCard(body: unknown): Promise<CardReply> {
+export async function issueCard(
+  body: unknown,
+  /** App mode the HTTP layer verified via `readLoggedInUser`. */
+  appMode?: AppMode,
+): Promise<CardReply> {
   if (!canIssueCard()) {
     // Not an error the shopper caused and not one they can act on. The UI does
     // not offer the button in this state; this is the second lock.
@@ -236,8 +240,11 @@ export async function issueCard(body: unknown): Promise<CardReply> {
   }
 
   // Which of the two cards this is, and why, is `keepsOneCard`'s doc comment.
-  const keeps = keepsOneCard(network, owner);
-  if (!keeps && modeKeepsRecords(modeForSession(Boolean(owner)))) {
+  // App mode is the cookie the route verified; falling back keeps direct
+  // callers (tests, older paths) compiling without reintroducing a network check.
+  const sessionMode = appMode ?? modeForSession(Boolean(owner));
+  const keeps = keepsOneCard(network, owner, process.env, sessionMode);
+  if (!keeps && modeKeepsRecords(sessionMode)) {
     // On a network that keeps records, the per-basket card is never a design
     // choice — it is the persistent path unavailable. The shopper still gets a
     // card and still pays, so nothing here fails; what stops holding is "one

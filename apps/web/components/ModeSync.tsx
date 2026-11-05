@@ -18,13 +18,15 @@ import { useNetwork } from './NetworkProvider';
  * cannot be the thing that decides the chain. This component is mounted
  * inside and writes upward, which is the only direction available.
  *
- * On login it also checks the session's network against LOGIN_NETWORK. Pollar
- * responses carry `network: 'testnet' | 'mainnet'`. A mismatch means the key
- * and the session disagree — log out and surface the error rather than let
- * the shopper spend on the wrong chain.
+ * On login it also checks the network Pollar returns for the application
+ * (`appConfig.application.network`, from `/applications/config`) against
+ * LOGIN_NETWORK. Comparing `usePollar().network` would be a no-op: that value
+ * is the client config we passed in, i.e. LOGIN_NETWORK itself. A mismatch
+ * means the key and the Pollar app disagree — log out and surface the error
+ * rather than let the shopper spend on the wrong chain.
  */
 export function ModeSync({ onMismatch }: { onMismatch?: (message: string) => void }) {
-  const { isAuthenticated, network: pollarNetwork, logout } = usePollar();
+  const { isAuthenticated, appConfig, configStatus, logout } = usePollar();
   const { setNetwork, setMode } = useNetwork();
   const mismatch = useRef(false);
 
@@ -35,19 +37,20 @@ export function ModeSync({ onMismatch }: { onMismatch?: (message: string) => voi
   }, [isAuthenticated, setNetwork, setMode]);
 
   useEffect(() => {
-    if (!isAuthenticated || !LOGIN_NETWORK) {
+    if (!isAuthenticated || !LOGIN_NETWORK || configStatus !== 'ready') {
       mismatch.current = false;
       return;
     }
-    // Pollar's network id matches ours. Anything else is a session we did not
-    // ask for — refuse it before a payment can land on the wrong chain.
-    if (pollarNetwork && pollarNetwork !== LOGIN_NETWORK) {
+    // The network Pollar's server says this key belongs to — not the client
+    // config we built the provider with.
+    const sessionNet = appConfig.application.network;
+    if (sessionNet && sessionNet !== LOGIN_NETWORK) {
       if (mismatch.current) return;
       mismatch.current = true;
       onMismatch?.(NETWORK_MISMATCH.session);
       logout();
     }
-  }, [isAuthenticated, pollarNetwork, logout, onMismatch]);
+  }, [isAuthenticated, appConfig, configStatus, logout, onMismatch]);
 
   return null;
 }
