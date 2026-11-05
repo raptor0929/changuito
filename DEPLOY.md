@@ -148,7 +148,7 @@ set rather than a variable of its own. In the dashboard, on that testnet app:
 | Setting | Value |
 |---|---|
 | Network | **testnet** |
-| Allowed domains | `app.changuito.me` and the Vercel preview domain |
+| Allowed domains | `app.changuito.me`, `ste.changuito.me`, and the Stellar Worker `*.workers.dev` URL |
 | Login methods | Freighter enabled, plus the existing email and Google |
 | Fee sponsorship | **off** — OZ Channels pays fees |
 | Reserve sponsorship | **off** — Changuito's sponsor account pays reserves |
