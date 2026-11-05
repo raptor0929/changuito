@@ -84,10 +84,11 @@ describe('which of the two cards a deposit buys', () => {
     }
   });
 
-  it('RULE: a proven owner on a mode that keeps no records still mints one', () => {
-    // The allowlist can prove a wallet on testnet. Preview must not write a
-    // row even then — inferring the path from `owner` alone would.
-    assert.equal(keepsOneCard('testnet', WALLET, withDb), false);
+  it('RULE: a signed-in session keeps a card on testnet too', () => {
+    // Mode follows the session, not the network. An owner is a signed-in
+    // session (production); the DB is keyed `(network, address)`, so a
+    // testnet row cannot collide with a mainnet one.
+    assert.equal(keepsOneCard('testnet', WALLET, withDb), true);
     assert.equal(keepsOneCard('mainnet', WALLET, withDb), true);
   });
 
