@@ -1,0 +1,35 @@
+# Secret scan of the whole history on every PR and push to main.
+# Runs the gitleaks binary directly (the gitleaks-action needs a licence for
+# organisation repos). Known fake test fixtures are allowlisted in
+# .gitleaks.toml and .gitleaksignore; anything new fails the job.
+name: Gitleaks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: 8.28.0
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar xz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Scan
+        run: gitleaks git --no-banner --redact --exit-code 1 .
