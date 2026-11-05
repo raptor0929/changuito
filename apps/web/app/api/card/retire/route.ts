@@ -36,18 +36,14 @@
  */
 import { canIssueCard, cardClient } from '../../../../lib/card.ts';
 import { cardOf, hasDatabase, unbindCard } from '../../../../lib/db.ts';
-import { DEFAULT_NETWORK, type NetworkId } from '../../../../lib/deployments.ts';
 import { requireHuman } from '../../../../lib/human-gate.ts';
+import { networkNotServed, requestNetwork } from '../../../../lib/server-network.ts';
 import { networkAccess } from '../../../../lib/network-access.ts';
 import { isSharedMember } from '../../../../lib/shared-card.ts';
 import { proofFromBody, verifyWalletProof } from '../../../../lib/wallet-proof-verify.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-function networkFrom(value: unknown): NetworkId {
-  return value === 'mainnet' || value === 'testnet' ? value : DEFAULT_NETWORK;
-}
 
 export async function POST(req: Request): Promise<Response> {
   const gated = await requireHuman(req);
@@ -68,7 +64,9 @@ export async function POST(req: Request): Promise<Response> {
 
   const address = typeof input.address === 'string' ? input.address.trim().toUpperCase() : '';
   if (!/^G[A-Z2-7]{55}$/.test(address)) return json({ error: 'dirección inválida' }, 400);
-  const network = networkFrom(input.network);
+  const asked = requestNetwork(input.network);
+  if (!asked.ok) return networkNotServed();
+  const network = asked.network;
 
   // Before the proof, so a wallet that may not use this network learns that
   // and nothing about whether it has a card here.

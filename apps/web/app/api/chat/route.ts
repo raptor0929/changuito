@@ -2,12 +2,12 @@ import { newTurnState, runTurn } from '@/lib/agent/loop';
 import { isChatImage } from '@/lib/chat-image';
 import { turnStore } from '@/lib/agent/turn-store';
 import { archiveChat, chatTitle } from '@/lib/chat-archive';
-import { asNetwork, DEFAULT_NETWORK } from '@/lib/deployments';
 import { langFrom } from '@/lib/lang';
 import { withSession } from '@/lib/mcp/session';
 import { encodeEvent, HEARTBEAT, SSE_HEADERS, type ChatRequest, type UiEvent } from '@/lib/protocol';
 import { requireHuman } from '@/lib/human-gate';
 import { readLoggedInUser, requireLoginOrFreeTurn } from '@/lib/login-gate';
+import { networkNotServed, requestNetwork } from '@/lib/server-network';
 
 /**
  * Node, not edge: the MCP server reads `node:url` and the Stellar SDK needs
@@ -74,7 +74,9 @@ export async function POST(req: Request): Promise<Response> {
   // A guest is `null` here, and `archiveChat` writes nothing for a guest.
   const user = await readLoggedInUser(req);
   const owner = user.ok ? user.address : null;
-  const network = asNetwork(body.network) ?? DEFAULT_NETWORK;
+  const asked = requestNetwork(body.network);
+  if (!asked.ok) return networkNotServed();
+  const network = asked.network;
   // Which language the agent answers in, and nothing else. This route's own
   // refusals stay Spanish: they are shared with the MCP server and with the
   // agent, neither of which reads a cookie from this browser, so the client

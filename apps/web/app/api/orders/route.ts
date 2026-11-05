@@ -56,7 +56,8 @@
  * actually asks, which is whether this order ended in a card.
  */
 import { hasDatabase, ordersOf, type OrderRow, type OrderStatus } from '../../../lib/db.ts';
-import { DEFAULT_NETWORK, type NetworkId } from '../../../lib/deployments.ts';
+import type { NetworkId } from '../../../lib/deployments.ts';
+import { networkNotServed, requestNetwork } from '../../../lib/server-network.ts';
 import { requireHuman } from '../../../lib/human-gate.ts';
 import { readLoggedInUser } from '../../../lib/login-gate.ts';
 import { networkAccess } from '../../../lib/network-access.ts';
@@ -95,10 +96,6 @@ const line = (o: OrderRow): OrderLine => ({
   createdAt: o.createdAt.toISOString(),
 });
 
-function networkFrom(value: unknown): NetworkId {
-  return value === 'mainnet' || value === 'testnet' ? value : DEFAULT_NETWORK;
-}
-
 export async function POST(req: Request): Promise<Response> {
   const gated = await requireHuman(req);
   if (gated) return gated;
@@ -135,7 +132,9 @@ export async function POST(req: Request): Promise<Response> {
   const claimed = typeof input.address === 'string' ? input.address.trim().toUpperCase() : '';
   const address = signedIn || claimed;
   if (!/^G[A-Z2-7]{55}$/.test(address)) return json({ error: 'dirección inválida' }, 400);
-  const network = networkFrom(input.network);
+  const asked = requestNetwork(input.network);
+  if (!asked.ok) return networkNotServed();
+  const network = asked.network;
 
   // Same gate the deposit route puts in front of a real network, and asked
   // before the proof is checked, so a wallet that may not use this network

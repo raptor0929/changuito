@@ -75,7 +75,7 @@
  */
 import { CARD_MAX_CENTS, CARD_MIN_CENTS, formatUsd } from '@changuito/mcp/pay';
 
-import { modeKeepsRecords } from '../app-mode.ts';
+import { modeForSession, modeKeepsRecords } from '../app-mode.ts';
 import {
   canIssueCard,
   cardClient,
@@ -94,7 +94,8 @@ import {
 import { cardOf, hasDatabase, unbindCard } from '../db.ts';
 import { isMemo } from '../deposit.ts';
 import { realModeFor, realModeNeedsProof } from '../deposit-gate.ts';
-import { DEFAULT_NETWORK, type NetworkId } from '../deployments.ts';
+import type { NetworkId } from '../deployments.ts';
+import { requestNetwork } from '../server-network.ts';
 import { activeLedger } from '../ledger/index.ts';
 import { networkAccess } from '../network-access.ts';
 
@@ -118,8 +119,9 @@ export interface CardReply {
   body: IssuedCard | { error: string };
 }
 
-function networkFrom(value: unknown): NetworkId {
-  return value === 'mainnet' || value === 'testnet' ? value : DEFAULT_NETWORK;
+function networkFrom(value: unknown): NetworkId | null {
+  const asked = requestNetwork(value);
+  return asked.ok ? asked.network : null;
 }
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
@@ -138,6 +140,7 @@ export async function issueCard(body: unknown): Promise<CardReply> {
   if (!isMemo(input.memo)) return reply({ error: 'código inválido' }, 400);
   const memo = input.memo;
   const network = networkFrom(input.network);
+  if (!network) return reply({ error: 'network_not_served' }, 400);
   const address = activeLedger().receiveAddress(network);
   if (!address) return reply({ error: 'los pagos no están habilitados en este entorno' }, 503);
 
@@ -234,7 +237,7 @@ export async function issueCard(body: unknown): Promise<CardReply> {
 
   // Which of the two cards this is, and why, is `keepsOneCard`'s doc comment.
   const keeps = keepsOneCard(network, owner);
-  if (!keeps && modeKeepsRecords(network)) {
+  if (!keeps && modeKeepsRecords(modeForSession(Boolean(owner)))) {
     // On a network that keeps records, the per-basket card is never a design
     // choice — it is the persistent path unavailable. The shopper still gets a
     // card and still pays, so nothing here fails; what stops holding is "one

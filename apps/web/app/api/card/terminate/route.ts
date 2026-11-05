@@ -37,15 +37,11 @@
  */
 import { canIssueCard, cardClient, depositorOf, heldCard, keepsOneCard } from '../../../../lib/card.ts';
 import { isMemo } from '../../../../lib/deposit.ts';
-import { DEFAULT_NETWORK, type NetworkId } from '../../../../lib/deployments.ts';
 import { requireHuman } from '../../../../lib/human-gate.ts';
+import { networkNotServed, requestNetwork } from '../../../../lib/server-network.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-function networkFrom(value: unknown): NetworkId {
-  return value === 'mainnet' || value === 'testnet' ? value : DEFAULT_NETWORK;
-}
 
 export async function POST(req: Request): Promise<Response> {
   const gated = await requireHuman(req);
@@ -59,7 +55,9 @@ export async function POST(req: Request): Promise<Response> {
   }
   const input = (body ?? {}) as { memo?: unknown; network?: unknown };
   if (!isMemo(input.memo)) return json({ error: 'código inválido' }, 400);
-  const network = networkFrom(input.network);
+  const asked = requestNetwork(input.network);
+  if (!asked.ok) return networkNotServed();
+  const network = asked.network;
 
   if (!canIssueCard()) return json({ terminated: false }, 200);
 

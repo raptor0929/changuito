@@ -86,8 +86,8 @@ import { CARD_MIN_CENTS, formatUsd, type VyrionClient } from '@changuito/mcp/pay
 
 import { canIssueCard, cardClient, keepsOneCard, mintKeptCard } from '../../../../lib/card.ts';
 import { cardOf, hasDatabase, unbindCard } from '../../../../lib/db.ts';
-import { DEFAULT_NETWORK, type NetworkId } from '../../../../lib/deployments.ts';
 import { requireHuman } from '../../../../lib/human-gate.ts';
+import { networkNotServed, requestNetwork } from '../../../../lib/server-network.ts';
 import { readLoggedInUser } from '../../../../lib/login-gate.ts';
 import { networkAccess } from '../../../../lib/network-access.ts';
 import { sharedCardIfMember } from '../../../../lib/shared-card.ts';
@@ -97,10 +97,6 @@ import type { IssuedCard } from '../route.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-function networkFrom(value: unknown): NetworkId {
-  return value === 'mainnet' || value === 'testnet' ? value : DEFAULT_NETWORK;
-}
 
 /**
  * Nothing thrown gets out of here as an empty body.
@@ -150,7 +146,9 @@ async function handle(req: Request): Promise<Response> {
   const claimed = typeof input.address === 'string' ? input.address.trim().toUpperCase() : '';
   const address = signedIn || claimed;
   if (!/^G[A-Z2-7]{55}$/.test(address)) return json({ error: 'dirección inválida' }, 400);
-  const network = networkFrom(input.network);
+  const asked = requestNetwork(input.network);
+  if (!asked.ok) return networkNotServed();
+  const network = asked.network;
 
   // Same gate the deposit route puts in front of a real network, and asked
   // before the credential is checked, so a wallet that may not use this

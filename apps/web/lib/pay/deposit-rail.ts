@@ -33,10 +33,11 @@
 import { arsToUsdCents, getArsPerUsd } from '@changuito/mcp/fx';
 import { CARD_MIN_CENTS, formatUsd } from '@changuito/mcp/pay';
 
-import { modeKeepsRecords } from '../app-mode.ts';
+import { modeForSession, modeKeepsRecords } from '../app-mode.ts';
 import { canIssueCard, rememberDepositor } from '../card.ts';
 import { hasDatabase, markPaid, openChatOrder } from '../db.ts';
-import { DEFAULT_NETWORK, type NetworkId } from '../deployments.ts';
+import type { NetworkId } from '../deployments.ts';
+import { requestNetwork } from '../server-network.ts';
 import { isMemo, mintMemo, type DepositAsset } from '../deposit.ts';
 import { authorizeRealMode, realModeNeedsProof } from '../deposit-gate.ts';
 import { activeLedger } from '../ledger/index.ts';
@@ -101,8 +102,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
-function networkFrom(value: string | null): NetworkId {
-  return value === 'mainnet' || value === 'testnet' ? value : DEFAULT_NETWORK;
+function networkFrom(value: string | null): NetworkId | null {
+  const asked = requestNetwork(value);
+  return asked.ok ? asked.network : null;
 }
 
 /**
@@ -141,6 +143,9 @@ export async function quoteDeposit(body: unknown): Promise<DepositReply> {
   }
 
   const network = networkFrom(typeof input.network === 'string' ? input.network : null);
+  if (!network) {
+    return { status: 400, body: { error: 'network_not_served' } };
+  }
 
   // The conversation this basket came out of, when there is one. Absent is
   // ordinary — preview has no chat to file anything against — but a string
@@ -252,7 +257,7 @@ export async function quoteDeposit(body: unknown): Promise<DepositReply> {
     // a chat already has an unclaimed order: a deposit sent against the old
     // código still matches, so a shopper who paid and then reloaded is not
     // stranded with real money against a memo nothing will ever look for.
-    const order = chatId && modeKeepsRecords(network) && hasDatabase()
+    const order = chatId && modeKeepsRecords(modeForSession(Boolean(depositor))) && hasDatabase()
       ? await openChatOrder({
           network,
           chatId,
@@ -328,6 +333,7 @@ export async function confirmDeposit(q: {
   network: string | null;
 }): Promise<DepositReply> {
   const network = networkFrom(q.network);
+  if (!network) return { status: 400, body: { error: 'network_not_served' } };
 
   if (!isMemo(q.memo)) return { status: 400, body: { error: 'memo inválido' } };
   if (!/^\d+(\.\d{1,7})?$/.test(q.amount)) return { status: 400, body: { error: 'monto inválido' } };

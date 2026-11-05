@@ -34,7 +34,7 @@
  */
 import { CARD_MAX_CENTS, CARD_MIN_CENTS, VyrionClient } from '@changuito/mcp/pay';
 
-import { modeKeepsRecords } from './app-mode.ts';
+import { modeForSession, modeKeepsRecords } from './app-mode.ts';
 import { bindCard, claimOrder, hasDatabase, openOrder, orderByMemo } from './db.ts';
 import type { NetworkId } from './deployments.ts';
 import { activeLedger } from './ledger/index.ts';
@@ -160,11 +160,11 @@ export async function fundingFor(
  * `owner` is the wallet the gate proved at deposit time. Without one there is
  * nobody to bind a card *to*, so there is nothing to keep.
  *
- * `modeKeepsRecords` is asked out loud rather than inferred from `owner`,
- * because the allowlist can put a proven wallet on testnet and preview must
- * never write a row. It is the same explicit check `archiveChat` makes, for
- * the same reason: an invariant that holds by coincidence is one refactor
- * from not holding.
+ * `modeKeepsRecords` is asked out loud from the session (an owner means
+ * production), not from the network: a signed-in shopper on testnet keeps
+ * their card. It is the same explicit check `archiveChat` makes, for the
+ * same reason: an invariant that holds by coincidence is one refactor from
+ * not holding.
  *
  * `hasDatabase` is here because `card_owner` is the binding. With no database
  * the fallback in this file keeps claims in a per-instance Map and
@@ -177,7 +177,7 @@ export function keepsOneCard(
   owner: string | undefined,
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  return Boolean(owner) && modeKeepsRecords(net) && hasDatabase(env);
+  return Boolean(owner) && modeKeepsRecords(modeForSession(Boolean(owner))) && hasDatabase(env);
 }
 
 export type FundingRefusal = 'too-small' | 'too-large';

@@ -51,11 +51,12 @@
  * `tx_insufficient_fee`; the honest answer then is to bring the field back,
  * not to widen the error copy.
  */
-import { networkOrDefault, type NetworkId } from '../../../lib/deployments.ts';
+import type { NetworkId } from '../../../lib/deployments.ts';
+import { requireHuman } from '../../../lib/human-gate.ts';
+import { networkNotServed, requestNetwork } from '../../../lib/server-network.ts';
 import { accountBalances, addressKind, classicBalance, formatUsdc } from '../../../lib/stellar.ts';
 import { usdcBalance } from '../../../lib/token.ts';
 import { trustlineFor, usdcAsset, type TrustlineState } from '../../../lib/trustline.ts';
-import { requireHuman } from '../../../lib/human-gate.ts';
 
 // XDR encoding is Node, not edge.
 export const runtime = 'nodejs';
@@ -91,7 +92,9 @@ export async function GET(req: Request): Promise<Response> {
 
   const params = new URL(req.url).searchParams;
   const address = params.get('address') ?? '';
-  const network = networkOrDefault(params.get('network'));
+  const asked = requestNetwork(params.get('network'));
+  if (!asked.ok) return networkNotServed();
+  const network = asked.network;
   const kind = addressKind(address);
   if (!kind) {
     return Response.json({ error: 'not a Stellar address' }, { status: 400, headers: NO_STORE });

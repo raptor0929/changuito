@@ -789,6 +789,23 @@ a:hover { color: var(--chg-arcilla); }
   color: var(--brand-ink);
   border-color: transparent;
 }
+/* Network label beside the mode badge when the app is on testnet. Neutral
+   surface, same type size — it names the chain, it does not shout. Contrast
+   is ink on surface, which clears 4.5:1 in both themes (see contrast tests). */
+.network-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  white-space: nowrap;
+  cursor: default;
+}
 /* One label at two widths. Both spans are aria-hidden and the button carries
    an explicit aria-label, so hiding either one never costs it its name. */
 .mode-short { display: none; }

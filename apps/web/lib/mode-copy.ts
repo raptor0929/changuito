@@ -1,3 +1,4 @@
+import type { AppMode } from './app-mode.ts';
 import { DEFAULT_NETWORK, type NetworkId } from './deployments.ts';
 import { DEFAULT_LANG, type Lang } from './lang.ts';
 
@@ -97,6 +98,50 @@ export const PREVIEW_MASTHEAD = {
   hint: 'Probá todo el pago con nuestra plata.',
   /** The crossing. */
   action: 'Cambiar a modo real',
+} as const;
+
+/**
+ * Masthead when signing in lands on testnet, not mainnet.
+ *
+ * PREVIEW_MASTHEAD still says "modo real" because that constant is what the
+ * vocabulary tests pin — and on mainnet it is still the right door. On a
+ * testnet-only deployment the crossing is "tu billetera", not real money, so
+ * `previewMastheadFor` picks this instead without touching the pinned export.
+ */
+export const PREVIEW_MASTHEAD_TESTNET = {
+  hint: 'Probá todo el pago con nuestra plata.',
+  action: 'Usar tu billetera',
+} as const;
+
+/**
+ * Production on testnet: their wallet pays, on play money.
+ *
+ * Kept out of `MODES` / `modeCopy(network)` on purpose — those are still keyed
+ * by network for the vocabulary tests, and a signed-in session on testnet is
+ * not "modo prueba". Callers that know the mode use this.
+ */
+export const PRODUCTION_TESTNET: ModeCopy = {
+  network: 'testnet',
+  label: 'Tu billetera',
+  short: 'Billetera',
+  balanceUnit: 'USDC de prueba',
+  hint: 'Es tu billetera, en la red de prueba. No es plata real.',
+  payLabel: (amount) => `Pagar ${amount} (prueba)`,
+  payNote: 'Sale de tu billetera, en la red de prueba: no es plata real.',
+  holdNote: 'Reservado en tu billetera de prueba.',
+};
+
+/** Badge that names the network when the app is on testnet. */
+export const NETWORK_BADGE = {
+  testnet: { label: 'Testnet', short: 'Testnet' },
+} as const;
+
+/** Freighter / session pointed at a different network from the Pollar key. */
+export const NETWORK_MISMATCH = {
+  freighter:
+    'Freighter está en otra red. Cambiala a la red de prueba e intentá de nuevo.',
+  session:
+    'La sesión no coincide con la red de esta app. Cerramos la sesión; volvé a entrar.',
 } as const;
 
 /**
@@ -212,6 +257,17 @@ const PRACTICE: ModeCopy = {
   holdNote: "It's practice, so no real money was held.",
 };
 
+const PRODUCTION_TESTNET_EN: ModeCopy = {
+  network: 'testnet',
+  label: 'Your wallet',
+  short: 'Wallet',
+  balanceUnit: 'practice USDC',
+  hint: 'Your wallet, on the practice network. Not real money.',
+  payLabel: (amount) => `Pay ${amount} (practice)`,
+  payNote: 'From your wallet, on the practice network: not real money.',
+  holdNote: 'Held in your practice wallet.',
+};
+
 const LIVE: ModeCopy = {
   network: 'mainnet',
   label: 'Real mode',
@@ -300,6 +356,34 @@ export function modes(lang: Lang): readonly ModeCopy[] {
 
 export function previewMasthead(lang: Lang): PreviewMastheadCopy {
   return lang === 'en' ? PREVIEW_MASTHEAD_EN : PREVIEW_MASTHEAD;
+}
+
+/**
+ * Masthead for the door out of preview, given which network a session lands on.
+ * When login is testnet, signing in is not "modo real".
+ */
+export function previewMastheadFor(
+  login: NetworkId | null,
+  lang: Lang = DEFAULT_LANG,
+): PreviewMastheadCopy {
+  if (login === 'testnet') {
+    return lang === 'en'
+      ? { hint: 'Try the whole payment on our money.', action: 'Use your wallet' }
+      : PREVIEW_MASTHEAD_TESTNET;
+  }
+  return previewMasthead(lang);
+}
+
+/**
+ * Voice for a given mode on a given network. Production on testnet is not
+ * mainnet copy: it must not claim real money.
+ */
+export function modeCopyFor(mode: AppMode, net: NetworkId, lang: Lang = DEFAULT_LANG): ModeCopy {
+  if (mode === 'preview') return modeCopy(net === 'mainnet' ? 'testnet' : net, lang);
+  if (net === 'testnet') {
+    return lang === 'en' ? PRODUCTION_TESTNET_EN : PRODUCTION_TESTNET;
+  }
+  return modeCopy('mainnet', lang);
 }
 
 export function balanceCopy(lang: Lang): BalanceCopy {
