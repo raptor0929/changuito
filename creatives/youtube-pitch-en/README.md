@@ -5,7 +5,7 @@ Horizontal brand film, 1920×1080, 30 fps, 88 seconds. Built with
 the narration separately. Music stays low so the voice has room.
 
 On-screen copy is English. The product name stays **Changuito** (wordmark PNG
-only). URLs stay `www.changuito.me` and `ste.changuito.me`.
+only). URLs stay `www.changuito.me` and `app.changuito.me`.
 
 This folder is a translation of `creatives/youtube-pitch/` (Spanish). It does
 not import `apps/web` or `apps/landing`, and it does not modify the Spanish
@@ -44,7 +44,7 @@ Durations live in `src/timeline.json` (2,640 frames, 88 s).
 | 3 | `Promesa` | 8 s | It builds the grocery run. Not an exchange. Not a price comparator |
 | 4 | `Demo` | 28 s | The product in motion: chat, real prices, cart, confirm |
 | 5 | `Pago` | 25 s | “Pay with USDC on Stellar. We take care of making the supermarket accept it.” Pollar wallet, funding, disposable card, USDC charge and discard, or the card you already have |
-| 6 | `Cta` | 11 s | Join the beta · www.changuito.me/whitelist · ste.changuito.me |
+| 6 | `Cta` | 11 s | Join the beta · www.changuito.me/whitelist · app.changuito.me |
 
 Cuts are covered by a panel (`src/components/Swipe.tsx`) as a `TransitionSeries`
 overlay, so the duration is the sum of the scenes. The swipe into the CTA uses

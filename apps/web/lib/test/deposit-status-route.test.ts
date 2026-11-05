@@ -62,7 +62,7 @@ describe('GET /api/deposit (status poll)', () => {
 
   const poll = async (memo = MEMO, amount = '12.5', cookie = human) => {
     const res = await GET(
-      new Request(`https://ste.changuito.me/api/deposit?memo=${encodeURIComponent(memo)}&amount=${amount}`, { headers: { cookie } }),
+      new Request(`https://app.changuito.me/api/deposit?memo=${encodeURIComponent(memo)}&amount=${amount}`, { headers: { cookie } }),
     );
     return { status: res.status, body: (await res.json()) as Record<string, unknown> };
   };

@@ -138,7 +138,7 @@ const failing: TurnCounter = {
 
 const UUID = '00000000-0000-4000-8000-000000000000';
 const prodEnv = { NODE_ENV: 'production', CHG_SESSION_SECRET: 'sess' } as NodeJS.ProcessEnv;
-const chat = (headers: Record<string, string> = {}) => new Request('https://ste.changuito.me/api/chat', { method: 'POST', headers });
+const chat = (headers: Record<string, string> = {}) => new Request('https://app.changuito.me/api/chat', { method: 'POST', headers });
 
 describe('quotas fail closed', () => {
   beforeEach(() => __resetTurnCounterForTests());

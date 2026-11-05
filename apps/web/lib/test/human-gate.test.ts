@@ -96,23 +96,23 @@ describe('human-gate', () => {
     const token = await mintHumanToken('s');
     const cookie = humanCookieHeader(token, { NODE_ENV: 'production' }).split(';')[0] ?? '';
     const ok = await requireHuman(
-      new Request('https://ste.changuito.me/api/chat', { headers: { cookie } }),
+      new Request('https://app.changuito.me/api/chat', { headers: { cookie } }),
       { ...ENFORCE },
     );
     assert.equal(ok, null);
 
-    const missing = await requireHuman(new Request('https://ste.changuito.me/api/chat'), { ...ENFORCE });
+    const missing = await requireHuman(new Request('https://app.changuito.me/api/chat'), { ...ENFORCE });
     assert.equal(missing?.status, 403);
     const body = (await missing!.json()) as { error?: string; message?: string };
     assert.equal(body.error, 'solo_humanos');
     assert.match(body.message ?? '', /Completá la verificación/);
 
-    const closed = await requireHuman(new Request('https://ste.changuito.me/api/chat'), {
+    const closed = await requireHuman(new Request('https://app.changuito.me/api/chat'), {
       NODE_ENV: 'production',
     });
     assert.equal(closed?.status, 403);
 
-    const open = await requireHuman(new Request('https://ste.changuito.me/api/chat'), {
+    const open = await requireHuman(new Request('https://app.changuito.me/api/chat'), {
       NODE_ENV: 'development',
     });
     assert.equal(open, null);

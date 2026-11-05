@@ -53,6 +53,6 @@ Menos vueltas en el súper. Más tiempo para lo que importa.
 
 Changuito te ayuda a pedir, comparar y pagar — con precios reales.
 
-Probar Changuito → ste.changuito.me
+Probar Changuito → app.changuito.me
 
 #Changuito

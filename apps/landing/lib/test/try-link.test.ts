@@ -12,7 +12,7 @@ test('the try CTA uses the locked running mascot instead of an arrow', () => {
   assert.equal(source.includes('→'), false);
   assert.match(source, /href="\/whitelist"/);
   assert.equal(source.includes('href={APP_URL}'), false);
-  assert.equal(source.includes('ste.changuito.me'), false);
+  assert.equal(source.includes('app.changuito.me'), false);
   assert.match(source, /HERO\.cta/);
   assert.match(source, /src="\/brand\/mascota-corriendo\.png"/);
   assert.match(source, /alt=""/);
@@ -26,7 +26,7 @@ test('the try CTA uses the locked running mascot instead of an arrow', () => {
   const page = readFileSync(join(root, 'components/landing/landing-page.tsx'), 'utf8');
   const header = readFileSync(join(root, 'components/landing/site-header.tsx'), 'utf8');
   assert.equal(page.includes('APP_URL'), false);
-  assert.equal(page.includes('ste.changuito.me'), false);
+  assert.equal(page.includes('app.changuito.me'), false);
   assert.equal(page.includes('footerLabel'), false);
   assert.equal(page.includes('landing-footer-app'), false);
   assert.equal(page.includes('FOOTER.appLabel'), false);

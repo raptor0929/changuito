@@ -1,6 +1,6 @@
 # Instagram — copy pack (Changuito launch)
 
-Frase canal: **Changuito te lo hace fácil**. CTA: **Probar Changuito** → www.changuito.me / ste.changuito.me
+Frase canal: **Changuito te lo hace fácil**. CTA: **Probar Changuito** → www.changuito.me / app.changuito.me
 
 Piezas: `IgFeed`, `IgStory`, `IgReel`, `IgCarousel1–5`, `IgInfografia`
 
@@ -41,7 +41,7 @@ Changuito te lo hace fácil → link en bio
 
 - Headline: **Changuito te lo hace fácil**
 - Sub: Armá el súper sin pensar. Pagá con tarjeta o USDC.
-- Sticker CTA: **Probar Changuito** → ste.changuito.me
+- Sticker CTA: **Probar Changuito** → app.changuito.me
 - (swipe-up / link sticker)
 
 **Pieza:** `exports/instagram/IgStory.png`
@@ -57,7 +57,7 @@ Changuito te lo hace fácil → link en bio
 | 3–4.5s | 2 Compará precios reales | Pose comparando |
 | 4.5–6s | 3 Confirmá el carrito | Pose lleno |
 | 6–7.5s | 4 Pagá con tarjeta o USDC | Pose corriendo |
-| 7.5–9s | Probar Changuito → ste.changuito.me | CTA |
+| 7.5–9s | Probar Changuito → app.changuito.me | CTA |
 
 **Caption reel:**
 

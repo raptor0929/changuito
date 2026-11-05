@@ -35,7 +35,7 @@ function signed(kp: Keypair, address = kp.publicKey(), intent: WalletIntent = 'l
 async function post(body: unknown, { human = true } = {}): Promise<Request> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (human) headers.cookie = `${HUMAN_COOKIE}=${encodeURIComponent(await mintHumanToken(TURNSTILE))}`;
-  return new Request('https://ste.changuito.me/api/session/login', { method: 'POST', headers, body: JSON.stringify(body) });
+  return new Request('https://app.changuito.me/api/session/login', { method: 'POST', headers, body: JSON.stringify(body) });
 }
 
 async function status(res: Response): Promise<{ status: number; error?: string; cookie: string | null }> {
@@ -106,7 +106,7 @@ describe('sessionSecret', () => {
   });
 
   it('accepts no cookie at all when production has no secret', async () => {
-    const req = new Request('https://ste.changuito.me/api/chat', { headers: { cookie: `${USER_COOKIE}=v2.1.2.3` } });
+    const req = new Request('https://app.changuito.me/api/chat', { headers: { cookie: `${USER_COOKIE}=v2.1.2.3` } });
     assert.deepEqual(await readLoggedInUser(req, { NODE_ENV: 'production' } as NodeJS.ProcessEnv), { ok: false });
   });
 });

@@ -11,7 +11,7 @@ changuito gives you a card number to type into the súper's payment form.
 
 | | |
 |---|---|
-| **Try it** | [ste.changuito.me](https://ste.changuito.me) — no wallet needed to shop |
+| **Try it** | [app.changuito.me](https://app.changuito.me) — no wallet needed to shop |
 | **Marketing site** | [www.changuito.me](https://www.changuito.me) |
 | **Reviewing this?** | **[docs/judges.md](docs/judges.md)** — a 15-minute path through the repo, and what to check |
 | **License** | MIT |
@@ -350,7 +350,7 @@ node --experimental-strip-types --experimental-test-module-mocks --no-warnings -
 ## Layout
 
 ```
-apps/web/            the shopper — chat, checkout, card, API routes (ste.changuito.me)
+apps/web/            the shopper — chat, checkout, card, API routes (app.changuito.me)
 apps/landing/        marketing site only (www.changuito.me)
 apps/branding/       brand kit (not an npm package): logo, mascot, manuals, social
 packages/mcp/        the supermarket MCP server (vendored, 520 tests)

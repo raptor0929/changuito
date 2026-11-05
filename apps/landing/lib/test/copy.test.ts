@@ -30,10 +30,10 @@ import {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
-test('the only app handoff is https://ste.changuito.me', () => {
+test('the only app handoff is https://app.changuito.me', () => {
   const url = new URL(APP_URL);
   assert.equal(url.protocol, 'https:');
-  assert.equal(url.hostname, 'ste.changuito.me');
+  assert.equal(url.hostname, 'app.changuito.me');
   assert.equal(url.pathname, '/');
   assert.equal(url.search, '');
   assert.equal(url.hash, '');
@@ -182,7 +182,7 @@ test('the hero is a coded product demo, not the loading GIF', () => {
   assert.equal(page.includes('animacion-busqueda'), false);
   assert.equal(page.includes('mascot-exito'), false);
   assert.equal(page.includes('landing-benefits'), false);
-  assert.equal(demo.includes('ste.changuito.me'), false);
+  assert.equal(demo.includes('app.changuito.me'), false);
   assert.match(demo, /Asado para 12 el sábado/);
   assert.match(demo, /Buscando en Jumbo, Disco, Carrefour y Día…/);
   assert.match(demo, /Pagá con USDC/);

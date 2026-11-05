@@ -45,7 +45,7 @@ Probar Changuito → www.changuito.me
 
 Menos listas eternas. Más carrito listo.
 
-Armá el súper sin pensar → ste.changuito.me
+Armá el súper sin pensar → app.changuito.me
 
 ---
 

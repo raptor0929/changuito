@@ -5,7 +5,7 @@ import { STOREFRONT_ORIGINS } from './storefront.ts';
 /**
  * Response headers for the shopper, mirroring www's (apps/landing/lib/csp.ts).
  *
- * The app shipped none, so any site could frame ste.changuito.me and lay a
+ * The app shipped none, so any site could frame app.changuito.me and lay a
  * fake button over "Cargar USDC" or "Ya lo completé". `frame-ancestors 'none'`
  * plus X-Frame-Options is the fix; the rest is the same baseline www has.
  *

@@ -6,7 +6,7 @@ browser.
 | Project | Target |
 |---|---|
 | `landing` | `LANDING_BASE_URL`, default `https://www.changuito.me` |
-| `app` | `APP_BASE_URL`, default `https://ste.changuito.me` |
+| `app` | `APP_BASE_URL`, default `https://app.changuito.me` |
 | `checkout` | `CHECKOUT_BASE_URL`, default a `next dev` Playwright starts on 3124 |
 
 The first two are smokes, and production is their target on purpose. A local

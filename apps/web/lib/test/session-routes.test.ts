@@ -37,7 +37,7 @@ describe('session routes', () => {
   });
 
   const post = (path: string, body: unknown, cookie = human) =>
-    new Request(`https://ste.changuito.me${path}`, {
+    new Request(`https://app.changuito.me${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie },
       body: JSON.stringify(body),
@@ -52,7 +52,7 @@ describe('session routes', () => {
     for (const flag of ['HttpOnly', 'Secure', 'SameSite=Lax', 'Path=/']) assert.ok(cookie.includes(flag), flag);
 
     const { readLoggedInUser } = await import('../login-gate.ts');
-    const who = await readLoggedInUser(new Request('https://ste.changuito.me/', { headers: { cookie: cookie.split(';')[0]! } }));
+    const who = await readLoggedInUser(new Request('https://app.changuito.me/', { headers: { cookie: cookie.split(';')[0]! } }));
     assert.deepEqual(who, { ok: true, address: wallet.publicKey() });
   });
 
