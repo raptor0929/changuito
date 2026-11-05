@@ -35,6 +35,8 @@ import type { NetworkId } from './deployments.ts';
 export type Sql = ReturnType<typeof postgres>;
 
 let cached: Sql | undefined;
+let cachedUrl: string | undefined;
+let cachedRequest: string | undefined;
 
 /** Whether this deployment has a database at all. */
 export function hasDatabase(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -42,25 +44,34 @@ export function hasDatabase(env: NodeJS.ProcessEnv = process.env): boolean {
 }
 
 /**
- * The pooled connection, made once.
+ * The pooled connection.
  *
- * DATABASE_URL is the transaction pooler (6543). DIRECT_URL (5432) is for
- * migrations only and is deliberately not read here: transaction-mode pooling
- * is what makes a lambda-per-request workload survivable, and a route that
- * quietly opened a session connection would exhaust the database under load
- * rather than at deploy.
+ * DATABASE_URL is the transaction pooler (6543) on a lambda. DIRECT_URL
+ * (5432) is for migrations only and is deliberately not read here.
+ * On the Worker, worker.ts copies the Hyperdrive binding's connection
+ * string onto DATABASE_URL and stamps CHG_DB_REQUEST for this request.
+ * Hyperdrive closes the socket when the request ends, so the next request
+ * opens a new client instead of reusing a dead one. A fake installed by
+ * resetDb() has no url and stays in place.
  */
 export function db(env: NodeJS.ProcessEnv = process.env): Sql {
-  if (cached) return cached;
   const url = (env.DATABASE_URL ?? '').trim();
+  const requestId = env.CHG_DB_REQUEST;
+  if (cached && cachedUrl === undefined) return cached;
+  if (cached && cachedUrl === url && cachedRequest === requestId) return cached;
   if (!url) {
+    if (cached && !requestId) return cached;
     // Reached only from a money path. The message names the variable because
     // the person reading this log is the person who can set it.
     throw new Error('DATABASE_URL is not set — the card and order tables are unreachable.');
   }
+  if (cached && cachedUrl !== undefined) void cached.end({ timeout: 1 });
+  cachedUrl = url;
+  cachedRequest = requestId;
   cached = postgres(url, {
     max: 1,
     prepare: false,
+    fetch_types: false,
     idle_timeout: 20,
     connect_timeout: 10,
     // A serverless function is killed, not shut down. Logging a fetch of a
@@ -73,6 +84,8 @@ export function db(env: NodeJS.ProcessEnv = process.env): Sql {
 /** Tests only: drop the cached connection so a fake can take its place. */
 export function resetDb(next?: Sql): void {
   cached = next;
+  cachedUrl = undefined;
+  cachedRequest = undefined;
 }
 
 /* ---- the card a customer keeps ------------------------------------------ */

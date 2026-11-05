@@ -22,6 +22,16 @@ const RetailerId = z.enum(RETAILER_IDS as unknown as [string, ...string[]]);
 const text = (s: string) => ({ content: [{ type: 'text' as const, text: s }] });
 const fail = (s: string) => ({ content: [{ type: 'text' as const, text: s }], isError: true });
 
+// The in-memory transport never JSON-encodes a tool result, so optional
+// fields stay `undefined`. The Workers schema validator throws on that
+// ("Instances of undefined type are not supported") and the model then
+// reports a successful catalogue search as a server error. A stdio client
+// would have dropped those keys in transit; do the same here.
+const structured = (s: string, value: unknown) => ({
+  ...text(s),
+  structuredContent: JSON.parse(JSON.stringify(value)),
+});
+
 /** Compact rendering. Raw VTEX payloads are enormous and waste the model's context. */
 function renderProducts(ps: Product[]): string {
   if (!ps.length) return 'No products matched.';
@@ -135,7 +145,7 @@ export function registerCatalogTools(
         const products = await getAdapter(ctx.retailer).search(query, ctx, {
           limit, offset, sort, onlyAvailable: !include_unavailable,
         });
-        return { ...text(renderProducts(products)), structuredContent: { products } };
+        return structured(renderProducts(products), { products });
       } catch (e) {
         return fail(e instanceof Error ? e.message : String(e));
       }
@@ -225,7 +235,7 @@ export function registerCatalogTools(
           ctx,
         );
         session.rememberCart(ctx.retailer, cart.cartId);
-        return { ...text(renderCart(cart)), structuredContent: { cart } };
+        return structured(renderCart(cart), { cart });
       } catch (e) {
         return fail(e instanceof Error ? e.message : String(e));
       }
@@ -249,7 +259,7 @@ export function registerCatalogTools(
       try {
         const { cart: current, ctx } = await session.ensureCart();
         const cart = await getAdapter(ctx.retailer).setQuantity(current.cartId, index, quantity, ctx);
-        return { ...text(renderCart(cart)), structuredContent: { cart } };
+        return structured(renderCart(cart), { cart });
       } catch (e) {
         return fail(e instanceof Error ? e.message : String(e));
       }
@@ -267,7 +277,7 @@ export function registerCatalogTools(
     async () => {
       try {
         const { cart } = await session.ensureCart();
-        return { ...text(renderCart(cart)), structuredContent: { cart } };
+        return structured(renderCart(cart), { cart });
       } catch (e) {
         return fail(e instanceof Error ? e.message : String(e));
       }
@@ -289,10 +299,9 @@ export function registerCatalogTools(
         const { cart, ctx } = await session.ensureCart();
         const url = getAdapter(ctx.retailer).handoffUrl(cart.cartId);
         if (!cart.lines.length) {
-          return { ...text('Cart is empty — add something before handing it over.'),
-                   structuredContent: { cart } };
+          return structured('Cart is empty — add something before handing it over.', { cart });
         }
-        return { ...text(renderCart(cart, url)), structuredContent: { cart, handoffUrl: url } };
+        return structured(renderCart(cart, url), { cart, handoffUrl: url });
       } catch (e) {
         return fail(e instanceof Error ? e.message : String(e));
       }

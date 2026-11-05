@@ -44,9 +44,56 @@ function limiterFor(host: string): RateLimiter {
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Workers' own fetch stamps CF-Worker on the way out. Node's does not. */
+function onWorkers(): boolean {
+  return typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers';
+}
+
+function isJsonBody(text: string): boolean {
+  const head = text.trimStart()[0];
+  return head === '{' || head === '[';
+}
+
+/**
+ * Read a store response. On a Worker, a block page (or a failed fetch) is
+ * tried again over a TLS socket that does not carry the Worker headers.
+ * Anywhere else the socket module is never loaded.
+ */
+async function exchange(
+  url: string,
+  method: 'GET' | 'POST',
+  headers: Record<string, string>,
+  body: string | undefined,
+  signal: AbortSignal,
+): Promise<{ status: number; text: string; headers: Headers }> {
+  let fetched: { status: number; text: string; headers: Headers } | undefined;
+  let fetchErr: unknown;
+  try {
+    const res = await fetch(url, { method, signal, headers, body });
+    fetched = { status: res.status, text: await res.text(), headers: res.headers };
+  } catch (e) {
+    fetchErr = e;
+  }
+  if (fetched && isJsonBody(fetched.text)) return fetched;
+  if (!onWorkers()) {
+    if (fetchErr) throw fetchErr;
+    return fetched as { status: number; text: string; headers: Headers };
+  }
+  const { socketExchange } = await import('./http-socket.js');
+  return socketExchange(url, { method, headers, body });
+}
+
 export async function request<T>(url: string, opts: HttpOptions = {}): Promise<T> {
   const { method = 'GET', body, headers = {}, retries = 2 } = opts;
   const host = new URL(url).host;
+  const wireHeaders = {
+    'User-Agent': UA,
+    Accept: 'application/json',
+    'Accept-Language': 'es-AR,es;q=0.9',
+    ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    ...headers,
+  };
+  const wireBody = body !== undefined ? JSON.stringify(body) : undefined;
 
   let lastErr: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -55,18 +102,7 @@ export async function request<T>(url: string, opts: HttpOptions = {}): Promise<T
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
     try {
-      const res = await fetch(url, {
-        method,
-        signal: ctrl.signal,
-        headers: {
-          'User-Agent': UA,
-          Accept: 'application/json',
-          'Accept-Language': 'es-AR,es;q=0.9',
-          ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-          ...headers,
-        },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      });
+      const res = await exchange(url, method, wireHeaders, wireBody, ctrl.signal);
 
       if (res.status === 429) {
         const retryAfter = Number(res.headers.get('retry-after')) || 2 ** attempt;
@@ -83,13 +119,12 @@ export async function request<T>(url: string, opts: HttpOptions = {}): Promise<T
         continue;
       }
 
-      const text = await res.text();
+      const text = res.text;
 
       // A 200 is not proof of an API. Coto returns HTTP 200 with an Angular
       // shell for every VTEX path; without this check the adapter would happily
       // "succeed" and then fail deep inside a JSON parse with a useless message.
-      const head = text.trimStart()[0];
-      if (head !== '{' && head !== '[') {
+      if (!isJsonBody(text)) {
         throw new RetailerError(
           `${host} returned HTML, not JSON (HTTP ${res.status}) — this endpoint does not exist on this store`,
           'UPSTREAM',
@@ -98,7 +133,7 @@ export async function request<T>(url: string, opts: HttpOptions = {}): Promise<T
       }
 
       const json = JSON.parse(text) as T;
-      if (!res.ok) {
+      if (res.status < 200 || res.status >= 300) {
         const err = json as { error?: { code?: string; message?: string } };
         throw new RetailerError(
           err?.error?.message ?? `HTTP ${res.status} from ${host}`,
