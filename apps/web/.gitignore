@@ -1,0 +1,6 @@
+.vercel
+.env
+
+/dist/
+.vinext/
+.cloudflare/

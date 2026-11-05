@@ -131,7 +131,66 @@ escrow; it is simply no longer on the deposit rail.
 
 ---
 
+## Part 2W — the app on Cloudflare Workers
+
+The app is hosted on the Worker **`changuito-ste`**, which owns
+`ste.changuito.me`. `app.changuito.me` joins it only at cutover, with the
+owner's go. Never deploy this repo to `changuito-web` or `changuito-sol`:
+those Workers serve the Solana app. Everything in Part 2 about *which*
+variables exist still applies; only where they are set changes.
+
+The build is vinext on Vite (`apps/web/vite.config.ts`, `worker.ts`,
+`cloudflare.config.ts`). It needs **Node 22.18 or newer**, because the
+config loader refuses anything older. `next build` keeps working for local
+checks.
+
+```sh
+npm run build:vinext -w @changuito/web     # local build, nothing deployed
+npm run deploy:vinext -w @changuito/web    # builds and deploys changuito-ste
+```
+
+**Build environment** (the shell that runs the deploy). `NEXT_PUBLIC_*` is
+inlined into the bundle at build time, so it has to be set *here*, not on the
+dashboard:
+
+| Name | Value |
+|---|---|
+| `NEXT_PUBLIC_POLLAR_API_KEY` | the **testnet** Pollar publishable key |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | the Turnstile site key for this hostname |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID`, `NEXT_PUBLIC_META_PIXEL_ID`, `NEXT_PUBLIC_CLARITY_PROJECT_ID` | optional |
+| `CHG_HYPERDRIVE_ID` | **required**: the id of the Stellar Hyperdrive config (Stellar's own Supabase, never Solana's), bound as `HYPERDRIVE`. Unset means no database, and production quotas then refuse every chat turn |
+
+Leave `NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` **unset** in that shell: whatever
+it holds is inlined.
+
+**Worker secrets** (`changuito-ste` → Settings → Variables and Secrets, type
+*Secret*). Same names and meanings as the tables in
+[2.4](#24-environment-variables): `ANTHROPIC_API_KEY`, `TURNSTILE_SECRET_KEY`,
+`CHG_SESSION_SECRET`, `STELLAR_RESOLVER_SECRET`, `DEPOSIT_ADDRESS_TESTNET`,
+`DEMO_WALLET_SECRET`, and optionally `FAUCET_ALLOWLIST_ADDRESSES`,
+`VYRION_API_KEY`, `FX_ARS_PER_USD`.
+
+No Redis. The chat and faucet quotas count in Postgres (`quota` table,
+`lib/kv.ts`). `KV_REST_API_URL` / `KV_REST_API_TOKEN` are still read by
+`lib/agent/turn-store.ts` alone, and are optional. Without them a
+conversation's history lives in the isolate's memory: it survives while the
+same isolate serves the shopper, and is lost on a cold start or a deploy.
+Moving the turn store to the `kv` table is a separate change.
+
+`NODE_ENV=production` is set by `cloudflare.config.ts` itself. It is not
+optional: the app reads it at runtime, and on a Worker `process.env` holds
+only the bindings, so without it every fail-closed rule takes its
+development branch.
+
+`DATABASE_URL` is not a secret here. `worker.ts` copies the Hyperdrive
+binding's connection string onto it for each request.
+
+---
+
 ## Part 2 — the app on Vercel
+
+Vercel is the previous host and the Stellar projects there are blocked. The
+variable tables below are still the reference for what each name means.
 
 ### 2.1 Get the two API keys
 
