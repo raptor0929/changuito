@@ -19,13 +19,19 @@ const publicEnv = Object.fromEntries(
 
 // Which Postgres this Worker reaches is a decision, not a default: the
 // database is a privacy boundary between the two apps. No id, no binding, and
-// the app runs without a database the way a fresh clone does.
+// the app runs without a database the way a fresh clone does — except on
+// Workers Builds, where a deploy without it would ship a production app with
+// no database, so it stops there instead.
 const hyperdriveId = process.env.CHG_HYPERDRIVE_ID?.trim();
+if (!hyperdriveId && process.env.WORKERS_CI === "1") {
+  throw new Error("CHG_HYPERDRIVE_ID is not set as a build variable: refusing to deploy without the database.");
+}
 
 export default defineConfig({
   worker: defineWorker({
-    // Not changuito-web: that Worker serves the Solana app today.
-    name: "changuito-ste",
+    // The Worker that owns app.changuito.me. Deployed by Workers Builds from
+    // this repo's main branch.
+    name: "changuito-web",
     entrypoint: "./worker.ts",
     compatibilityDate: "2026-11-02",
     compatibilityFlags: ["nodejs_compat"],
@@ -35,9 +41,10 @@ export default defineConfig({
       runWorkerFirst: ["/*", "!/_next/static/*", "!/*/_next/static/*"],
     },
     // The domain this Worker already owns, declared so a deploy leaves it as
-    // it is. app.changuito.me joins it only at cutover, with the owner's go.
+    // it is. A hostname belongs to one Worker, so ste.changuito.me stays on
+    // changuito-ste.
     domains: [
-      { hostname: "ste.changuito.me", production: true, previews: false },
+      { hostname: "app.changuito.me", production: true, previews: false },
     ],
     workersDev: true,
     previewUrls: false,

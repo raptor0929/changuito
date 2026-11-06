@@ -13,8 +13,9 @@
     "prebuild:vinext": "tsc -p ../../packages/mcp",
     "dev:vinext": "vite dev --port 3124",
     "build:vinext": "vite build",
+    "postbuild:vinext": "node ../../scripts/migrate-on-build.mjs",
     "start:vinext": "vinext start",
-    "deploy:vinext": "tsc -p ../../packages/mcp && vinext-cloudflare deploy"
+    "deploy:vinext": "vinext-cloudflare deploy --skip-build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.127.0",
