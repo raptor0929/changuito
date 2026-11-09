@@ -63,6 +63,24 @@ contract. To force new ids:
 npm run deploy:testnet -- --force
 ```
 
+#### Escrow over the USDC SAC (testnet)
+
+To deploy the escrow against the USDC Stellar Asset Contract instead of
+`mock_usdc`, pass the issuer. The script derives the SAC id itself and deploys
+only a new escrow, because the token is fixed in the constructor:
+
+```bash
+USDC_ISSUER=GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5 npm run deploy:testnet
+```
+
+The id must come out as `CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`.
+Two accounts need to exist and hold XLM before it runs, and a person funds them:
+`changuito-resolver` and `changuito-treasury` in the `stellar keys ls` keystore.
+The treasury also needs a `USDC` trustline to that issuer before the first
+`settle`. The resolver address in `deployments.json` must keep matching
+`STELLAR_RESOLVER_SECRET`; if a new identity is generated, that variable has to
+be updated by a person.
+
 ### 1.4 Commit what changed
 
 ```bash

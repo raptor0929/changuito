@@ -4,6 +4,7 @@
 #
 #   scripts/deploy.sh                    # testnet, deploy anything missing
 #   scripts/deploy.sh --force            # testnet, fresh ids, overwriting
+#   USDC_ISSUER=G... scripts/deploy.sh   # testnet, escrow over the USDC SAC, no mock_usdc
 #   scripts/deploy.sh mainnet            # mainnet — reads the checklist below
 #
 # Idempotent by default: a contract already recorded in deployments.json is left
@@ -157,7 +158,7 @@ prev() {
 
 # --------------------------------------------------------------------- deploy
 
-if [[ "$NETWORK" == testnet ]]; then
+if [[ "$NETWORK" == testnet && -z "${USDC_ISSUER:-}" ]]; then
   if USDC_ID="$(prev usdc)"; then
     say "Demo USDC already deployed: $USDC_ID"
   else
@@ -170,10 +171,23 @@ if [[ "$NETWORK" == testnet ]]; then
     echo "  $USDC_ID"
   fi
 else
+  # Testnet with USDC_ISSUER set is the same path as mainnet: the escrow takes
+  # the USDC Stellar Asset Contract, derived from the issuer rather than pasted.
+  if [[ "$NETWORK" == testnet ]]; then
+    USDC_ID="$(stellar contract id asset --asset "$(asset_code):$USDC_ISSUER" --network "$NETWORK")"
+  fi
   say "Using real USDC: $USDC_ID (mock_usdc is never deployed here)"
 fi
 
-if ESCROW_ID="$(prev escrow)"; then
+# The token is fixed in the escrow's constructor, so a recorded escrow only
+# counts as deployed while it still points at the token chosen above. Without
+# this, switching testnet from mock_usdc to the SAC would reuse the old escrow.
+escrow_token_matches() {
+  stellar contract invoke --id "$1" --source-account "$RESOLVER" --network "$NETWORK" \
+    -- config 2>/dev/null | grep -q "$USDC_ID"
+}
+
+if ESCROW_ID="$(prev escrow)" && escrow_token_matches "$ESCROW_ID"; then
   say "Escrow already deployed: $ESCROW_ID"
 else
   say "Deploying escrow (resolver = $RESOLVER, treasury = $TREASURY, token = $USDC_ID)"
@@ -203,7 +217,8 @@ USDC_ID="$USDC_ID" ESCROW_ID="$ESCROW_ID" USDC_ISSUER="${USDC_ISSUER:-}" OUT="$O
   if (n.contracts.escrow.id !== ESCROW_ID || n.contracts.usdc.id !== USDC_ID) {
     n.deployedAt = new Date().toISOString();
   }
-  n.accounts = { resolver: RESOLVER_ADDR, treasury: TREASURY_ADDR };
+  // Spread first: demoWallet is not a deploy identity and must survive a re-run.
+  n.accounts = { ...n.accounts, resolver: RESOLVER_ADDR, treasury: TREASURY_ADDR };
   // null, not '', on a network whose token has no issuer: the app reads that
   // as 'there is no trustline to open here', and '' would read as 'unknown'.
   const issuer = USDC_ISSUER || null;
