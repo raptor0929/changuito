@@ -38,3 +38,7 @@ apps/landing/.data/
 
 # Soroban writes one JSON per test on every run; useful locally, noise in git
 contracts/**/test_snapshots/
+
+# Throwaway keys / local validator state from integration tests
+*.keypair.json
+test-ledger/

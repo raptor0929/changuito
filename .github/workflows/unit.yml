@@ -1,6 +1,7 @@
-# Unit tests on every pull request and on every push to main.
-# Playwright does not live here. See e2e.yml.
-name: Unit
+# Unit + local-node integration tests.
+# Playwright stays in e2e.yml. This workflow never deploys (no Vercel /
+# Cloudflare actions, no environments that trigger a host).
+name: Tests
 
 on:
   pull_request:
@@ -8,23 +9,23 @@ on:
     branches: [main]
 
 concurrency:
-  group: unit-${{ github.workflow }}-${{ github.ref }}
+  group: tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  unit:
     name: npm test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Setup Node from .nvmrc
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -35,5 +36,34 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      - name: Typecheck (web)
-        run: npm run typecheck -w @changuito/web
+  integration:
+    name: escrow (stellar/quickstart)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Install Rust (wasm32v1-none)
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          targets: wasm32v1-none
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: contracts
+
+      - name: Install Stellar CLI
+        env:
+          STELLAR_CLI_VERSION: '30.0.1'
+        run: |
+          set -euo pipefail
+          asset="stellar-cli-${STELLAR_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSL -o /tmp/stellar-cli.tgz \
+            "https://github.com/stellar/stellar-cli/releases/download/v${STELLAR_CLI_VERSION}/${asset}"
+          tar -xzf /tmp/stellar-cli.tgz -C /usr/local/bin stellar
+          stellar --version
+
+      - name: Escrow against local quickstart
+        run: npm run test:integration:escrow

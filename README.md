@@ -297,10 +297,18 @@ The annotated list is `apps/web/.env.example`. The ones that change what works:
 ```bash
 npm test                    # 1278: mcp 520 · trust 2 · web 682 · landing 74
 npm run contracts:test      #   34: escrow 19 · mock_usdc 15
+npm run test:integration:escrow  # local stellar/quickstart: open/settle, refund, BasketMismatch
 npm run typecheck -w @changuito/web
 npm run build
 npm run test:e2e            # Playwright — see docs/e2e.md
 ```
+
+`test:integration:escrow` starts `stellar/quickstart` in local mode (Docker +
+Stellar CLI), deploys `mock_usdc` and `escrow` with throwaway keys, and checks
+open→settle, open→refund, and settle with the wrong basket hash. Keys never
+leave a temp `--config-dir`. Buyer self-refund after expiry stays in
+`contracts:test` (`MIN_TIMEOUT` is five minutes of wall clock on the local
+node). See [docs/testing-strategy.md](docs/testing-strategy.md).
 
 The suites are treated as a fixed point rather than a formality: a change that
 only passes because its test moved with it tells you nothing once it is live, so
