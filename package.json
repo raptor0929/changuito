@@ -26,7 +26,8 @@
     "contracts:build": "stellar contract build --manifest-path contracts/Cargo.toml",
     "contracts:test": "cargo test --manifest-path contracts/Cargo.toml",
     "deploy:testnet": "./scripts/deploy.sh testnet",
-    "deploy:mainnet": "./scripts/deploy.sh mainnet"
+    "deploy:mainnet": "./scripts/deploy.sh mainnet",
+    "test:integration:escrow": "./scripts/integration/escrow-local.sh"
   },
   "devDependencies": {
     "@playwright/test": "1.55.1"
