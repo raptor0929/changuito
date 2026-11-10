@@ -9,7 +9,7 @@ import { modeCopyFor, previewMasthead } from '../lib/mode-copy.ts';
 import { OPEN_FAUCET_EVENT } from '../lib/onboarding.ts';
 import { initials, profileCopy } from '../lib/profile-copy.ts';
 import { ensureUserCookie, forgetUserCookie } from '../lib/session-login.ts';
-import { fetchAs } from '../lib/fetch-as.ts';
+import { postFaucet } from '../lib/faucet-client.ts';
 import { wipeLocalAccount } from '../lib/local-account.ts';
 import { useBalances } from '../lib/use-balances.ts';
 import { useWallet } from '../lib/use-wallet.ts';
@@ -17,7 +17,6 @@ import { uiCopy } from '../lib/ui-copy.ts';
 import { useLang } from './LangProvider';
 import { useNetwork } from './NetworkProvider';
 import { FaucetConfirm } from './FaucetConfirm';
-import { ModeBadge } from './ModeBadge';
 import { ProfileModal } from './ProfileModal';
 import { ReceiveModal } from './ReceiveModal';
 
@@ -124,7 +123,8 @@ export function WalletWidget() {
     setNoteError(false);
     try {
       await ensureUserCookie(address, wallet.accessToken);
-      const res = await fetchAs({ address, sign: wallet.accessToken }, '/api/faucet', { method: 'POST' });
+      const res = await postFaucet({ address, sign: wallet.accessToken }, network);
+      if (!res) throw new Error(copy.fundProofFailed);
       const json = await res.json().catch(() => ({}));
       // 429 carries a real answer ("you already have enough"), not a failure.
       if (!res.ok && res.status !== 429) throw new Error(json.message ?? json.error ?? `faucet failed (${res.status})`);
@@ -165,7 +165,6 @@ export function WalletWidget() {
         className={android ? 'topbar-wallet is-android' : wallet.enabled ? 'topbar-wallet' : 'topbar-wallet wallet-off'}
         title={wallet.enabled ? undefined : 'Falta NEXT_PUBLIC_POLLAR_API_KEY. Ver DEPLOY.md'}
       >
-        <ModeBadge network={network} mode={appMode} />
         {android ? (
           <span className="sr-only">{wallet.ready ? copy.androidLead : copy.verifying}</span>
         ) : wallet.enabled ? (
@@ -277,8 +276,6 @@ export function WalletWidget() {
         <span className="topbar-unit">{mode.balanceUnit}</span>
         {loading ? <span className="sr-only">{copy.refreshing}</span> : null}
       </span>
-      {/* Beside the balance, so "test money" is always in sight, not only in the profile. */}
-      <ModeBadge network={network} mode={appMode} />
 
       <button
         ref={profileButton}

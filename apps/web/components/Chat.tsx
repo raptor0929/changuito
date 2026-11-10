@@ -47,6 +47,27 @@ const VOICE_NOTE: Record<DictationError, 'voiceUnsupported' | 'voiceDenied' | 'v
 };
 
 /**
+ * The cart offer belongs in the thread, after the products it would buy.
+ *
+ * It stays out of the composer: that row is 44px icon buttons, and a label
+ * there spills under them. It also stays out while a turn is running and
+ * once a cart is already the newest thing on screen — pointing at an order
+ * that is already there is the card's job.
+ */
+function offerBuildCart(blocks: Block[], streaming: boolean, readOnly: boolean): boolean {
+  if (streaming || readOnly) return false;
+  let products = -1;
+  let cart = -1;
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    if (!block) continue;
+    if (block.kind === 'products') products = i;
+    else if (block.kind === 'cart') cart = i;
+  }
+  return products > cart;
+}
+
+/**
  * The placeholder for this screen.
  *
  * The server renders the first one; the random pick and the phone variant
@@ -408,6 +429,8 @@ function ChatCore({
     track('error_shown', { code: errorCode(lastError.message) });
   }, [state.blocks]);
 
+  const showBuildCart = offerBuildCart(state.blocks, state.streaming, readOnly);
+
   return (
     // `is-empty` is the hook for the mobile first-screen layout. The class is
     // server-rendered with the initial state, so compact CSS applies before
@@ -513,6 +536,19 @@ function ChatCore({
             />
           </p>
         ) : null}
+        {showBuildCart ? (
+          <div className="chat-build">
+            <button
+              type="button"
+              className="btn"
+              data-testid="chat-build-cart"
+              disabled={gated}
+              onClick={() => submit(copy.buildCartAsk)}
+            >
+              {copy.buildCart}
+            </button>
+          </div>
+        ) : null}
         {receipt ? <ReceiptCard receipt={receipt} /> : null}
         <ReportBug />
       </div>
@@ -616,17 +652,6 @@ function ChatCore({
           </button>
         )}
         <div className="composer-tools">
-          {state.blocks.length > 0 ? (
-            <button
-              type="button"
-              className="btn btn-ghost composer-tool"
-              data-testid="composer-build-cart"
-              disabled={state.streaming || gated || readOnly}
-              onClick={() => submit(copy.buildCartAsk)}
-            >
-              {copy.buildCart}
-            </button>
-          ) : null}
           <button
             type="button"
             className="btn btn-ghost composer-tool"
@@ -664,7 +689,6 @@ function ChatCore({
             {composerNote}
           </p>
         ) : null}
-        {state.streaming ? <TurnProgressLine state={state} /> : null}
         <input
           ref={fileRef}
           className="composer-file"
@@ -859,11 +883,12 @@ export function UserBubble({
 }
 
 /**
- * What the turn is doing and for how long, under the composer.
+ * What the turn is doing and for how long.
  *
- * Mounted only while a turn streams, so its first render is the turn's start.
- * The seconds are aria-hidden: announcing a counter every second would drown
- * the stage changes, which are the part worth hearing.
+ * The fixture gallery mounts this. The composer does not: the same sentence
+ * was painting under the icon row while a search ran. The seconds are
+ * aria-hidden: announcing a counter every second would drown the stage
+ * changes, which are the part worth hearing.
  */
 export function TurnProgressLine({ state }: { state: ChatState }) {
   const lang = useLang();

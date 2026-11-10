@@ -11,6 +11,7 @@ import { escrowCopy } from '../lib/checkout/copy.ts';
 import type { QuoteResponse, StatusResponse } from '../lib/checkout/types.ts';
 import { OpenConfirmationPending, recoverOpen, submitOpen, type OpenSubmission } from '../lib/checkout/open-submission.ts';
 import type { PublicProfile } from '../lib/profile.ts';
+import { postFaucet } from '../lib/faucet-client.ts';
 import { fetchAs } from '../lib/fetch-as.ts';
 import { ensureUserCookie } from '../lib/session-login';
 import { explorer } from '../lib/stellar.ts';
@@ -18,6 +19,7 @@ import { useBalances } from '../lib/use-balances.ts';
 import { uiCopy } from '../lib/ui-copy.ts';
 import { useWallet } from '../lib/use-wallet.ts';
 import { useLang } from './LangProvider';
+import { useNetwork } from './NetworkProvider';
 import { PasswordInput } from './PasswordInput';
 import { ManualPaymentPanel } from './ManualPaymentPanel';
 import { GuidedCheckout } from './GuidedCheckout';
@@ -91,6 +93,7 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
   const lang = useLang();
   const copy = escrowCopy(lang);
   const wallet = useWallet();
+  const { network } = useNetwork();
   const { data: balance, refresh } = useBalances(wallet.address);
 
   const [quote, setQuote] = useState<QuoteResponse | null>(null);
@@ -182,7 +185,8 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
     setFunding(true);
     setError(null);
     try {
-      const res = await fetchAs({ address: wallet.address, sign: wallet.accessToken }, '/api/faucet', { method: 'POST' });
+      const res = await postFaucet({ address: wallet.address, sign: wallet.accessToken }, network);
+      if (!res) throw new Error(copy.failed);
       const body = await res.json().catch(() => null);
       if (!res.ok && res.status !== 429) throw new Error(body?.error ?? copy.failed);
       if (res.status === 429 && body?.note) setError(body.note);
@@ -194,7 +198,7 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
     } finally {
       setFunding(false);
     }
-  }, [copy.failed, refresh]);
+  }, [copy.failed, network, refresh, wallet.accessToken, wallet.address]);
 
   const lock = useCallback(async () => {
     if (!quote || !wallet.address) return;

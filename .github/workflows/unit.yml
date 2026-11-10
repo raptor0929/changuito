@@ -1,5 +1,5 @@
 # Unit tests on every pull request and on every push to main.
-# Playwright does not live here. See e2e.yml.
+# Playwright is not a GitHub workflow. Run it locally with npm run test:e2e.
 name: Unit
 
 on:
