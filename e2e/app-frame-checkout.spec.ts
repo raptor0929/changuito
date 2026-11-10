@@ -93,6 +93,7 @@ test.describe('frame checkout', () => {
     const calls = installCheckoutMocks(page);
     const errors = collectPageErrors(page);
 
+    await page.addInitScript(() => localStorage.setItem('changuito:onboarding:v1', '1'));
     await page.goto('/');
 
     // ---- shop -------------------------------------------------------------

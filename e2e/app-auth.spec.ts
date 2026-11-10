@@ -25,6 +25,7 @@ test.describe('app auth', () => {
     test.slow();
 
     const errors = collectPageErrors(page);
+    await page.addInitScript(() => localStorage.setItem('changuito:onboarding:v1', '1'));
     await page.goto('/');
     await page.getByRole('button', { name: 'Empezá a comprar' }).click();
 

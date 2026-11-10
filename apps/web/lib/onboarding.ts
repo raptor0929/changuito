@@ -4,9 +4,10 @@ import type { Lang } from './lang.ts';
  * The first-visit explainer for beta testers: what this is, and the five
  * steps of a purchase. Shown once per browser, dismissed into localStorage.
  *
- * An inline card above the chat, not a modal: it must never cover the
- * "Iniciar sesión" button or the composer (the production smokes in e2e/ click
- * those on a fresh browser), and a tester who already knows can just ignore it.
+ * It is a modal, and the only way through it is the button. A click on the
+ * dimmed page and Escape do nothing: the first visit has to read the five
+ * steps. A later visit finds the key and the modal stays down, so the
+ * production smokes set `changuito:onboarding:v1` before they click.
  */
 export const ONBOARDING_KEY = 'changuito:onboarding:v1';
 

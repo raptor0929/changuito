@@ -18,6 +18,7 @@ const STARTER = 'Compará precios de leche con proteína';
 test.describe('app guest', () => {
   test('loads guest chrome and either chats or stops on the human check', async ({ page }) => {
     const errors = collectPageErrors(page);
+    await page.addInitScript(() => localStorage.setItem('changuito:onboarding:v1', '1'));
     await page.goto('/');
 
     // The name lives on the h1 either way: as the wordmark's alt before #51,
@@ -83,6 +84,7 @@ test.describe('app guest', () => {
 
   test('login modal offers email and does not ask for a password', async ({ page }) => {
     const errors = collectPageErrors(page);
+    await page.addInitScript(() => localStorage.setItem('changuito:onboarding:v1', '1'));
     await page.goto('/');
     await page.getByRole('button', { name: APP.loginAction }).click();
 
