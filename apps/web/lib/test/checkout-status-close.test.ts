@@ -4,7 +4,7 @@ import { after, before, beforeEach, describe, it, mock } from 'node:test';
 
 import { Address, Keypair, nativeToScVal, xdr } from '@stellar/stellar-sdk';
 
-import { orderFromEscrowEvents } from '../checkout/escrow-events.ts';
+import { orderFromEscrowEvents, readOrderFromEvents } from '../checkout/escrow-events.ts';
 import type { OrderAccount } from '../checkout/escrow-server.ts';
 import type { CheckoutRecord } from '../checkout/store.ts';
 import type { SandboxJob } from '../checkout/sandbox.ts';
@@ -181,6 +181,81 @@ describe('escrow events rebuild an open order', () => {
     assert.equal(order?.status, 'settled');
     assert.equal(order?.basketHash, BASKET);
     assert.equal(order?.receiptHash, receipt);
+  });
+
+  it('queries getEvents with a three-topic filter matching order id', async () => {
+    const deadline = 1_762_800_000;
+    const orderTopic = nativeToScVal(Buffer.from(ORDER, 'hex'), { type: 'bytes' }).toXDR('base64');
+    const topic = [
+      xdr.ScVal.scvSymbol('opened').toXDR('base64'),
+      orderTopic,
+      new Address(BUYER).toScVal().toXDR('base64'),
+    ];
+    const value = nativeToScVal(
+      {
+        amount: 114_400_000n,
+        basket_hash: Buffer.from(BASKET, 'hex'),
+        deadline: BigInt(deadline),
+      },
+      {
+        type: {
+          amount: ['symbol', 'i128'],
+          basket_hash: ['symbol', 'bytes'],
+          deadline: ['symbol', 'u64'],
+        },
+      },
+    ).toXDR('base64');
+
+    const realFetch = globalThis.fetch;
+    const captured: { topics: string[] | undefined } = { topics: undefined };
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        method?: string;
+        params?: { filters?: { topics?: string[][] }[] };
+      };
+      if (body.method === 'getLatestLedger') {
+        return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { sequence: 5_000 } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (body.method === 'getEvents') {
+        captured.topics = body.params?.filters?.[0]?.topics?.[0];
+        return new Response(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          result: { events: [{ topic, value }] },
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, error: { message: 'unexpected' } }), {
+        status: 500,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    try {
+      const order = await readOrderFromEvents(ORDER);
+      assert.ok(Array.isArray(captured.topics));
+      assert.equal(captured.topics.length, 3);
+      assert.equal(captured.topics[0], '*');
+      assert.equal(captured.topics[1], orderTopic);
+      assert.equal(captured.topics[2], '*');
+      assert.deepEqual(order, {
+        orderId: ORDER,
+        buyer: BUYER,
+        amount: 114_400_000n,
+        basketHash: BASKET,
+        status: 'open',
+        openedAt: deadline - 3600,
+        deadline,
+        receiptHash: '00'.repeat(32),
+      });
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 });
 

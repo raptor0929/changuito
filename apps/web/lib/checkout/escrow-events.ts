@@ -141,13 +141,15 @@ export async function readOrderFromEvents(orderIdHex: string): Promise<OrderAcco
   const sequence = typeof latest.sequence === 'number' ? latest.sequence : 0;
   if (!sequence) return null;
 
+  // Opened, Settled and Refunded each publish three topics: name, order_id, buyer.
+  // RPC matches topic length exactly, so the filter must be three segments too.
   const orderTopic = nativeToScVal(Buffer.from(fromHex(orderIdHex)), { type: 'bytes' }).toXDR('base64');
   const result = await rpcCall(url, 'getEvents', {
     startLedger: Math.max(1, sequence - 2_000),
     filters: [{
       type: 'contract',
       contractIds: [escrowId],
-      topics: [['*', orderTopic]],
+      topics: [['*', orderTopic, '*']],
     }],
     pagination: { limit: 10 },
   });
