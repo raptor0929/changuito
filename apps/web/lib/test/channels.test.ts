@@ -185,10 +185,10 @@ describe('channels open', () => {
       [new PluginExecutionError('fee', { code: 'FEE_LIMIT_EXCEEDED', status: 429, details: {} }), 'channels_fee_cap', 503, 1, 'fee'],
       [new PluginExecutionError('pool', { code: 'POOL_CAPACITY', status: 503, details: {} }), 'channels_pool', 503, 3, 'pool'],
       [new PluginExecutionError('expiry', { code: 'AUTH_EXPIRY_TOO_SHORT', status: 400, details: {} }), 'channels_auth_expiry', 409, 1, 'expiry'],
-      [new PluginExecutionError('sim', { code: 'SIMULATION_FAILED', status: 400, details: { message: 'account not found' } }), 'channels_account', 409, 1, 'account'],
-      [new PluginExecutionError('sim', { code: 'SIMULATION_FAILED', status: 400, details: { message: 'insufficient balance' } }), 'channels_balance', 409, 1, 'balance'],
+      [new PluginExecutionError('Simulation failed', { code: 'SIMULATION_FAILED', status: 400, details: { error: 'account not found', authMode: 'enforce' } }), 'channels_account', 409, 1, 'account'],
+      [new PluginExecutionError('Simulation failed', { code: 'SIMULATION_FAILED', status: 400, details: { error: 'insufficient balance', authMode: 'enforce' } }), 'channels_balance', 409, 1, 'balance'],
       [new PluginExecutionError('auth', { code: 'SIMULATION_SIGNED_AUTH_VALIDATION_FAILED', status: 400, details: {} }), 'channels_auth', 400, 1, 'auth'],
-      [new PluginExecutionError('chain', { code: 'ONCHAIN_FAILED', status: 400, details: { message: 'OrderExists' } }), 'channels_onchain', 409, 1, 'exists'],
+      [new PluginExecutionError('host error', { code: 'ONCHAIN_FAILED', status: 400, details: { status: 'failed', reason: 'OrderExists', id: '1', hash: null, resultCode: 'OrderExists', labUrl: null } }), 'channels_onchain', 409, 1, 'onchain'],
     ];
     for (const [thrown, code, status, calls, label] of cases) {
       let n = 0;
@@ -229,7 +229,11 @@ describe('channels structured errors', () => {
   }
 
   it('does not call a SIMULATION_FAILED without balance "No alcanza el USDC"', () => {
-    const mapped = mapChannelsError(pluginExec('SIMULATION_FAILED', { message: 'Simulation failed' }, 'Simulation failed'));
+    const mapped = mapChannelsError(pluginExec(
+      'SIMULATION_FAILED',
+      { error: 'Simulation failed', authMode: 'enforce' },
+      'Simulation failed',
+    ));
     assert.equal(mapped.code, 'channels_sim');
     assert.doesNotMatch(mapped.message, /USDC/);
   });
@@ -238,18 +242,29 @@ describe('channels structured errors', () => {
     process.env.STELLAR_ESCROW_ID = ESCROW;
     const func = buildOpenFuncForBuyer(input(), BUYER);
     let n = 0;
+    let saved = 0;
     await assert.rejects(
       () => submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
+        saveAttempt: async () => { saved += 1; },
         client: {
           async submitSorobanTransaction() {
             n += 1;
-            throw pluginExec('ONCHAIN_FAILED', { ledger: 1502, reason: 'boom' });
+            throw pluginExec('ONCHAIN_FAILED', {
+              status: 'failed',
+              reason: 'boom',
+              id: '1',
+              hash: null,
+              resultCode: null,
+              labUrl: null,
+              ledger: 1502,
+            });
           },
         },
       })),
       (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_onchain',
     );
     assert.equal(n, 1);
+    assert.equal(saved, 0);
   });
 
   it('stores WAIT_TIMEOUT hash as openAttemptSig and returns it when the order landed', async () => {
@@ -414,23 +429,31 @@ describe('channels structured errors', () => {
     const func = buildOpenFuncForBuyer(input(), BUYER);
     const failed = 'ab'.repeat(32);
     const store: { openAttemptSig?: string; openSig?: string } = {};
+    let saved = 0;
     await assert.rejects(
       () => submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
         loadRecord: async () => ({
           orderId: ORDER, buyer: BUYER, amount: '1000000', basketHash: BASKET,
           openAttemptSig: store.openAttemptSig, openSig: store.openSig,
         }),
-        saveAttempt: async (_orderId, hash) => { store.openAttemptSig = hash; },
-        clearAttempt: async () => { store.openAttemptSig = undefined; },
+        saveAttempt: async (_orderId, hash) => { saved += 1; store.openAttemptSig = hash; },
         recoverAttempt: async (rec) => rec,
         client: {
           async submitSorobanTransaction() {
-            throw pluginExec('ONCHAIN_FAILED', { hash: failed, message: 'host error' });
+            throw pluginExec('ONCHAIN_FAILED', {
+              status: 'failed',
+              reason: 'host error',
+              id: 'tx-1',
+              hash: failed,
+              resultCode: 'txFailed',
+              labUrl: null,
+            }, 'host error');
           },
         },
       })),
       (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_onchain',
     );
+    assert.equal(saved, 0);
     assert.equal(store.openAttemptSig, undefined);
     let simulated = 0;
     const funcAgain = buildOpenFuncForBuyer(input(), BUYER);
@@ -449,6 +472,117 @@ describe('channels structured errors', () => {
     }));
     assert.equal(simulated, 1);
     assert.equal(prepared.kind, 'sign');
+  });
+
+  it('SIMULATION_FAILED OrderExists with a matching order is not a failure', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    await assert.rejects(
+      () => submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
+        readOpened: async () => true,
+        client: {
+          async submitSorobanTransaction() {
+            throw pluginExec('SIMULATION_FAILED', {
+              error: 'HostError: Error(Contract, #1) OrderExists',
+              authMode: 'enforce',
+            }, 'Simulation failed');
+          },
+        },
+      })),
+      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_confirming',
+    );
+  });
+
+  it('ONCHAIN_FAILED with no matching order is a plain failure and does not save the hash', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    const failed = 'cd'.repeat(32);
+    let saved = 0;
+    await assert.rejects(
+      () => submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
+        readOpened: async () => false,
+        saveAttempt: async () => { saved += 1; },
+        client: {
+          async submitSorobanTransaction() {
+            throw pluginExec('ONCHAIN_FAILED', {
+              status: 'failed',
+              reason: 'contract error',
+              id: 'tx-2',
+              hash: failed,
+              resultCode: 'txFailed',
+              labUrl: null,
+            }, 'contract error');
+          },
+        },
+      })),
+      (err: unknown) => err instanceof ChannelsFailure
+        && err.code === 'channels_onchain'
+        && err.hash === failed,
+    );
+    assert.equal(saved, 0);
+  });
+
+  it('transport then SIMULATION_FAILED with the order on chain is not a failure', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    let n = 0;
+    let opened = false;
+    await assert.rejects(
+      () => submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
+        readOpened: async () => opened,
+        client: {
+          async submitSorobanTransaction() {
+            n += 1;
+            if (n === 1) throw new PluginTransportError('bad gateway', 502);
+            opened = true;
+            throw pluginExec('SIMULATION_FAILED', {
+              error: 'HostError: Error(Contract, #1) OrderExists',
+              authMode: 'enforce',
+            }, 'Simulation failed');
+          },
+        },
+      })),
+      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_confirming',
+    );
+    assert.equal(n, 2);
+  });
+
+  it('WAIT_TIMEOUT with a null hash and the order on chain is not a failure', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    let saved = 0;
+    await assert.rejects(
+      () => submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
+        readOpened: async () => true,
+        saveAttempt: async () => { saved += 1; },
+        client: {
+          async submitSorobanTransaction() {
+            throw pluginExec('WAIT_TIMEOUT', { id: 'sub-1', hash: null }, 'WAIT_TIMEOUT');
+          },
+        },
+      })),
+      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_confirming',
+    );
+    assert.equal(saved, 0);
+  });
+
+  it('prepare checks the chain before simulating when there is no stored hash', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    let simulated = 0;
+    await assert.rejects(
+      () => prepareOpen(input(), BUYER, deps({
+        loadRecord: async () => null,
+        readOpened: async () => true,
+        simulator: {
+          async simulate() {
+            simulated += 1;
+            return { auth: [], latestLedger: 1000 };
+          },
+        },
+      })),
+      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_confirming',
+    );
+    assert.equal(simulated, 0);
   });
 
   it('a successful submit stores the hash and the next prepare does not simulate', async () => {

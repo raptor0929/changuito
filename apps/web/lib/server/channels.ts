@@ -102,15 +102,23 @@ export interface ChannelsSubmitter {
   submitSorobanTransaction(req: { func: string; auth: string[] }): Promise<{ hash?: string }>;
 }
 
+/** Quote fields compared to an on-chain order. */
+export interface OpenedWant {
+  orderId: string;
+  buyer: string;
+  amount: string;
+  basketHash: string;
+}
+
 export interface ChannelsDeps {
   simulator: Simulator;
   client: ChannelsSubmitter | null;
   apiKey: string | undefined;
   sleep?: (ms: number) => Promise<void>;
-  readOpened?: (orderId: string) => Promise<boolean>;
+  /** True when the chain holds an order matching buyer, amount and basket hash. */
+  readOpened?: (want: OpenedWant) => Promise<boolean>;
   loadRecord?: (orderId: string) => Promise<ChannelsRecordRow | null>;
   saveAttempt?: (orderId: string, hash: string) => Promise<void>;
-  clearAttempt?: (orderId: string, hash: string) => Promise<void>;
   recoverAttempt?: (rec: ChannelsRecord) => Promise<ChannelsRecord>;
   note?: (line: string) => void;
 }
@@ -317,6 +325,60 @@ async function recoverCheckout(rec: ChannelsRecord): Promise<ChannelsRecord> {
   return { ...rec, openSig: rec.openAttemptSig };
 }
 
+function openedWant(input: OpenFields, buyer: string): OpenedWant {
+  return {
+    orderId: input.orderId,
+    buyer,
+    amount: input.amount,
+    basketHash: input.basketHash,
+  };
+}
+
+async function orderMatches(want: OpenedWant): Promise<boolean> {
+  const order = await readOrder(want.orderId);
+  return Boolean(
+    order
+    && order.orderId === want.orderId
+    && order.buyer === want.buyer
+    && order.amount === BigInt(want.amount)
+    && order.basketHash === want.basketHash,
+  );
+}
+
+async function isOpened(want: OpenedWant, deps: ChannelsDeps): Promise<boolean> {
+  return (deps.readOpened ?? orderMatches)(want);
+}
+
+function confirming(hash?: string): ChannelsFailure {
+  return new ChannelsFailure(
+    409,
+    'channels_confirming',
+    'El pago puede haber entrado. No vuelvas a firmar.',
+    hash,
+  );
+}
+
+/**
+ * A matching on-chain order is never a retryable failure.
+ * Returns the known hash, or throws channels_confirming when the hash is unknown.
+ */
+async function settleFromChain(
+  want: OpenedWant,
+  deps: ChannelsDeps,
+  candidateHash?: string,
+): Promise<{ hash: string } | null> {
+  if (!(await isOpened(want, deps))) return null;
+  const rec = await loadQuoted(want.orderId, deps);
+  if (rec?.openSig && HASH_RE.test(rec.openSig)) return { hash: rec.openSig };
+  const fromAttempt = rec?.openAttemptSig && HASH_RE.test(rec.openAttemptSig)
+    ? rec.openAttemptSig
+    : undefined;
+  const fromCandidate = candidateHash && HASH_RE.test(candidateHash) ? candidateHash : undefined;
+  const hash = fromAttempt ?? fromCandidate;
+  if (hash) return { hash };
+  throw confirming();
+}
+
 export async function prepareOpen(
   input: OpenFields,
   buyer: string,
@@ -326,6 +388,7 @@ export async function prepareOpen(
     throw new ChannelsFailure(503, 'channels_unconfigured', 'Los pagos no están habilitados.');
   }
   const func = buildOpenFuncForBuyer(input, buyer);
+  const want = openedWant(input, buyer);
   const rec = await loadQuoted(input.orderId, deps);
   if (rec) {
     assertRecordMatch(rec, input, buyer);
@@ -333,9 +396,11 @@ export async function prepareOpen(
       return { kind: 'opened', hash: rec.openSig };
     }
     if (rec.openAttemptSig && HASH_RE.test(rec.openAttemptSig)) {
-      throw new ChannelsFailure(409, 'channels_confirming', 'El pago puede haber entrado. No vuelvas a firmar.', rec.openAttemptSig);
+      throw confirming(rec.openAttemptSig);
     }
   }
+  const settled = await settleFromChain(want, deps);
+  if (settled) return { kind: 'opened', hash: settled.hash };
   const source = deployment('testnet').resolver;
   let sim: { auth: string[]; latestLedger: number };
   try {
@@ -360,6 +425,7 @@ export async function submitOpen(
     throw new ChannelsFailure(503, 'channels_unconfigured', 'Los pagos no están habilitados.');
   }
   const func = buildOpenFuncForBuyer(input, buyer);
+  const want = openedWant(input, buyer);
   const rec = await loadQuoted(input.orderId, deps);
   if (rec) {
     assertRecordMatch(rec, input, buyer);
@@ -367,7 +433,7 @@ export async function submitOpen(
       return { hash: rec.openSig };
     }
     if (rec.openAttemptSig && HASH_RE.test(rec.openAttemptSig)) {
-      throw new ChannelsFailure(409, 'channels_confirming', 'El pago puede haber entrado. No vuelvas a firmar.', rec.openAttemptSig);
+      throw confirming(rec.openAttemptSig);
     }
   }
   assertBuyerEntries(signed, buyer, func);
@@ -390,15 +456,17 @@ export async function submitOpen(
         await sleep(200 * (attempt + 1));
         continue;
       }
-      if (mapped.code === 'channels_wait') {
-        return recoverLanded(input.orderId, mapped, deps);
-      }
-      if (mapped.code === 'channels_exists' || mapped.code === 'channels_onchain') {
-        return recoverOnchain(input.orderId, mapped, deps);
-      }
+      // WAIT_TIMEOUT may still land — keep a real hash. Never store an ONCHAIN_FAILED hash.
+      const waitHash = mapped.code === 'channels_wait' ? mapped.hash : undefined;
+      if (waitHash) await rememberAttempt(input.orderId, waitHash, deps);
+      const settled = await settleFromChain(want, deps, waitHash);
+      if (settled) return settled;
+      if (mapped.code === 'channels_wait') throw confirming(waitHash);
       throw mapped;
     }
   }
+  const settled = await settleFromChain(want, deps);
+  if (settled) return settled;
   throw last ?? new ChannelsFailure(503, 'channels_pool', 'No se pudo enviar el pago. Probá de nuevo en un momento.');
 }
 
@@ -408,34 +476,6 @@ async function rememberAttempt(orderId: string, hash: string, deps: ChannelsDeps
   } catch (err) {
     console.warn('[channels] attempt not stored', err instanceof Error ? err.name : 'failed');
   }
-}
-
-async function recoverOnchain(
-  orderId: string,
-  mapped: ChannelsFailure,
-  deps: ChannelsDeps,
-): Promise<{ hash: string }> {
-  if (mapped.hash) await rememberAttempt(orderId, mapped.hash, deps);
-  const rec = await loadQuoted(orderId, deps);
-  if (rec?.openSig && HASH_RE.test(rec.openSig)) return { hash: rec.openSig };
-  if (mapped.hash) await (deps.clearAttempt ?? clearOpenAttempt)(orderId, mapped.hash);
-  throw new ChannelsFailure(409, 'channels_onchain', 'No se pudo abrir el pedido en la red.');
-}
-
-async function recoverLanded(
-  orderId: string,
-  mapped: ChannelsFailure,
-  deps: ChannelsDeps,
-): Promise<{ hash: string }> {
-  if (mapped.hash) {
-    await (deps.saveAttempt ?? saveOpenAttempt)(orderId, mapped.hash);
-  }
-  const rec = await loadQuoted(orderId, deps);
-  if (rec?.openSig && HASH_RE.test(rec.openSig)) {
-    return { hash: rec.openSig };
-  }
-  const hash = mapped.hash ?? (rec?.openAttemptSig && HASH_RE.test(rec.openAttemptSig) ? rec.openAttemptSig : undefined);
-  throw new ChannelsFailure(409, 'channels_confirming', 'El pago puede haber entrado. No vuelvas a firmar.', hash);
 }
 
 async function loadCheckout(orderId: string): Promise<ChannelsRecord | null> {
@@ -455,13 +495,6 @@ async function saveOpenAttempt(orderId: string, hash: string): Promise<void> {
   const rec = await checkoutStore().get(orderId);
   if (!rec || rec.openSig) return;
   rec.openAttemptSig = hash;
-  await checkoutStore().set(rec);
-}
-
-async function clearOpenAttempt(orderId: string, hash: string): Promise<void> {
-  const rec = await checkoutStore().get(orderId);
-  if (!rec || rec.openSig || rec.openAttemptSig !== hash) return;
-  delete rec.openAttemptSig;
   await checkoutStore().set(rec);
 }
 
@@ -505,20 +538,18 @@ function detailHash(details: unknown): string | undefined {
   return HASH_RE.test(normalized) ? normalized : undefined;
 }
 
-function detailBlob(details: unknown, message: string): string {
-  if (details == null) return message;
-  if (typeof details === 'string') return `${details} ${message}`;
-  try {
-    return `${JSON.stringify(details)} ${message}`;
-  } catch {
-    return message;
-  }
-}
-
+/** Plugin shapes: SIMULATION_FAILED `{ error }`, ONCHAIN_FAILED `{ reason, resultCode }`. */
 function detailMessage(details: unknown): string {
   if (typeof details === 'string') return details;
-  if (details && typeof details === 'object' && typeof (details as { message?: unknown }).message === 'string') {
-    return (details as { message: string }).message;
+  if (!details || typeof details !== 'object') return '';
+  const body = details as {
+    error?: unknown;
+    reason?: unknown;
+    resultCode?: unknown;
+    message?: unknown;
+  };
+  for (const value of [body.error, body.reason, body.resultCode, body.message]) {
+    if (typeof value === 'string' && value) return value;
   }
   return '';
 }
@@ -538,12 +569,12 @@ function mapSimFailed(details: unknown): ChannelsFailure {
 }
 
 function mapOnchainFailed(details: unknown): ChannelsFailure {
-  const hash = detailHash(details);
-  const text = detailBlob(details, '').toLowerCase();
-  if (!details || text.includes('orderexists')) {
-    return new ChannelsFailure(409, 'channels_exists', 'Ese pedido ya está abierto.', hash);
-  }
-  return new ChannelsFailure(409, 'channels_onchain', 'No se pudo abrir el pedido en la red.', hash);
+  return new ChannelsFailure(
+    409,
+    'channels_onchain',
+    'No se pudo abrir el pedido en la red.',
+    detailHash(details),
+  );
 }
 
 export function mapChannelsError(err: unknown): ChannelsFailure {
