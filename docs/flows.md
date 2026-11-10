@@ -287,7 +287,7 @@ BROWSER                            /api/card                   STELLAR / DB
 
 ## 6. The escrow
 
-Deployed on testnet over the Circle USDC SAC and covered by 19 tests. On the
+Deployed on testnet over the mintable `mock_usdc` and covered by 19 tests. On the
 login network, checkout mounts `PaymentModal` and calls `open`. Other networks
 keep the memo deposit rail. See
 [stellar.md](stellar.md#the-escrow-contract).

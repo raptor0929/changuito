@@ -17,7 +17,7 @@ changuito is four things that happen to live in one repository:
    types into the store's own payment form.
 4. **A Soroban escrow** (`contracts/escrow`) that holds USDC between "the user
    approved this basket" and "the basket actually happened". Deployed on
-   testnet over the Circle USDC SAC and mounted on the login-network checkout.
+   testnet over the mintable `mock_usdc` and mounted on the login-network checkout.
    See [the escrow contract](stellar.md#the-escrow-contract).
 
 The app is the reason the first two exist: the MCP server had never been used by

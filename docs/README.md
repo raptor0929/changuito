@@ -55,6 +55,6 @@ Two networks, one path. Signed out is **modo prueba** on testnet, paid from a
 demo wallet this repo holds. Signed in with Pollar is **modo real** on mainnet,
 paid from the shopper's own account.
 
-The escrow contract is deployed on testnet over the Circle USDC SAC. On the
+The escrow contract is deployed on testnet over the mintable `mock_usdc`. On the
 login network it is the checkout path — [stellar.md](stellar.md#the-escrow-contract).
 Other networks still use the memo deposit.
