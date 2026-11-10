@@ -110,6 +110,7 @@ export interface ChannelsDeps {
   readOpened?: (orderId: string) => Promise<boolean>;
   loadRecord?: (orderId: string) => Promise<ChannelsRecordRow | null>;
   saveAttempt?: (orderId: string, hash: string) => Promise<void>;
+  clearAttempt?: (orderId: string, hash: string) => Promise<void>;
   recoverAttempt?: (rec: ChannelsRecord) => Promise<ChannelsRecord>;
   note?: (line: string) => void;
 }
@@ -379,6 +380,7 @@ export async function submitOpen(
       if (!hash || !HASH_RE.test(hash)) {
         throw new ChannelsFailure(502, 'channels_submit', 'No se pudo enviar el pago.');
       }
+      await rememberAttempt(input.orderId, hash, deps);
       deps.note?.(`[channels] submitted ${hash}`);
       return { hash };
     } catch (err) {
@@ -388,13 +390,36 @@ export async function submitOpen(
         await sleep(200 * (attempt + 1));
         continue;
       }
-      if (mapped.code === 'channels_wait' || mapped.code === 'channels_exists' || mapped.code === 'channels_onchain') {
+      if (mapped.code === 'channels_wait') {
         return recoverLanded(input.orderId, mapped, deps);
+      }
+      if (mapped.code === 'channels_exists' || mapped.code === 'channels_onchain') {
+        return recoverOnchain(input.orderId, mapped, deps);
       }
       throw mapped;
     }
   }
   throw last ?? new ChannelsFailure(503, 'channels_pool', 'No se pudo enviar el pago. Probá de nuevo en un momento.');
+}
+
+async function rememberAttempt(orderId: string, hash: string, deps: ChannelsDeps): Promise<void> {
+  try {
+    await (deps.saveAttempt ?? saveOpenAttempt)(orderId, hash);
+  } catch (err) {
+    console.warn('[channels] attempt not stored', err instanceof Error ? err.name : 'failed');
+  }
+}
+
+async function recoverOnchain(
+  orderId: string,
+  mapped: ChannelsFailure,
+  deps: ChannelsDeps,
+): Promise<{ hash: string }> {
+  if (mapped.hash) await rememberAttempt(orderId, mapped.hash, deps);
+  const rec = await loadQuoted(orderId, deps);
+  if (rec?.openSig && HASH_RE.test(rec.openSig)) return { hash: rec.openSig };
+  if (mapped.hash) await (deps.clearAttempt ?? clearOpenAttempt)(orderId, mapped.hash);
+  throw new ChannelsFailure(409, 'channels_onchain', 'No se pudo abrir el pedido en la red.');
 }
 
 async function recoverLanded(
@@ -428,8 +453,15 @@ async function loadCheckout(orderId: string): Promise<ChannelsRecord | null> {
 
 async function saveOpenAttempt(orderId: string, hash: string): Promise<void> {
   const rec = await checkoutStore().get(orderId);
-  if (!rec) return;
+  if (!rec || rec.openSig) return;
   rec.openAttemptSig = hash;
+  await checkoutStore().set(rec);
+}
+
+async function clearOpenAttempt(orderId: string, hash: string): Promise<void> {
+  const rec = await checkoutStore().get(orderId);
+  if (!rec || rec.openSig || rec.openAttemptSig !== hash) return;
+  delete rec.openAttemptSig;
   await checkoutStore().set(rec);
 }
 

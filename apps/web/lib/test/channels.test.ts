@@ -188,7 +188,7 @@ describe('channels open', () => {
       [new PluginExecutionError('sim', { code: 'SIMULATION_FAILED', status: 400, details: { message: 'account not found' } }), 'channels_account', 409, 1, 'account'],
       [new PluginExecutionError('sim', { code: 'SIMULATION_FAILED', status: 400, details: { message: 'insufficient balance' } }), 'channels_balance', 409, 1, 'balance'],
       [new PluginExecutionError('auth', { code: 'SIMULATION_SIGNED_AUTH_VALIDATION_FAILED', status: 400, details: {} }), 'channels_auth', 400, 1, 'auth'],
-      [new PluginExecutionError('chain', { code: 'ONCHAIN_FAILED', status: 400, details: { message: 'OrderExists' } }), 'channels_confirming', 409, 1, 'exists'],
+      [new PluginExecutionError('chain', { code: 'ONCHAIN_FAILED', status: 400, details: { message: 'OrderExists' } }), 'channels_onchain', 409, 1, 'exists'],
     ];
     for (const [thrown, code, status, calls, label] of cases) {
       let n = 0;
@@ -247,7 +247,7 @@ describe('channels structured errors', () => {
           },
         },
       })),
-      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_confirming',
+      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_onchain',
     );
     assert.equal(n, 1);
   });
@@ -407,5 +407,100 @@ describe('channels structured errors', () => {
       (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_confirming' && err.hash === LANDED,
     );
     assert.equal(simulated, 0);
+  });
+
+  it('a failed on-chain open does not stick and the next prepare can simulate', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    const failed = 'ab'.repeat(32);
+    const store: { openAttemptSig?: string; openSig?: string } = {};
+    await assert.rejects(
+      () => submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
+        loadRecord: async () => ({
+          orderId: ORDER, buyer: BUYER, amount: '1000000', basketHash: BASKET,
+          openAttemptSig: store.openAttemptSig, openSig: store.openSig,
+        }),
+        saveAttempt: async (_orderId, hash) => { store.openAttemptSig = hash; },
+        clearAttempt: async () => { store.openAttemptSig = undefined; },
+        recoverAttempt: async (rec) => rec,
+        client: {
+          async submitSorobanTransaction() {
+            throw pluginExec('ONCHAIN_FAILED', { hash: failed, message: 'host error' });
+          },
+        },
+      })),
+      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_onchain',
+    );
+    assert.equal(store.openAttemptSig, undefined);
+    let simulated = 0;
+    const funcAgain = buildOpenFuncForBuyer(input(), BUYER);
+    const prepared = await prepareOpen(input(), BUYER, deps({
+      loadRecord: async () => ({
+        orderId: ORDER, buyer: BUYER, amount: '1000000', basketHash: BASKET,
+        openAttemptSig: store.openAttemptSig,
+      }),
+      recoverAttempt: async (rec) => rec,
+      simulator: {
+        async simulate() {
+          simulated += 1;
+          return { auth: [entry(BUYER, funcAgain)], latestLedger: 1000 };
+        },
+      },
+    }));
+    assert.equal(simulated, 1);
+    assert.equal(prepared.kind, 'sign');
+  });
+
+  it('a successful submit stores the hash and the next prepare does not simulate', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    const store: { openAttemptSig?: string; openSig?: string } = {};
+    const record = () => ({
+      orderId: ORDER, buyer: BUYER, amount: '1000000', basketHash: BASKET,
+      openAttemptSig: store.openAttemptSig, openSig: store.openSig,
+    });
+    const sent = await submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
+      loadRecord: async () => record(),
+      saveAttempt: async (_orderId, hash) => { store.openAttemptSig = hash; },
+      recoverAttempt: async (rec) => rec,
+      client: { async submitSorobanTransaction() { return { hash: LANDED }; } },
+    }));
+    assert.equal(sent.hash, LANDED);
+    assert.equal(store.openAttemptSig, LANDED);
+    let simulated = 0;
+    const prepared = await prepareOpen(input(), BUYER, deps({
+      loadRecord: async () => record(),
+      recoverAttempt: async (rec) => ({ ...rec, openSig: rec.openAttemptSig }),
+      simulator: {
+        async simulate() {
+          simulated += 1;
+          return { auth: [], latestLedger: 1000 };
+        },
+      },
+    }));
+    assert.deepEqual(prepared, { kind: 'opened', hash: LANDED });
+    assert.equal(simulated, 0);
+  });
+
+  it('submit does not call Channels while confirmation is still pending', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    let n = 0;
+    await assert.rejects(
+      () => submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
+        loadRecord: async () => ({
+          orderId: ORDER, buyer: BUYER, amount: '1000000', basketHash: BASKET, openAttemptSig: LANDED,
+        }),
+        recoverAttempt: async (rec) => rec,
+        client: {
+          async submitSorobanTransaction() {
+            n += 1;
+            return { hash: 'ab'.repeat(32) };
+          },
+        },
+      })),
+      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_confirming',
+    );
+    assert.equal(n, 0);
   });
 });
