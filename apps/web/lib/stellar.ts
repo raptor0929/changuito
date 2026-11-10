@@ -13,18 +13,24 @@
 import { Horizon, rpc, StrKey } from '@stellar/stellar-sdk';
 
 import { DEFAULT_NETWORK, DEPLOYMENTS, type NetworkId } from './deployments.ts';
+import { rpcUrl } from './rpc-url.ts';
 
 /**
- * One server per network per process — same memoisation as before, just keyed.
- * A single `let` froze the app to whichever network asked first, which was
- * invisible while there was only one.
+ * One server per RPC URL per process. A single `let` froze the app to
+ * whichever network asked first, which was invisible while there was only one.
+ *
+ * Keyed by the URL and not the network, and the URL is read on every call:
+ * the Worker copies its variables onto the env per request, so a server kept
+ * by network would be the one built before that copy, and would outlive a
+ * later change of the variable.
  */
-const _rpc = new Map<NetworkId, rpc.Server>();
+const _rpc = new Map<string, rpc.Server>();
 export function rpcServer(net: NetworkId = DEFAULT_NETWORK): rpc.Server {
-  let s = _rpc.get(net);
+  const url = rpcUrl(net);
+  let s = _rpc.get(url);
   if (!s) {
-    s = new rpc.Server(DEPLOYMENTS[net].rpcUrl);
-    _rpc.set(net, s);
+    s = new rpc.Server(url);
+    _rpc.set(url, s);
   }
   return s;
 }

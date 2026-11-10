@@ -221,6 +221,14 @@ A value that is not a `C…` contract id is ignored. Do not put these names in
 the build variables: the build does not read them, and a value inlined there
 would not be the one a later request sees.
 
+**The Soroban RPC URLs are runtime variables too**, on the same page:
+`STELLAR_RPC_URL` for testnet and `STELLAR_RPC_URL_MAINNET` for mainnet. A
+valid `https` URL wins for that request. Anything else is ignored and the
+request uses the URL recorded in `deployments.json`. Both are declared in
+`apps/web/cloudflare.config.ts` next to the contract ids, and a strict deploy
+aborts while that file and the dashboard disagree, so change the two together
+and set a new name on the dashboard before the deploy that introduces it.
+
 Never set `NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` there: whatever it holds is
 inlined. On a local machine the same public names can come from the shell.
 

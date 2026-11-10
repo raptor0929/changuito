@@ -17,7 +17,7 @@ export const DEPLOYMENTS = {
   testnet: {
     id: 'testnet',
     networkPassphrase: 'Test SDF Network ; September 2015',
-    rpcUrl: 'https://soroban-testnet.stellar.org',
+    rpcUrl: 'https://soroban-rpc.testnet.stellar.gateway.fm',
     horizonUrl: 'https://horizon-testnet.stellar.org',
     /** Testnet only. `null` is how the faucet knows it has no meaning here. */
     friendbotUrl: 'https://friendbot.stellar.org',

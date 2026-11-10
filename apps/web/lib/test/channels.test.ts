@@ -24,6 +24,11 @@ import {
   type OpenFields,
   type SimulationRpc,
 } from '../server/channels.ts';
+import { Keypair, hash } from '@stellar/stellar-sdk';
+import { applyRpcUrlBindings, rpcUrl, RPC_URL_VAR_NAMES } from '../rpc-url.ts';
+import { attachBuyerSignature, authPayload } from '../server/channels.ts';
+import { rpcServer } from '../stellar.ts';
+import { signAuthEntryWith, type WalletAuthEntryOutcome, type WalletSignClient } from '../wallet-signers.ts';
 
 const ESCROW = 'CA4BDF4U65OHCO6AB4KRJWBRZ4BJBZURDFNFKJDEZAKQRCUNJZFLN72S';
 const BUYER = 'GDFF477UQUWOFIHSOEXPPOD5GPUSEW6OLGZB5FCPS6AFRAOPTMINA55X';
@@ -795,5 +800,261 @@ describe('channels live simulator', () => {
         && err.code === 'channels_rpc'
         && err.message === 'La red no pudo simular el pago.',
     );
+  });
+});
+
+describe('channels wallet signature', () => {
+  const PASSPHRASE = DEPLOYMENTS.testnet.networkPassphrase;
+
+  /** The same entry under the credentials protocol 30 records. */
+  function asV2(legacyXdr: string): string {
+    const legacy = xdr.SorobanAuthorizationEntry.fromXDR(legacyXdr, 'base64');
+    if (legacy.credentials.type !== 'sorobanCredentialsAddress') throw new Error('not address credentials');
+    return new xdr.SorobanAuthorizationEntry({
+      credentials: xdr.SorobanCredentials.sorobanCredentialsAddressV2(legacy.credentials.address),
+      rootInvocation: legacy.rootInvocation,
+    }).toXDR('base64');
+  }
+
+  /** What Freighter does with the string it is given: sign its sha256, return the signature. */
+  function freighterSign(key: Keypair, text: string): string {
+    return Buffer.from(key.sign(hash(Buffer.from(text, 'base64')))).toString('base64');
+  }
+
+  function prepared(buyer: string) {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), buyer);
+    const v2 = setAuthExpiry(asV2(entry(buyer, func)), 5060);
+    const legacy = setAuthExpiry(entry(buyer, func), 5060);
+    return { func, v2, legacy };
+  }
+
+  it('an entry is not something Freighter can parse, and its payload is', () => {
+    const { v2, legacy } = prepared(BUYER);
+    // Freighter decodes the string as a HashIdPreimage. Neither credential
+    // variant of the entry is one, so the legacy form would not have helped.
+    assert.throws(() => xdr.HashIdPreimage.fromXDR(v2, 'base64'));
+    assert.throws(() => xdr.HashIdPreimage.fromXDR(legacy, 'base64'));
+    const payload = xdr.HashIdPreimage.fromXDR(authPayload(v2), 'base64');
+    assert.equal(payload.type, 'envelopeTypeSorobanAuthorizationWithAddress');
+    if (payload.type !== 'envelopeTypeSorobanAuthorizationWithAddress') return;
+    const body = payload.sorobanAuthorizationWithAddress;
+    assert.equal(Address.fromScAddress(body.address).toString(), BUYER);
+    assert.equal(body.signatureExpirationLedger, 5060);
+    assert.equal(body.nonce, 1n);
+    assert.equal(body.networkId.toXDR('hex'), Buffer.from(hash(Buffer.from(PASSPHRASE))).toString('hex'));
+    const signedFor = xdr.SorobanAuthorizationEntry.fromXDR(v2, 'base64').rootInvocation;
+    assert.equal(body.invocation.toXDR('base64'), signedFor.toXDR('base64'));
+  });
+
+  it('prepare returns one payload per entry, for the entry it returns', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    const out = await prepareOpen(input(), BUYER, deps({
+      simulator: { async simulate() { return { auth: [asV2(entry(BUYER, func))], latestLedger: 5000 }; } },
+    }));
+    assert.equal(out.kind, 'sign');
+    if (out.kind !== 'sign') return;
+    assert.equal(out.payloads.length, 1);
+    assert.equal(out.payloads[0], authPayload(out.entries[0]!));
+    const kept = xdr.SorobanAuthorizationEntry.fromXDR(out.entries[0]!, 'base64');
+    assert.equal(kept.credentials.type, 'sorobanCredentialsAddressV2');
+  });
+
+  it('the legacy credentials hash to a different payload', () => {
+    const { v2, legacy } = prepared(BUYER);
+    assert.notEqual(authPayload(legacy), authPayload(v2));
+    assert.equal(xdr.HashIdPreimage.fromXDR(authPayload(legacy), 'base64').type, 'envelopeTypeSorobanAuthorization');
+  });
+
+  it('submit puts a payload signature on the entry it was made for', async () => {
+    const key = Keypair.random();
+    const buyer = key.publicKey();
+    const { func, v2 } = prepared(buyer);
+    const signature = freighterSign(key, authPayload(v2));
+    let sent: string[] = [];
+    await submitOpen(input(), buyer, [v2], deps({
+      client: { async submitSorobanTransaction(req) { sent = req.auth; return { hash: 'ab'.repeat(32) }; } },
+    }), [signature]);
+    assert.equal(sent.length, 1);
+    const out = xdr.SorobanAuthorizationEntry.fromXDR(sent[0]!, 'base64');
+    assert.equal(out.credentials.type, 'sorobanCredentialsAddressV2');
+    if (out.credentials.type !== 'sorobanCredentialsAddressV2') return;
+    const creds = out.credentials.addressV2;
+    assert.equal(creds.signatureExpirationLedger, 5060);
+    assert.equal(creds.nonce, 1n);
+    assert.equal(Address.fromScAddress(creds.address).toString(), buyer);
+    assert.equal(out.rootInvocation.toXDR('base64'), xdr.SorobanAuthorizationEntry.fromXDR(v2, 'base64').rootInvocation.toXDR('base64'));
+    assert.doesNotThrow(() => assertBuyerEntries(sent, buyer, func));
+    // The account contract reads a vector of { public_key, signature }.
+    const expected = xdr.ScVal.scvVec([xdr.ScVal.scvMap([
+      new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('public_key'), val: xdr.ScVal.scvBytes(key.rawPublicKey()) }),
+      new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('signature'), val: xdr.ScVal.scvBytes(Buffer.from(signature, 'base64')) }),
+    ])]);
+    assert.equal(creds.signature.toXDR('base64'), expected.toXDR('base64'));
+    // And it is a signature over the payload of the entry that was sent.
+    assert.ok(key.verify(hash(Buffer.from(authPayload(sent[0]!), 'base64')), Buffer.from(signature, 'base64')));
+  });
+
+  it('submit refuses a signature made over the legacy payload, before Channels', async () => {
+    const key = Keypair.random();
+    const buyer = key.publicKey();
+    const { v2, legacy } = prepared(buyer);
+    let n = 0;
+    await assert.rejects(
+      () => submitOpen(input(), buyer, [v2], deps({
+        client: { async submitSorobanTransaction() { n += 1; return { hash: 'ab'.repeat(32) }; } },
+      }), [freighterSign(key, authPayload(legacy))]),
+      (err: unknown) => err instanceof ChannelsFailure && err.status === 400 && err.code === 'channels_auth',
+    );
+    assert.equal(n, 0);
+  });
+
+  it('submit refuses another key, another expiry and a signature that is not one', async () => {
+    const key = Keypair.random();
+    const buyer = key.publicKey();
+    const { v2 } = prepared(buyer);
+    const later = setAuthExpiry(v2, 5061);
+    const bad = [
+      freighterSign(Keypair.random(), authPayload(v2)),
+      freighterSign(key, authPayload(later)),
+      'not-a-signature',
+      v2,
+    ];
+    for (const signature of bad) {
+      let n = 0;
+      await assert.rejects(
+        () => submitOpen(input(), buyer, [v2], deps({
+          client: { async submitSorobanTransaction() { n += 1; return { hash: 'ab'.repeat(32) }; } },
+        }), [signature]),
+        (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_auth',
+      );
+      assert.equal(n, 0);
+    }
+    await assert.rejects(() => attachBuyerSignature('not-an-entry', bad[0]!), /autorización/);
+  });
+
+  it('submit still checks the buyer and the call when a signature comes with the entry', async () => {
+    const key = Keypair.random();
+    const { v2 } = prepared(key.publicKey());
+    await assert.rejects(
+      () => submitOpen(input(), BUYER, [v2], deps(), [freighterSign(key, authPayload(v2))]),
+      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_auth',
+    );
+  });
+
+  it('an entry the wallet returned signed is sent as it came', async () => {
+    const { v2 } = prepared(BUYER);
+    let sent: string[] = [];
+    await submitOpen(input(), BUYER, [v2], deps({
+      client: { async submitSorobanTransaction(req) { sent = req.auth; return { hash: 'ab'.repeat(32) }; } },
+    }), [null]);
+    assert.deepEqual(sent, [v2]);
+  });
+});
+
+describe('channels wallet hand-off', () => {
+  function wallet(type: string | null, answer: WalletAuthEntryOutcome) {
+    const seen: string[] = [];
+    const client: WalletSignClient = {
+      async signAuthEntry(text) { seen.push(text); return answer; },
+      async signTx() { return { status: 'error' }; },
+      getWalletType: () => type,
+    };
+    return { client, seen };
+  }
+
+  it('gives Freighter the payload and returns its signature', async () => {
+    const { client, seen } = wallet('freighter-native', { status: 'signed', signedAuthEntry: 'c2ln' });
+    const out = await signAuthEntryWith(client, 'entry-xdr', { validUntilLedger: 100, payload: 'payload-xdr' });
+    assert.deepEqual(seen, ['payload-xdr']);
+    assert.deepEqual(out, { status: 'signature', signature: 'c2ln' });
+  });
+
+  it('gives a custodial wallet the entry and returns it signed', async () => {
+    const { client, seen } = wallet(null, { status: 'signed', signedAuthEntry: 'signed-entry-xdr' });
+    const out = await signAuthEntryWith(client, 'entry-xdr', { validUntilLedger: 100, payload: 'payload-xdr' });
+    assert.deepEqual(seen, ['entry-xdr']);
+    assert.deepEqual(out, { status: 'signed', signedAuthEntry: 'signed-entry-xdr' });
+  });
+
+  it('asks Freighter once when the shopper rejects', async () => {
+    const details = 'Freighter signAuthEntry failed: The user rejected this request.';
+    const { client, seen } = wallet('freighter-native', { status: 'error', details });
+    const out = await signAuthEntryWith(client, 'entry-xdr', { validUntilLedger: 100, payload: 'payload-xdr' });
+    assert.deepEqual(out, { status: 'error', details });
+    assert.equal(seen.length, 1);
+  });
+});
+
+describe('channels rpc url', () => {
+  const GATEWAY = 'https://soroban-rpc.testnet.stellar.gateway.fm';
+  const OTHER_RPC = 'https://rpc.example.test/soroban';
+  const env = process.env as Record<string, string | undefined>;
+  const saved = Object.fromEntries(RPC_URL_VAR_NAMES.map((name) => [name, env[name]]));
+  const restore = () => {
+    for (const name of RPC_URL_VAR_NAMES) {
+      if (saved[name] === undefined) delete env[name];
+      else env[name] = saved[name];
+    }
+  };
+  const clear = () => { for (const name of RPC_URL_VAR_NAMES) delete env[name]; };
+
+  it('bakes Gateway for testnet and leaves mainnet where it was', () => {
+    assert.equal(DEPLOYMENTS.testnet.rpcUrl, GATEWAY);
+    assert.equal(DEPLOYMENTS.mainnet.rpcUrl, 'https://mainnet.sorobanrpc.com');
+    assert.equal(rpcUrl('testnet', {} as NodeJS.ProcessEnv), GATEWAY);
+    assert.equal(rpcUrl('mainnet', {} as NodeJS.ProcessEnv), 'https://mainnet.sorobanrpc.com');
+  });
+
+  it('lets a valid https variable win, each network by its own name', () => {
+    const set = { STELLAR_RPC_URL: ` ${OTHER_RPC} `, STELLAR_RPC_URL_MAINNET: 'https://main.example.test' } as unknown as NodeJS.ProcessEnv;
+    assert.equal(rpcUrl('testnet', set), OTHER_RPC);
+    assert.equal(rpcUrl('mainnet', set), 'https://main.example.test');
+    assert.equal(rpcUrl('mainnet', { STELLAR_RPC_URL: OTHER_RPC } as unknown as NodeJS.ProcessEnv), 'https://mainnet.sorobanrpc.com');
+  });
+
+  it('ignores a value that is not an https URL', () => {
+    for (const value of ['', '   ', 'not a url', 'http://rpc.example.test', 'ftp://rpc.example.test', 'rpc.example.test']) {
+      assert.equal(rpcUrl('testnet', { STELLAR_RPC_URL: value } as unknown as NodeJS.ProcessEnv), GATEWAY, value);
+    }
+  });
+
+  it('copies present bindings and leaves the others', () => {
+    const target: { [key: string]: string | undefined } = { STELLAR_RPC_URL_MAINNET: 'keep' };
+    applyRpcUrlBindings({ STELLAR_RPC_URL: `  ${OTHER_RPC}  `, STELLAR_RPC_URL_MAINNET: '   ' }, target);
+    assert.equal(target.STELLAR_RPC_URL, OTHER_RPC);
+    assert.equal(target.STELLAR_RPC_URL_MAINNET, 'keep');
+    assert.doesNotThrow(() => applyRpcUrlBindings(undefined, target));
+  });
+
+  it('rpcServer follows the variable, in both directions', () => {
+    try {
+      clear();
+      const baked = rpcServer('testnet');
+      assert.equal(String(baked.serverURL).replace(/\/$/, ''), GATEWAY);
+      // The binding lands on the env after a server was already built.
+      env.STELLAR_RPC_URL = OTHER_RPC;
+      const moved = rpcServer('testnet');
+      assert.notEqual(moved, baked);
+      assert.equal(String(moved.serverURL), OTHER_RPC);
+      assert.equal(rpcServer('testnet'), moved, 'one server per URL');
+      assert.equal(String(rpcServer('mainnet').serverURL).replace(/\/$/, ''), 'https://mainnet.sorobanrpc.com');
+      delete env.STELLAR_RPC_URL;
+      assert.equal(rpcServer('testnet'), baked);
+    } finally {
+      restore();
+    }
+  });
+
+  it('the Worker config pins both URLs and the entry copies the bindings', () => {
+    const config = readFileSync(join(import.meta.dirname, '../../cloudflare.config.ts'), 'utf8');
+    // Plain-text bindings, not a comment. The values may move away from the
+    // recorded URLs, which is what the variables are for.
+    assert.match(config, /^  STELLAR_RPC_URL: bindings\.text\("https:\/\/[^"]+"\),$/m);
+    assert.match(config, /^  STELLAR_RPC_URL_MAINNET: bindings\.text\("https:\/\/[^"]+"\),$/m);
+    assert.match(config, /\.\.\.rpcUrls,/);
+    const worker = readFileSync(join(import.meta.dirname, '../../worker.ts'), 'utf8');
+    assert.match(worker, /applyRpcUrlBindings\(cfEnv\)/);
   });
 });

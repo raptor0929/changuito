@@ -35,6 +35,11 @@ const POLLAR_ASSETS = 'https://pollar.xyz';
  * inside the Stellar SDK — which reads like the network is down. Every chain
  * host the app can be pointed at is in DEPLOYMENTS by construction, so taking
  * them from there means adding a network cannot forget this file.
+ *
+ * `STELLAR_RPC_URL` can point the server at another RPC at runtime. That host
+ * is not listed and does not need to be: only the server calls the RPC, and a
+ * server-side fetch is not under this policy. The browser's chain calls are
+ * Pollar's, to Horizon.
  */
 const STELLAR = [
   ...new Set(NETWORK_IDS.flatMap((net) => [DEPLOYMENTS[net].horizonUrl, DEPLOYMENTS[net].rpcUrl])),

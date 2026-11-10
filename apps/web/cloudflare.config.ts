@@ -28,6 +28,18 @@ const contractIds = {
   STELLAR_USDC_ID: bindings.text("CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E"),
 };
 
+// The Soroban RPC each network is read through. The same rule as the contract
+// ids above: runtime variables the build machine does not have, declared so a
+// deploy keeps them, and strict mode aborts while this file and the dashboard
+// disagree, in either direction. So a name that is new here has to be on the
+// dashboard, as plain text with this value, before the deploy that carries it.
+// Moving to another provider means changing both together. Both networks are
+// declared, and each value starts as the URL recorded in deployments.json.
+const rpcUrls = {
+  STELLAR_RPC_URL: bindings.text("https://soroban-rpc.testnet.stellar.gateway.fm"),
+  STELLAR_RPC_URL_MAINNET: bindings.text("https://mainnet.sorobanrpc.com"),
+};
+
 // Which Postgres this Worker reaches is a decision, not a default: the
 // database is a privacy boundary between the two apps. No id, no binding, and
 // the app runs without a database the way a fresh clone does.
@@ -63,6 +75,7 @@ export default defineConfig({
       NODE_ENV: bindings.text("production"),
       ...(hyperdriveId ? { HYPERDRIVE: bindings.hyperdrive({ id: hyperdriveId }) } : {}),
       ...contractIds,
+      ...rpcUrls,
       ...publicEnv,
     },
   }),
