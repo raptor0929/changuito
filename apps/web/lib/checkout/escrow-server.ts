@@ -13,10 +13,16 @@
  *
  * Purchases that are not on chain yet are read back from the checkout store,
  * which is what the shopper just paid into.
+ *
+ * `find_order` goes through the contract client, which on protocol 30 often
+ * cannot decode the ledger entries the simulation needs. When that read fails,
+ * `readOrderFromEvents` rebuilds the order the same way Channels finds an
+ * `opened` hash: raw JSON-RPC `getEvents` and `scValToNative` on the value.
  */
 import { Buffer } from 'node:buffer';
 
 import { fromHex, toHex } from '../order.ts';
+import { readOrderFromEvents } from './escrow-events.ts';
 import { checkoutStore, type CheckoutRecord } from './store.ts';
 
 export interface OrderAccount {
@@ -96,6 +102,12 @@ export async function readOrder(orderIdHex: string): Promise<OrderAccount | null
     if (found) return asOrder(orderIdHex, found);
   } catch (err) {
     console.warn('[escrow] read failed', err instanceof Error ? err.name : 'failed');
+  }
+  try {
+    const fromEvents = await readOrderFromEvents(orderIdHex);
+    if (fromEvents) return fromEvents;
+  } catch (err) {
+    console.warn('[escrow] events read failed', err instanceof Error ? err.name : 'failed');
   }
   const rec = await checkoutStore().get(orderIdHex);
   return rec?.openSig ? fromRecord(rec) : null;
