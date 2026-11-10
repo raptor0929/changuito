@@ -21,7 +21,7 @@ automated is stated by us, before you find it.
 | **Built by** | [SimonethG](https://www.linkedin.com/in/simonethg/) and [Fabio](https://www.linkedin.com/in/fabio-laura-yavi/), in Argentina |
 | **Networks** | Stellar **testnet** (preview, and the deployed contracts) and **mainnet** (production, real USDC) |
 | **What is on-chain** | a classic USDC payment with a memo, confirmed by reading Horizon. No contract sits on the money rail, and the deployment holds no signing key on mainnet |
-| **Contracts** | escrow [`CDBGEMWE…W3HDF`](https://stellar.expert/explorer/testnet/contract/CDBGEMWESQJNEGBJ46TMPXNI5KFZN5B23W6ACO6NZFQATWWYY2WW3HDF) *(testnet, Circle USDC SAC, mounted on the login-network checkout)* · Circle USDC SAC [`CBIELTK6…QDAMA`](https://stellar.expert/explorer/testnet/contract/CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA) |
+| **Contracts** | escrow [`CCA3ES6A…JG7EX`](https://stellar.expert/explorer/testnet/contract/CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX) *(testnet, mintable `mock_usdc`, mounted on the login-network checkout)* · mintable USDC [`CAOPLEE4…BNN3E`](https://stellar.expert/explorer/testnet/contract/CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E) |
 | **SEPs used** | SEP-53 (signed messages, for identity), SEP-41 (the token interface), SEP-7 (the receive URI) |
 | **Wallet** | Pollar (`@pollar/react` 0.11.3) — email or Google login, so a shopper needs no prior wallet |
 | **Tests** | `npm test` → 1178 · `npm run contracts:test` → 34. Neither needs an API key |
@@ -77,7 +77,7 @@ being told.
 | The exact payable total, envío included | **Real.** Read server-side from VTEX's public `orderForm` |
 | The USDC payment and its confirmation | **Real.** A classic Stellar payment, matched by memo, confirmed from Horizon |
 | Identity and the gates on real money | **Real.** SEP-53 signatures, allowlisted in production |
-| The escrow contract | **Deployed on testnet over the Circle USDC SAC and mounted on the login-network checkout** (`PaymentModal` calls `open`). Other networks keep the memo deposit in [`lib/deposit.ts`](../apps/web/lib/deposit.ts) |
+| The escrow contract | **Deployed on testnet over the mintable `mock_usdc` and mounted on the login-network checkout** (`PaymentModal` calls `open`). Other networks keep the memo deposit in [`lib/deposit.ts`](../apps/web/lib/deposit.ts) |
 | **Funding the card from the deposit** | **Operator-run.** The issuer's API answers `403 "Contact support via email to enable your API"` on every endpoint. One card exists, created by hand, read from a `shared_card` row by wallets on a member list. No copy in the app claims a load happened |
 | Refunds | **By hand.** No automated outbound payment and no Stellar secret in the production deployment |
 | The receipt's per-order link | **Inferred by one character.** `orderRef` is `${orderGroup}-01`; degrades to the order list, never a 404 |
@@ -90,7 +90,7 @@ the source.
 
 ```bash
 stellar contract invoke --network testnet \
-  --id CDBGEMWESQJNEGBJ46TMPXNI5KFZN5B23W6ACO6NZFQATWWYY2WW3HDF \
+  --id CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX \
   --source-account GBXBAOFWG4Y4ZQEDXH73BACYYCE7ODSKXHLXYVRPLJOYFRDCPWHGYGN5 \
   --send=no -- config
 ```
@@ -99,7 +99,7 @@ The deployed wasm's own interface, rather than a copy of the source:
 
 ```bash
 stellar contract info interface --network testnet \
-  --id CDBGEMWESQJNEGBJ46TMPXNI5KFZN5B23W6ACO6NZFQATWWYY2WW3HDF
+  --id CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX
 ```
 
 Re-derive the receipt hash stored by the settle linked in the README:

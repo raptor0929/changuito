@@ -136,14 +136,15 @@ the default and it cannot spend anything.
 
 ## The escrow contract
 
-`CDBGEMWESQJNEGBJ46TMPXNI5KFZN5B23W6ACO6NZFQATWWYY2WW3HDF` — deployed on
-testnet against the Circle USDC SAC
-(`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`, issuer
-`GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`), 19 tests. On the
+`CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX` — deployed on
+testnet against the mintable `mock_usdc`
+(`CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E`), 19 tests. On the
 login network the shopper path mounts `PaymentModal`, which calls `open`
-through Pollar. The earlier escrow over `mock_usdc`
-(`CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557`) is not the one
-`deployments.json` points at.
+through Pollar. The classic deposit issuer
+(`GCGV3225QTJFJ32KTPJNOR5SYANP4QWNUGKKGKVK7ILMK4QACZHJTGJB`) stays on the memo
+rail only — it is not the escrow token. An earlier `mock_usdc`
+(`CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF`) and the Circle
+SAC escrow are not what `deployments.json` points at.
 
 ```rust
 open(buyer, order_id: BytesN<32>, amount: i128,
@@ -228,9 +229,11 @@ call leaves no event behind, and that a refunded order cannot then be settled.
 
 ## The demo USDC token (SEP-41)
 
-`CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF` — SEP-41, symbol
+`CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E` — SEP-41, symbol
 `USDC`, 7 decimals, admin-gated `mint`, 15 tests. It backs the escrow and the
-faucet; it is **not** on the deposit rail, for the memo reason above.
+faucet; it is **not** on the deposit rail, for the memo reason above. The
+previous mintable deploy
+(`CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF`) is retired.
 
 **Why not Blend's testnet mock.** It is a real SEP-41 token, but a probe during
 planning showed its admin is `GATALTGT…5V56`, an address we do not control, and

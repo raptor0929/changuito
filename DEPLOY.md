@@ -63,23 +63,34 @@ contract. To force new ids:
 npm run deploy:testnet -- --force
 ```
 
-#### Escrow over the USDC SAC (testnet)
+#### Live testnet escrow (mintable `mock_usdc`)
 
-To deploy the escrow against the USDC Stellar Asset Contract instead of
-`mock_usdc`, pass the issuer. The script derives the SAC id itself and deploys
-only a new escrow, because the token is fixed in the constructor:
+The Circle USDC SAC path is withdrawn. Run without `USDC_ISSUER` so the script
+deploys a new `mock_usdc` (resolver as admin) and an escrow over that token.
+The live ids:
+
+| | |
+|---|---|
+| escrow | `CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX` |
+| mintable token | `CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E` |
+| classic deposit issuer | `GCGV3225QTJFJ32KTPJNOR5SYANP4QWNUGKKGKVK7ILMK4QACZHJTGJB` (memo rail only; not the escrow token) |
 
 ```bash
-USDC_ISSUER=GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5 npm run deploy:testnet
+npm run deploy:testnet
 ```
 
-The id must come out as `CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`.
 Two accounts need to exist and hold XLM before it runs, and a person funds them:
 `changuito-resolver` and `changuito-treasury` in the `stellar keys ls` keystore.
-The treasury also needs a `USDC` trustline to that issuer before the first
-`settle`. The resolver address in `deployments.json` must keep matching
-`STELLAR_RESOLVER_SECRET`; if a new identity is generated, that variable has to
-be updated by a person.
+The only keystore identity for the resolver is `changuito-resolver`
+(`GBXBAOFWG4Y4ZQEDXH73BACYYCE7ODSKXHLXYVRPLJOYFRDCPWHGYGN5`). Do not redeploy
+with another resolver. A person sets `STELLAR_RESOLVER_SECRET` to that identity
+so it matches `deployments.json`. The treasury
+(`GBKJHIKIZONKCCV2JVOGUDXEOPTQUZ2OKYZNV3R3LDALNZHCSF2JJEIF`) stays. The escrow
+token is Soroban-only, so the treasury needs no classic USDC trustline for
+`settle`.
+
+`USDC_ISSUER=…` still exists in the script for a SAC deploy, but that is not the
+live escrow and must not be used for this redeploy.
 
 ### 1.4 Commit what changed
 
