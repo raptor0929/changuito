@@ -17,6 +17,17 @@ const publicEnv = Object.fromEntries(
   }),
 );
 
+// The testnet contracts the live Worker calls, as set on its dashboard. They
+// are runtime variables, so the build machine does not have them, and a deploy
+// that left them out would delete them; strict mode refuses that deploy
+// instead. Pinned here rather than read from deployments.json, which lags the
+// upgradeable escrow. Moving the shop to another contract means changing these
+// and the dashboard together. The mainnet pair stays undeclared on purpose.
+const contractIds = {
+  STELLAR_ESCROW_ID: bindings.text("CA4BDF4U65OHCO6AB4KRJWBRZ4BJBZURDFNFKJDEZAKQRCUNJZFLN72S"),
+  STELLAR_USDC_ID: bindings.text("CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E"),
+};
+
 // Which Postgres this Worker reaches is a decision, not a default: the
 // database is a privacy boundary between the two apps. No id, no binding, and
 // the app runs without a database the way a fresh clone does.
@@ -51,6 +62,7 @@ export default defineConfig({
       // takes its development branch and opens.
       NODE_ENV: bindings.text("production"),
       ...(hyperdriveId ? { HYPERDRIVE: bindings.hyperdrive({ id: hyperdriveId }) } : {}),
+      ...contractIds,
       ...publicEnv,
     },
   }),
