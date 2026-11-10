@@ -131,7 +131,83 @@ escrow; it is simply no longer on the deposit rail.
 
 ---
 
+## Part 2W — the app on Cloudflare Workers
+
+The app is the Worker **`changuito-web`**, which owns `app.changuito.me`.
+It is deployed by **Workers Builds** from this repository's `main` branch,
+not from a laptop. Everything in Part 2 about *which* variables exist still
+applies; only where they are set changes.
+
+The build is vinext on Vite (`apps/web/vite.config.ts`, `worker.ts`,
+`cloudflare.config.ts`). It needs **Node 22.18 or newer**, because the config
+loader refuses anything older; `.nvmrc` pins it, and Workers Builds reads
+that file. `next build` keeps working for local checks.
+
+### Workers Builds settings (`changuito-web` → Settings → Build)
+
+| Setting | Value |
+|---|---|
+| Git repository / branch | `tote-hq/stellar`, `main` |
+| Root directory | `/` (the repository root: the build is an npm workspace) |
+| Build command | `npm run build:vinext -w @changuito/web` |
+| Deploy command | `npm run deploy:vinext -w @changuito/web` |
+| Builds for non-production branches | off |
+| API token | the one Workers Builds creates. The deploy reads it from `CLOUDFLARE_API_TOKEN`, so nothing logs in interactively |
+
+The build command compiles `packages/mcp` and runs the Vite build. It does
+not read `DIRECT_URL` and it applies no SQL. A person runs `npm run db:migrate`
+on a machine that has that URL when the schema should change; that command is
+the approval, including for a migration that drops or rewrites something. The
+deploy command uploads the build (`--skip-build`), so run it only after the
+build command.
+
+**Build variables and secrets.** `NEXT_PUBLIC_*` is inlined into the bundle
+at build time, so it is set here, not under the Worker's runtime variables:
+
+| Name | Kind | Value |
+|---|---|---|
+| `NEXT_PUBLIC_POLLAR_API_KEY` | variable | the **testnet** Pollar publishable key |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | variable | the Turnstile site key for `app.changuito.me` |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID`, `NEXT_PUBLIC_META_PIXEL_ID`, `NEXT_PUBLIC_CLARITY_PROJECT_ID` | variable | optional |
+
+`CHG_HYPERDRIVE_ID` and `DIRECT_URL` are not build settings. Without the
+Hyperdrive id the Worker deploys with no database binding and the app runs
+the way a fresh clone does. `DIRECT_URL` stays on the laptop that runs
+`npm run db:migrate`.
+
+Never set `NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` there: whatever it holds is
+inlined. On a local machine the same public names can come from the shell.
+
+**Worker secrets** (`changuito-web` → Settings → Variables and Secrets, type
+*Secret*). Same names and meanings as the tables in
+[2.4](#24-environment-variables): `ANTHROPIC_API_KEY`, `TURNSTILE_SECRET_KEY`,
+`CHG_SESSION_SECRET`, and for payments `STELLAR_RESOLVER_SECRET`,
+`DEPOSIT_ADDRESS_TESTNET`, `DEMO_WALLET_SECRET`, plus optionally
+`FAUCET_ALLOWLIST_ADDRESSES`, `VYRION_API_KEY`, `FX_ARS_PER_USD`. Without the
+three payment ones the app runs and checkout answers 503 "los pagos no están
+habilitados" (`lib/test/go-live-without-payments.test.ts`).
+
+No Redis. The chat and faucet quotas count in Postgres (`quota` table,
+`lib/kv.ts`). `KV_REST_API_URL` / `KV_REST_API_TOKEN` are still read by
+`lib/agent/turn-store.ts` alone, and are optional. Without them a
+conversation's history lives in the isolate's memory: it survives while the
+same isolate serves the shopper, and is lost on a cold start or a deploy.
+Moving the turn store to the `kv` table is a separate change.
+
+`NODE_ENV=production` is set by `cloudflare.config.ts` itself. It is not
+optional: the app reads it at runtime, and on a Worker `process.env` holds
+only the bindings, so without it every fail-closed rule takes its
+development branch.
+
+`DATABASE_URL` is not a secret here. `worker.ts` copies the Hyperdrive
+binding's connection string onto it for each request.
+
+---
+
 ## Part 2 — the app on Vercel
+
+Vercel is the previous host and the Stellar projects there are blocked. The
+variable tables below are still the reference for what each name means.
 
 ### 2.1 Get the two API keys
 
@@ -315,6 +391,7 @@ npm run db:invariants  # the constraints, against the real database
 ```
 
 5. In Vercel, set **`DATABASE_URL` only**. Migrations are a laptop operation.
+   Workers Builds does not run them and does not need `DIRECT_URL`.
 
 **The 6543/5432 difference is the part that fails only under load**, which is
 why it is spelled out here rather than left to the connection-string picker.
