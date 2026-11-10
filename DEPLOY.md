@@ -233,6 +233,16 @@ inlined. On a local machine the same public names can come from the shell.
 three payment ones the app runs and checkout answers 503 "los pagos no están
 habilitados" (`lib/test/go-live-without-payments.test.ts`).
 
+`OZ_CHANNELS_API_KEY` is the OpenZeppelin Channels key for testnet, from
+[channels.openzeppelin.com/testnet/gen](https://channels.openzeppelin.com/testnet/gen).
+Channels pays the fee for the escrow `open`, so the buyer signs only an
+authorization entry and spends no XLM. Set it here as a *Secret*, never as a
+build variable and never in `cloudflare.config.ts`: a value there is
+committed, and declaring a binding the dashboard does not have yet makes the
+strict deploy abort. The hosted service caps the fees one key may spend and
+resets that cap every 24 hours; past it, a request fails with
+`FEE_LIMIT_EXCEEDED`.
+
 The faucet list is the database, not a Worker secret. Apply
 `supabase/migrations/0011_wallet.sql` first. `config.faucet_open_to_all`
 (default false) lets any wallet that is not banned mint; otherwise only a
