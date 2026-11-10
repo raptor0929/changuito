@@ -8,7 +8,9 @@ import { withSession } from '@/lib/mcp/session';
 import { encodeEvent, HEARTBEAT, SSE_HEADERS, type ChatRequest, type UiEvent } from '@/lib/protocol';
 import { requireHuman } from '@/lib/human-gate';
 import { readLoggedInUser, requireLoginOrFreeTurn } from '@/lib/login-gate';
+import { presetLocationFromProfile } from '@/lib/profile-location';
 import { networkNotServed, requestNetwork } from '@/lib/server-network';
+import { applyShopperPlace, priorLines } from '@/lib/shopper-location';
 
 /**
  * Node, not edge: the MCP server reads `node:url` and the Stellar SDK needs
@@ -136,6 +138,11 @@ export async function POST(req: Request): Promise<Response> {
           // per-session queue covers the whole read-modify-write and two tabs
           // on one id cannot each save a history missing the other's messages.
           const turn = (await turns.get(body.sessionId)) ?? newTurnState();
+          // Before early-ask and the model. A saved profile, then the lines
+          // the shopper already typed. Either one sets the location the
+          // banner reads, so the model does not ask for it again.
+          if (owner) await presetLocationFromProfile(session, owner);
+          await applyShopperPlace(session, [...priorLines(body.prior), body.message]);
           brain = (await runTurn(session, turn, body.message, emit, lang, body.image)).brain;
 
           // Only after a clean return. A turn that threw mid-hop can leave an
