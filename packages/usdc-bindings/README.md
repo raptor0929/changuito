@@ -1,6 +1,6 @@
 # @changuito/usdc-bindings
 
-Generated from the deployed contract `CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF` by `stellar contract bindings typescript`,
+Generated from the deployed contract `CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA` by `stellar contract bindings typescript`,
 then reshaped by `scripts/fixup-bindings.mjs`. **Do not edit by hand** — the next
 deploy overwrites everything here.
 

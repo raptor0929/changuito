@@ -23,11 +23,11 @@ export const DEPLOYMENTS = {
     friendbotUrl: 'https://friendbot.stellar.org',
     /** stellar.expert's path segment: 'testnet' or 'public'. */
     explorerPath: 'testnet',
-    deployedAt: '2026-09-21T06:53:57.747Z',
+    deployedAt: '2026-11-10T01:04:39.824Z',
     /** Backend hot key: signs settle and refund (and mints, on testnet). */
-    resolver: 'GBGMPRHU3NW3BCXUNDNC7VSYQKS6FZKWFHSGEHHMR3G3TZOUWEDBHTFK',
+    resolver: 'GBXBAOFWG4Y4ZQEDXH73BACYYCE7ODSKXHLXYVRPLJOYFRDCPWHGYGN5',
     /** Where a settled order's USDC ends up. The app never signs for it. */
-    treasury: 'GAXUICH5DZMB4ZIZVF6ETTE524RCZYRKHWLGG7EOLY6ECVD4IS6TBNZG',
+    treasury: 'GBKJHIKIZONKCCV2JVOGUDXEOPTQUZ2OKYZNV3R3LDALNZHCSF2JJEIF',
     /**
      * The account that pays for a preview shopper, and the only account this
      * deployment has a secret for. Empty on every network but testnet, which
@@ -36,8 +36,8 @@ export const DEPLOYMENTS = {
      * and an empty string matches nothing.
      */
     demoWallet: 'GDFF477UQUWOFIHSOEXPPOD5GPUSEW6OLGZB5FCPS6AFRAOPTMINA55X',
-    escrowId: 'CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557',
-    usdcId: 'CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF',
+    escrowId: 'CDBGEMWESQJNEGBJ46TMPXNI5KFZN5B23W6ACO6NZFQATWWYY2WW3HDF',
+    usdcId: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
     /**
      * The issuer of the classic asset this network deposits in.
      *
@@ -51,7 +51,7 @@ export const DEPLOYMENTS = {
      * escrow and is no longer on the deposit rail — the two are separate
      * assets that share a code.
      */
-    usdcIssuer: 'GCGV3225QTJFJ32KTPJNOR5SYANP4QWNUGKKGKVK7ILMK4QACZHJTGJB',
+    usdcIssuer: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
     usdcCode: 'USDC',
     usdcDecimals: 7,
   },
