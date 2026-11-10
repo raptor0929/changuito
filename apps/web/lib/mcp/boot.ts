@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/cfworker';
 import { createSupermercadoServer } from '@changuito/mcp/server';
 import { createSessionState, type SessionState } from '@changuito/mcp/session';
 
@@ -30,7 +31,17 @@ export async function bootMcp(): Promise<McpPair> {
   const server = createSupermercadoServer({ session: state });
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: 'changuito-web', version: '0.1.0' }, { capabilities: {} });
+  // Ajv compiles every output schema with `new Function`. Workers refuse that,
+  // and tools/list is the first thing a real turn does, so the reply dies
+  // before the model speaks. This validator reads the schema instead.
+  // The schemas come from zod-to-json-schema, which emits draft-07.
+  const client = new Client(
+    { name: 'changuito-web', version: '0.1.0' },
+    {
+      capabilities: {},
+      jsonSchemaValidator: new CfWorkerJsonSchemaValidator({ draft: '7' }),
+    },
+  );
 
   // Both sides connect concurrently. `client.connect` sends `initialize` and
   // waits for the reply, so awaiting it before the server is listening is a
