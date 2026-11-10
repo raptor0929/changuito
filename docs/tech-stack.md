@@ -72,10 +72,10 @@ live in `lib/pay/`; the port is `lib/ledger/`. Full detail, and why, in
 | **MCP session snapshot** | retailer, postal code, cart id | the browser holds it and sends it back each turn |
 | **Upstash Redis** | the hop loop's conversation history | 1h TTL, falls back to an in-process `Map` |
 | **localStorage** | the transcript the shopper sees, and their chat list | the browser |
-| **Postgres** | orders, deposits, cards, archived chats | the record |
+| **Postgres** | orders, deposits, cards, archived chats, chat and faucet quotas | the record, and the counters |
 
-Four migrations in `supabase/migrations/`, applied with `npm run db:migrate`:
-`0001_init`, `0002_order_identity`, `0003_card_face`, `0004_shared_card`.
+Migrations in `supabase/migrations/` are applied with `npm run db:migrate`.
+The chat and faucet counters are the `quota` table from `0006_kv.sql`.
 `npm run db:invariants` checks the ones SQL cannot state — chiefly that a
 deposit is claimed by at most one card.
 
@@ -140,8 +140,8 @@ here.
 | | |
 |---|---|
 | **Vercel** | the Next apps. Node runtime, `maxDuration = 300` on `/api/chat` — a basket is a dozen HTTPS round trips to a storefront |
-| **Postgres** | orders, deposits, cards and archived chats, over `DATABASE_URL` |
-| **Upstash Redis** | conversation history, 1h TTL. Provisioned through the Vercel Marketplace, which injects legacy KV-compatible names (`KV_REST_API_URL`, `KV_REST_API_TOKEN`) — so `Redis.fromEnv()` does *not* work and credentials are passed explicitly |
+| **Postgres** | orders, deposits, cards, archived chats, and the chat and faucet quotas, over `DATABASE_URL` |
+| **Upstash Redis** | optional. The in-flight turn only (`lib/agent/turn-store.ts`), 1h TTL, falling back to memory. `KV_REST_API_URL` / `KV_REST_API_TOKEN`, or the `UPSTASH_REDIS_REST_*` pair. Not the quotas |
 | **Cloudflare Turnstile** | the human gate in `middleware.ts`. Unset in production it fails **shut**: every `/api/*` route but `/api/human` answers 403 |
 | **Stellar** | Horizon on both networks; Soroban RPC and friendbot on testnet |
 | **stellar.expert** | explorer links |
@@ -194,7 +194,7 @@ in `apps/web/.env.example`; setup in [`../DEPLOY.md`](../DEPLOY.md).
 | `STELLAR_RESOLVER_SECRET_MAINNET` | no | must be a *different* key; checked against `deployments.json` and refused on mismatch |
 | `REAL_MODE_ALLOWLIST_ADDRESSES` | for modo real | deny-by-default: empty in production means nobody, Vercel previews included |
 | `REAL_MODE_OPEN_TO_ALL` | no | drops the allowlist, **not** the SEP-53 signature |
-| `FAUCET_ALLOWLIST_ADDRESSES`, `FAUCET_OPEN_TO_ALL` | no | same rules, for the testnet faucet |
+| `FAUCET_ALLOWLIST_ADDRESSES`, `FAUCET_OPEN_TO_ALL` | no | the env faucet gate. After migration 0011 the database can open it too (`config.faucet_open_to_all`, `wallet.faucet_allowed`); a ban wins |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | in production | the human gate. The secret alone decides it, and unset in production it fails shut |
 | `CHG_SESSION_SECRET` | in production | signs the httpOnly login cookie. Unset, nobody can sign in |
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | no | conversation history across restarts; falls back to an in-process Map |

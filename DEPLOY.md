@@ -233,12 +233,22 @@ inlined. On a local machine the same public names can come from the shell.
 three payment ones the app runs and checkout answers 503 "los pagos no están
 habilitados" (`lib/test/go-live-without-payments.test.ts`).
 
+The faucet has a second gate in the database, read after the env one. Apply
+`supabase/migrations/0011_wallet.sql` first. `config.faucet_open_to_all`
+(default false) lets any wallet that is not banned mint; otherwise only a
+`wallet` row with `faucet_allowed` does, on top of the env list.
+`node scripts/config.mjs set faucet_open_to_all true` flips the flag, and
+`npm run wallet -- allow G...` grants one address. A `banned` row refuses
+the login cookie and the faucet. A missing database leaves the env list in
+charge. The SEP-53 proof is still required in production.
+
 No Redis. The chat and faucet quotas count in Postgres (`quota` table,
-`lib/kv.ts`). `KV_REST_API_URL` / `KV_REST_API_TOKEN` are still read by
-`lib/agent/turn-store.ts` alone, and are optional. Without them a
-conversation's history lives in the isolate's memory: it survives while the
-same isolate serves the shopper, and is lost on a cold start or a deploy.
-Moving the turn store to the `kv` table is a separate change.
+`lib/kv.ts`). Production without `DATABASE_URL` refuses them. `KV_REST_API_URL`
+/ `KV_REST_API_TOKEN` are still read by `lib/agent/turn-store.ts` alone, and
+are optional. Without them a conversation's history lives in the isolate's
+memory: it survives while the same isolate serves the shopper, and is lost on
+a cold start or a deploy. Moving the turn store to the `kv` table is a
+separate change.
 
 `NODE_ENV=production` is set by `cloudflare.config.ts` itself. It is not
 optional: the app reads it at runtime, and on a Worker `process.env` holds
@@ -344,9 +354,10 @@ Grouped by which of the two apps needs them.
 | `ANTHROPIC_API_KEY` | `sk-ant-…` | server only |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | from Cloudflare → Turnstile | the browser, by design |
 | `TURNSTILE_SECRET_KEY` | **required**, the matching secret | server only |
-| `KV_REST_API_URL` | set by the Redis integration | server only |
-| `KV_REST_API_TOKEN` | set by the Redis integration | server only |
 | `FX_ARS_PER_USD` | optional, e.g. `1500` | server only |
+
+`KV_REST_API_URL` and `KV_REST_API_TOKEN` are optional and are not a quota
+store. See [2.6](#26-conversation-history-and-quotas).
 
 **Preview — the demo pays for itself:**
 
@@ -370,11 +381,16 @@ Grouped by which of the two apps needs them.
 | `REAL_MODE_OPEN_TO_ALL` | optional, `1` to drop that list — read [2.8](#28-who-may-pay) first | server only |
 
 **Still configured for the escrow and the testnet faucet:**
-`STELLAR_RESOLVER_SECRET`, `STELLAR_RESOLVER_SECRET_MAINNET`,
-`FAUCET_ALLOWLIST_ADDRESSES`, `FAUCET_OPEN_TO_ALL`. Settle and refund need the
-resolver secret; the faucet needs its own gate. See
-[docs/flows.md](docs/flows.md#6-the-escrow). Leave them set if they
-are set.
+`STELLAR_RESOLVER_SECRET`, `STELLAR_RESOLVER_SECRET_MAINNET`, and optionally
+`FAUCET_ALLOWLIST_ADDRESSES` or `FAUCET_OPEN_TO_ALL`. Settle and refund need
+the resolver secret. The env pair is one faucet gate: an empty list in
+production disables that gate, and `FAUCET_OPEN_TO_ALL` (`1`, `true`, `yes`
+or `on`) skips the list without skipping the SEP-53 proof. The other gate
+is in the database, after `0011_wallet.sql`: `config.faucet_open_to_all` or
+a `wallet.faucet_allowed` row. Either one opens a faucet the env gate
+refused; a ban wins over both. Set them with `node scripts/config.mjs` and
+`npm run wallet`, not with a Worker secret. See
+[docs/flows.md](docs/flows.md#2-funding-a-wallet-testnet).
 
 `DEPOSIT_ADDRESS_*` is **public by nature** — it is printed on screen for the
 shopper to pay — and no secret for either one is anywhere near this deployment.
@@ -464,34 +480,23 @@ moved (`supabase/migrations/0002_order_identity.sql`).
 
 ### 2.6 Conversation history and quotas
 
-Redis, and it is **no longer on the money path** — that moved to Postgres in
-2.5. What it still holds is the agent's in-flight turn, the chat and faucet
-quotas, and the local model's breaker and lanes. Losing it costs chat
-continuity and the breaker, not a deposit.
+The chat and faucet quotas count in Postgres (`quota`, through `lib/kv.ts`).
+Production without `DATABASE_URL` refuses them, so `/api/chat` and the faucet
+answer 503 instead of running with no ceiling. Redis is not that store, and
+the Upstash integration this section used to prescribe is not part of the
+current deploy.
 
-Required in production all the same, because the quotas fail closed: without
-it (or with Redis down) `/api/chat` answers 503 instead of running unlimited
-turns on your Anthropic key.
+`KV_REST_API_URL` and `KV_REST_API_TOKEN` are optional. `lib/agent/turn-store.ts`
+reads them for the in-flight conversation, with a one hour TTL. Without the
+pair the turn lives in the isolate's memory and is lost on a cold start or a
+deploy. A signed-in transcript is also written to Postgres, which is the
+record that outlives that hour and a cleared browser. `chat-store.ts` keeps
+the blocks the shopper sees in localStorage.
 
-1. **Storage → Create Database → Marketplace → Upstash for Redis.**
-2. Region: match your functions (Vercel's default is `iad1`). Leave Read
-   Regions empty.
-3. **Turn Eviction on.** Off means writes *fail* once the database is full.
-   This is a cache — dropping the oldest session is the right answer, and a
-   conversation is roughly 100 KB with a one hour TTL.
-4. **Connect Project.** That injects `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
-
-Use the REST pair, not `REDIS_URL` or `KV_URL`: those are `rediss://` strings
-for a TCP client, and one TCP connection per lambda is the connection-limit
-problem an HTTP client exists to avoid.
-
-Locally, copy the two into `apps/web/.env`. Leave them out and an in-process
-Map stands in, which on one machine is the same guarantee for free.
-
-A reload starts a new chat and the old one is still there: `chat-store.ts`
-keeps the blocks in localStorage and the rail lists them. For a signed-in
-shopper the transcript is also in Postgres, which is what outlives the TTL and
-a cleared browser.
+Leave the pair unset unless you want that turn store in Redis. If you do,
+use the REST names, not `REDIS_URL` or `KV_URL`: those are `rediss://` strings
+for a TCP client. A database created at upstash.com names the same endpoint
+`UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; both are read.
 
 ### 2.7 Deploy a preview first
 
