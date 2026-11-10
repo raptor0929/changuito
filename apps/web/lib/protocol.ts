@@ -90,6 +90,11 @@ export interface ChatRequest {
    * model would otherwise ask for again. Absent on the first turn.
    */
   prior?: string[];
+  /**
+   * The products already on screen, names and sku ids only. Prices stay on
+   * the server. Absent when nothing has been shown.
+   */
+  shown?: { skuId: string; name: string }[];
 }
 
 export const SSE_HEADERS: Record<string, string> = {
