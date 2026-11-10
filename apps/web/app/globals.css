@@ -28,6 +28,10 @@
   /* Overridden by ViewportLock from visualViewport (keyboard + browser chrome). */
   --vvh: 100dvh;
   --vv-top: 0px;
+
+  /* The sunflower bar (TopBar.tsx). Fixed, so the shell and the deck start
+     this far down and are this much shorter. */
+  --topbar-h: 56px;
 }
 
 /* Shopper stays on brand light — same as landing. */
@@ -81,60 +85,180 @@ a:hover { color: var(--chg-arcilla); }
    screen. top/height follow the keyboard via --vv-top / --vvh. */
 .shell {
   position: fixed;
-  top: var(--vv-top, 0px);
+  top: calc(var(--vv-top, 0px) + var(--topbar-h));
   left: max(0px, calc(50% - 410px));
   width: min(820px, 100%);
-  height: var(--vvh, 100dvh);
-  max-height: var(--vvh, 100dvh);
+  height: calc(var(--vvh, 100dvh) - var(--topbar-h));
+  max-height: calc(var(--vvh, 100dvh) - var(--topbar-h));
   margin: 0;
-  padding: 24px 16px 0;
+  padding: 14px 16px 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--bg);
 }
 
+/* A fixture with no top bar keeps the full viewport. The shopper page has the bar. */
+body:not(:has(.topbar)) .shell {
+  top: var(--vv-top, 0px);
+  height: var(--vvh, 100dvh);
+  max-height: var(--vvh, 100dvh);
+}
+
+/* What is left under the bar: the one sentence that says what this is. */
 .masthead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 16px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
+.masthead .tagline { margin-top: 0; }
 
-.brand {
+/* ------------------------------------------------------------- top bar
+   Sunflower, full width, above the shell and the deck at every breakpoint.
+   Brand manual §14: sunflower is the background here, so every control on it
+   is espresso — outline pills and an off-white avatar, never a sunflower
+   button that would vanish into the bar. */
+.topbar {
+  position: fixed;
+  top: var(--vv-top, 0px);
+  left: 0;
+  right: 0;
+  height: var(--topbar-h);
+  z-index: 30;
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 44px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--brand);
+  color: var(--brand-ink);
+  border-bottom: 1px solid rgba(42, 26, 20, 0.18);
 }
-
-.brand-copy {
+.topbar-left {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
+.topbar .deck-drawer-toggle {
+  color: var(--brand-ink);
+  border-color: rgba(42, 26, 20, 0.35);
+}
+.topbar .deck-drawer-toggle:hover { background: rgba(42, 26, 20, 0.08); }
 
 .brand-name {
   margin: 0;
   line-height: 0;
+  min-width: 0;
 }
 
 /* Canonical lettering. The name is the image, not Inter. */
 .brand-wordmark {
   display: block;
-  height: 28px;
+  height: 26px;
   width: auto;
   max-width: 100%;
 }
 
-@media (max-width: 520px) {
-  .brand-wordmark {
-    height: 22px;
+/* Read right to left: profile, balance, Cargar USDC. */
+.topbar-wallet {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.btn.topbar-btn {
+  background: transparent;
+  border: 2px solid var(--brand-ink);
+  color: var(--brand-ink);
+  padding: 6px 16px;
+  font-size: 14px;
+  min-height: 40px;
+  white-space: nowrap;
+}
+/* Android offers email, Google and the phone account. 44px meets the touch size. */
+.topbar-wallet.is-android {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.topbar-wallet.is-android .btn.topbar-btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+@media (max-width: 720px) {
+  :root:has(.topbar-wallet.is-android) { --topbar-h: 120px; }
+  .topbar:has(.topbar-wallet.is-android) {
+    height: auto;
+    min-height: var(--topbar-h);
+    align-items: center;
   }
+}
+.btn.topbar-btn:hover { background: rgba(42, 26, 20, 0.08); }
+.btn.topbar-btn:active { background: rgba(42, 26, 20, 0.14); }
+.topbar-btn:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: 2px; }
+.topbar-balance {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  white-space: nowrap;
+}
+.topbar-balance strong {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.topbar-unit,
+.topbar-muted { font-size: 12px; font-weight: 600; }
+/* On the bar the avatar inverts: off-white with espresso initials and ring. */
+.topbar .avatar {
+  width: 38px;
+  height: 38px;
+  background: var(--chg-offwhite);
+  box-shadow: inset 0 0 0 2px var(--brand-ink);
+}
+.topbar .avatar:hover { background: #fff; }
+.topbar .avatar:active { background: rgba(250, 250, 247, 0.85); }
+/* The faucet's answer, under the bar rather than inside it. */
+.topbar-toast {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  margin: 0;
+  width: max-content;
+  max-width: min(320px, 80vw);
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ok);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(42, 26, 20, 0.12);
+}
+.topbar-toast.is-error { color: var(--warn-ink); }
+
+@media (max-width: 560px) {
+  :root { --topbar-h: 52px; }
+  .topbar {
+    gap: 8px;
+    padding-left: max(8px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+  }
+  .brand-wordmark { height: 20px; }
+  .topbar-wallet { gap: 8px; }
+  .btn.topbar-btn { padding: 4px 12px; font-size: 13px; }
+  .topbar-balance strong { font-size: 16px; }
+  /* The amount stays; "USDC de prueba" is in the faucet and the profile. */
+  .topbar-unit,
+  .topbar-hint { display: none; }
+  .topbar .avatar { width: 36px; height: 36px; }
+}
+@media (max-width: 374px) {
+  .topbar .wallet-mode { display: none; }
+  .btn.topbar-btn { padding: 4px 10px; font-size: 12px; }
 }
 
 .tagline {
@@ -482,6 +606,10 @@ a:hover { color: var(--chg-arcilla); }
 .receipt {
   padding: 12px 14px;
   gap: 8px;
+  /* `.card` hides overflow, and in the thread's scrolling flex column a flex
+     item that hides overflow may shrink to nothing: the receipt showed its
+     heading and was cut below it. The thread scrolls; nothing in it shrinks. */
+  flex-shrink: 0;
 }
 .receipt-head {
   display: flex;
@@ -676,6 +804,11 @@ a:hover { color: var(--chg-arcilla); }
   opacity: 1;
   white-space: pre-wrap;
 }
+/* Phones: the placeholder one step smaller so it fits one line; the typed
+   text stays 16px, which keeps iOS from zooming on focus. */
+@media (max-width: 560px) {
+  .composer-input::placeholder { font-size: 14px; }
+}
 
 @media (max-width: 560px) {
   .shell {
@@ -683,9 +816,7 @@ a:hover { color: var(--chg-arcilla); }
     padding-left: max(12px, env(safe-area-inset-left, 0px));
     padding-right: max(12px, env(safe-area-inset-right, 0px));
   }
-  .masthead { flex-direction: column; gap: 8px; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
-  .wallet { width: 100%; }
   /* "Prueba" / "Real" once the card is full-width beside three actions. */
   .mode-long { display: none; }
   .mode-short { display: inline; }
@@ -693,11 +824,16 @@ a:hover { color: var(--chg-arcilla); }
     padding-block: 12px;
     padding-inline-start: 0;
   }
-  /* A long placeholder must not inflate the bar once a conversation exists. */
+  /* A long placeholder must not inflate the bar once a conversation exists.
+     The phone placeholders are one line at 360px (ui-copy.ts), so the field
+     stays one line tall: iOS Safari sizes an empty field to one line anyway. */
   .composer-input {
     min-height: 48px;
     max-height: 96px;
   }
+  /* Enviar sits mid-height beside the field; the tools get an even gap. */
+  .composer > .btn { align-self: center; }
+  .composer-tools { gap: 8px; }
   /* Empty means there is nothing to scroll to. A placeholder that still
      overflows (large text settings) is clipped instead of wearing a bar. */
   .composer-input:placeholder-shown {
@@ -707,18 +843,85 @@ a:hover { color: var(--chg-arcilla); }
 
 /* --------------------------------------------------------------- wallet */
 
-.wallet {
-  min-width: 190px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  padding: 10px 12px;
+/* The profile avatar. Brand kit (apps/branding): espresso initials on
+   sunflower, which is the CTA pairing and clears contrast; round, like the
+   pill buttons beside it. */
+.avatar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  border: 0;
+  background: var(--brand);
+  color: var(--brand-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.avatar:hover { background: var(--chg-sunflower-hover); }
+.avatar:active { background: var(--chg-sunflower-active); }
+.avatar:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: 2px; }
+
+/* The profile dialog: tabs in a column on the left, the panel on the right.
+   Text stays espresso; the selected tab is marked by a sunflower bar on its
+   left edge, never by sunflower text (too little contrast on off-white —
+   brand manual §14). */
+.profile-layout {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.tabs {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  padding-right: 10px;
+  border-right: 1px solid var(--border);
+  align-self: stretch;
 }
-.wallet-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.wallet-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.tab {
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 0 10px 10px 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 10px 12px;
+  text-align: left;
+  min-height: 44px;
+  cursor: pointer;
+}
+.tab:hover { color: var(--text); background: rgba(42, 26, 20, 0.04); }
+.tab[aria-selected='true'] { color: var(--text); border-left-color: var(--brand); background: rgba(42, 26, 20, 0.05); }
+.tab:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: -2px; }
+.profile-panel { min-width: 0; }
+.profile-general { display: flex; flex-direction: column; gap: 16px; }
+.profile-who { display: flex; align-items: flex-start; gap: 12px; }
+.profile-who-text { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; flex: 1; }
+.profile-email { font-size: 15px; overflow-wrap: anywhere; }
+.profile-addr-row { font-size: 12px; overflow-wrap: anywhere; }
+.profile-addr-row .wallet-addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-align: left; overflow-wrap: anywhere; }
+.avatar-static { cursor: default; width: 44px; height: 44px; font-size: 15px; }
+.avatar-static:hover,
+.avatar-static:active { background: var(--brand); }
+.profile-section-title { margin: 0 0 8px; font-size: 15px; }
+.profile-general .modal-actions .btn { flex: 0 0 auto; }
+@media (max-width: 520px) {
+  .profile-layout { grid-template-columns: 96px minmax(0, 1fr); gap: 10px; }
+  .tabs { padding-right: 6px; }
+  .tab { font-size: 13px; padding: 8px; }
+}
+.ck-hint { font-size: 12px; color: var(--muted); }
+.ck-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); }
+.ck-check input { accent-color: var(--brand-ink); }
 .wallet-addr {
   border: 0;
   background: none;
@@ -741,28 +944,9 @@ a:hover { color: var(--chg-arcilla); }
   text-decoration-color: var(--border);
 }
 .wallet-addr:hover { text-decoration-color: currentColor; }
-/* The full G… address, not a shortened one. Monospace so look-alike
-   characters stay apart; it wraps instead of widening the masthead. */
-.wallet-addr {
-  min-width: 0;
-  text-align: right;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
-  overflow-wrap: anywhere;
-  word-break: break-all;
-}
-.wallet-balance { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
-.wallet-balance strong { font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-.wallet-unit { font-size: 12px; color: var(--muted); }
-.wallet-sub { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
 .wallet-muted { color: var(--muted); }
-.wallet-error { margin: 0; font-size: 12px; color: var(--warn); }
 
-/* Modo prueba / modo real — a label, not a control. See ModeBadge.
-   A wrapper div, not a bare element, because the phone block at the bottom
-   of this file branches on `.wallet:has(> .btn)` vs `.wallet:not(:has(> .btn))`
-   to tell the logged-out masthead from the connected one. A button added as a
-   direct child of .wallet flips that selector and breaks both branches. */
+/* Modo prueba / modo real — a label, not a control. See ModeBadge. */
 .wallet-mode { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .mode-badge {
   display: inline-flex;
@@ -789,44 +973,9 @@ a:hover { color: var(--chg-arcilla); }
   color: var(--brand-ink);
   border-color: transparent;
 }
-/* Network label beside the mode badge when the app is on testnet. Neutral
-   surface, same type size — it names the chain, it does not shout. Contrast
-   is ink on surface, which clears 4.5:1 in both themes (see contrast tests). */
-.network-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-  padding: 7px 11px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--text);
-  white-space: nowrap;
-  cursor: default;
-}
 /* One label at two widths. Both spans are aria-hidden and the button carries
    an explicit aria-label, so hiding either one never costs it its name. */
 .mode-short { display: none; }
-/* One row, including at phone width. Icon controls keep a 44px hit box. */
-.wallet-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: nowrap;
-}
-.wallet-actions .btn {
-  flex: 0 0 auto;
-  white-space: nowrap;
-  min-height: 44px;
-}
-.wallet-icon-btn {
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
-  padding: 0;
-}
 .wallet-icon {
   width: 18px;
   height: 18px;
@@ -840,7 +989,6 @@ a:hover { color: var(--chg-arcilla); }
 .wallet-off { opacity: 0.7; }
 
 .btn-sm { padding: 5px 12px; font-size: 12px; font-weight: 600; min-height: 32px; }
-.wallet-note { margin: 0; font-size: 12px; color: var(--ok); }
 
 /* ---------------------------------------------------------- payment modal */
 
@@ -883,11 +1031,13 @@ a:hover { color: var(--chg-arcilla); }
 .modal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .modal-actions .btn { flex: 1 1 auto; min-width: 128px; text-align: center; }
 
-/* The record, opened from the balance. Wider than the default, because a
-   purchase line carries two figures and a date and wraps badly at 460px, and
-   it leans on the 90dvh ceiling `.modal` already sets: the list can run long
-   and scrolling inside the dialog is the right place for it. */
-.modal-orders { max-width: 560px; }
+
+/* The profile, opened from the avatar. Wider than the default: the tab
+   column takes ~160px, and Mis compras inside General carries two figures
+   and a date per line and wraps badly at 460px. It leans on the 90dvh ceiling
+   `.modal` already sets: the list can run long and scrolling inside the
+   dialog is the right place for it. */
+.modal-profile { max-width: 680px; }
 
 /* The card, opened from the balance. Left at the default width, because it is
    the same three fields the checkout panel shows at the same size. */
@@ -967,7 +1117,48 @@ a:hover { color: var(--chg-arcilla); }
 .ck-rail-done { color: var(--ok); }
 .ck-rail-done .ck-rail-n { border-color: var(--ok); color: var(--ok); }
 
+/* The close control stays in the corner and comes last in the tab order. */
+.modal-wide { position: relative; }
+.modal-wide .modal-head { padding-right: 48px; }
+.ck-close { position: absolute; top: 8px; right: 8px; }
+.ck-flow-head { margin: 0; font-size: 18px; }
+.ck-flow-head:focus { outline: none; }
+.ck-flow-head:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.ck-flow-status { margin: 0; }
+.ck-spin {
+  width: 14px; height: 14px; margin-right: 8px; border-radius: 50%;
+  border: 2px solid var(--border); border-top-color: var(--fg);
+  display: inline-block; vertical-align: -2px;
+  animation: ck-spin 0.8s linear infinite;
+}
+@keyframes ck-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ck-spin { animation: none; } }
+.ck-flow-frame { width: 100%; min-height: 640px; border: 1px solid var(--border); background: var(--surface); }
+.ck-flow-browser { height: min(70dvh, 760px); min-height: 420px; }
+.ck-pay .btn { min-height: 44px; white-space: normal; }
+
 .ck-delivery { display: flex; flex-direction: column; gap: 8px; }
+
+/* The shopper's Día login. Plain inputs: the browser's own password manager
+   is welcome here, the app never keeps what is typed. */
+.ck-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.ck-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.ck-input {
+  font: inherit;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 11px;
+  min-width: 0;
+  min-height: 44px;
+}
+.ck-input::placeholder { color: var(--placeholder); }
+.ck-input:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.ck-more { font-size: 13px; color: var(--muted); }
+.ck-more summary { cursor: pointer; }
+.ck-more .ck-form { margin-top: 10px; }
 .ck-pay { display: flex; flex-direction: column; gap: 12px; }
 
 /* Productos / Envío / Total. The envío row is the reason this exists: the
@@ -999,7 +1190,7 @@ a:hover { color: var(--chg-arcilla); }
 
 .ck-login { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px; }
 .ck-login-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.ck-login-actions .btn { flex: 1 1 auto; min-width: 140px; text-align: center; }
+.ck-login-actions .btn { flex: 1 1 auto; min-width: 140px; min-height: 44px; text-align: center; }
 
 .ck-frame {
   width: 100%;
@@ -1070,7 +1261,8 @@ a:hover { color: var(--chg-arcilla); }
 
 .pay-note { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
 .pay-warn { margin: 0; font-size: 13px; color: var(--warn); }
-.pay-error { margin: 0; font-size: 13px; color: var(--warn); word-break: break-word; }
+/* --warn (arcilla) is about 2.9:1 on white. Error text uses --warn-ink, which clears 4.5:1. */
+.pay-error { margin: 0; font-size: 13px; color: var(--warn-ink); word-break: break-word; }
 .pay-fine-line { margin: 0; font-size: 12px; color: var(--muted); text-align: center; }
 /* The dialog that hands out the shopper's own address. See ReceiveModal. */
 .receive-modal { max-width: 380px; }
@@ -1269,120 +1461,92 @@ a:hover { color: var(--chg-arcilla); }
   color: var(--chg-arcilla);
 }
 
-/* One line under the composer: the mark, the privacy link, the language
-   switch. #6b5a52 on --bg is 6.26:1. The background is explicit so the
-   line does not sit on a transparent strip. */
+/* One line under the composer: copyright, privacy, language. Partners,
+   social icons, and the founder sentence live on the landing footer.
+   #4a332c (--muted) on #fafaf7 (--bg) is 11.2:1. color-scheme stays light
+   with the rest of the shopper, including when the OS is dark, so the
+   line is not painted onto a dark canvas. */
 .app-footer {
   flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-  margin: 0;
-  padding: 0 8px calc(8px + env(safe-area-inset-bottom, 0px));
-  background: var(--bg);
-  color: #6b5a52;
-  font-size: 12px;
-  line-height: 16px;
-  text-align: center;
-  border-top: 1px solid rgba(42, 26, 20, 0.08);
-}
-.app-footer-line {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0;
-  list-style: none;
+  gap: 2px 8px;
   margin: 0;
-  padding: 0;
-  min-width: 0;
+  padding: 2px 16px calc(8px + env(safe-area-inset-bottom, 0px));
+  color: var(--muted);
+  background: var(--bg);
+  color-scheme: light;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
 }
-.app-footer-line > li {
-  display: flex;
-  align-items: center;
-  margin: 0;
-  padding: 0;
-  min-height: 44px;
-}
-.app-footer-line > li + li {
-  margin-left: 12px;
-  padding-left: 12px;
-  border-left: 1px solid var(--border);
-}
-.app-legal {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
+.app-footer-copy {
   padding: 0 4px;
-  color: inherit;
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  white-space: nowrap;
 }
-.app-legal:hover { color: var(--text); }
-.app-legal:focus-visible {
-  outline: 3px solid var(--chg-espresso);
-  outline-offset: -3px;
+@media (prefers-color-scheme: dark) {
+  .app-footer {
+    background: #fafaf7;
+    color: #4a332c;
+  }
+  /* The shop stays on the light brand even when the OS is dark, so these
+     error surfaces keep the same ink on the same plate. */
+  .topbar-toast {
+    background: #ffffff;
+    color: #1a7f4b;
+  }
+  .topbar-toast.is-error,
+  .pay-error {
+    color: #7a2e12;
+  }
 }
 
-/* One sentence at every width. On a phone it is the last row and the smallest type. */
-.chg-trust {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
-  padding-bottom: 8px;
-  /* #6b5a52 on --bg is 6.26:1. Quieter than --muted, still body text. */
-  color: #6b5a52;
-  font-size: 11px;
-  line-height: 16px;
-}
-.chg-trust-line { margin: 0; }
-.chg-trust-link {
-  color: inherit;
-  font: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.chg-trust-link:hover { text-decoration-thickness: 2px; }
-.chg-trust-sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-/* Language switch. Same 44px row as the privacy link beside it. The visible
-   letters are EN / ES; the border is the pill. Hover stays on --muted / --text:
-   arcilla on the page background is under 3:1. The ring is inset because the
-   shell clips overflow. */
+/* Language switch. Same 44px row as the privacy link beside it, so the
+   footer reads as one strip. It carries a word as well as the glyph because
+   the word is the whole affordance (see LangToggle), so it is wider than
+   44px and that is fine: the footer wraps. Hover stays on --muted / --text:
+   arcilla on the page background is under 3:1. The ring is inset because
+   the shell clips overflow and the empty-state footer padding is only a
+   few pixels. */
 .app-lang {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
   min-width: 44px;
   min-height: 44px;
-  padding: 0 8px;
+  padding: 0;
   color: var(--muted);
   background: none;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: 8px;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
 }
+/* 32px pill inside the 44px hit target, so the row matches the glyphs
+   without dropping the touch size. */
+.app-lang-face {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  min-width: 56px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
 .app-lang-label {
   font-size: 12px;
-  font-weight: 600;
   line-height: 16px;
+  font-weight: 600;
 }
 .app-lang:hover {
   color: var(--text);
+}
+.app-lang:hover .app-lang-face {
   background: rgba(42, 26, 20, 0.06);
 }
 .app-lang:focus-visible {
@@ -1395,6 +1559,22 @@ a:hover { color: var(--chg-arcilla); }
    muted grey Pollar uses for the rest of its footer. Scoped to its overlay. */
 .pollar-overlay .pollar-footer-version {
   opacity: 1;
+}
+
+/* Network label beside the mode badge. Ink on surface, in both themes. */
+.network-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  white-space: nowrap;
+  cursor: default;
 }
 
 /* ------------------------------------------------- empty chat, phone only
@@ -1417,54 +1597,10 @@ a:hover { color: var(--chg-arcilla); }
     padding-bottom: 6px;
   }
 
-  .shell:has(.chat.is-empty) .brand {
-    gap: 8px;
-    min-height: 0;
-  }
-
-  .shell:has(.chat.is-empty) .brand-wordmark {
-    height: 18px;
-  }
-
   .shell:has(.chat.is-empty) .tagline {
     margin-top: 1px;
     font-size: 12px;
     line-height: 1.25;
-  }
-
-  /* Logged-out masthead is a single full-width CTA. Drop the extra card
-     chrome so the pill is the control, not a card wrapping a control. */
-  .shell:has(.chat.is-empty) .wallet:has(> .btn) {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    gap: 0;
-    min-width: 0;
-  }
-
-  .shell:has(.chat.is-empty) .wallet:has(> .btn) .btn {
-    width: 100%;
-  }
-
-  /* Connected wallet (balance + actions) is the tall masthead. Keep every
-     row, just stop it from eating the onboarding. */
-  .shell:has(.chat.is-empty) .wallet:not(:has(> .btn)) {
-    padding: 6px 10px;
-    gap: 2px;
-  }
-
-  .shell:has(.chat.is-empty) .wallet-balance strong {
-    font-size: 18px;
-    line-height: 1.05;
-  }
-
-  .shell:has(.chat.is-empty) .wallet-sub {
-    gap: 6px;
-    line-height: 1.2;
-  }
-
-  .shell:has(.chat.is-empty) .mode-badge {
-    padding: 6px 9px;
   }
 
   .shell:has(.chat.is-empty) .thread {
@@ -1507,12 +1643,12 @@ a:hover { color: var(--chg-arcilla); }
   }
 
   .shell:has(.chat.is-empty) .composer {
-    column-gap: 6px;
-    row-gap: 4px;
-    /* Same ring gutter as .composer. The empty bar used to be 4px on the
-       bottom, one pixel short of the field ring, so the lower stroke clipped
-       too. 6px clears a 5px ring without giving back the tight first screen. */
-    padding: 6px 8px;
+    column-gap: 8px;
+    /* Same 16px of vertical space as before, split 5 / 6 / 5: 5px top and
+       bottom hold the field's and the tools' 5px focus ring inside the clip,
+       and 6px between the rows keeps the field's ring off the icons. */
+    row-gap: 6px;
+    padding: 5px 8px;
     margin: 0;
   }
 
@@ -1521,6 +1657,9 @@ a:hover { color: var(--chg-arcilla); }
        Enviar off the visual viewport. 16px avoids the iOS focus zoom. */
     field-sizing: content;
     height: auto;
+    /* One line: the phone placeholders fit one line at 360px (ui-copy.ts).
+       iOS Safari sizes an empty field to one line, ignoring the placeholder,
+       so a two-line placeholder was cut in half. */
     min-height: 44px;
     max-height: 112px;
     padding: 8px 12px;
@@ -1733,16 +1872,22 @@ a:hover { color: var(--chg-arcilla); }
   .deck {
     display: grid;
     position: fixed;
-    top: var(--vv-top, 0px);
+    top: calc(var(--vv-top, 0px) + var(--topbar-h));
     left: 0;
     width: 100%;
-    height: var(--vvh, 100dvh);
-    max-height: var(--vvh, 100dvh);
+    height: calc(var(--vvh, 100dvh) - var(--topbar-h));
+    max-height: calc(var(--vvh, 100dvh) - var(--topbar-h));
     grid-template-columns: 236px minmax(0, 820px) 308px;
     grid-template-rows: 100%;
     justify-content: center;
     overflow: hidden;
     background: var(--bg);
+  }
+
+  body:not(:has(.topbar)) .deck {
+    top: var(--vv-top, 0px);
+    height: var(--vvh, 100dvh);
+    max-height: var(--vvh, 100dvh);
   }
 
   /* Out of the fixed position and into the middle cell. Everything inside it
@@ -1867,6 +2012,12 @@ a:hover { color: var(--chg-arcilla); }
     padding-top: 8px;
   }
 
+  /* Pagar under the basket: full width, the one sunflower CTA in the rail. */
+  .rail-cart-pay {
+    width: 100%;
+    margin-top: 10px;
+  }
+
   .rail-cart-warn {
     margin: 0 0 6px;
     font-size: 12px;
@@ -1986,38 +2137,219 @@ a:hover { color: var(--chg-arcilla); }
 .btn-warn { background: transparent; color: var(--warn-ink); border-color: var(--warn-ink); }
 .btn-warn:hover { background: rgba(122, 46, 18, 0.08); }
 
-/* A document page (privacy) is not the shop shell: the shell locks scroll. */
-html.doc-scroll,
-html.doc-scroll body {
-  height: auto;
-  overflow: auto;
-  background: var(--bg);
+/* In the profile there is room for the long label at every width. */
+.profile-who .mode-long { display: inline; }
+.profile-who .mode-short { display: none; }
+
+/* The demo run's promise, before anything is locked: a neutral callout, not a
+   warning — nothing is wrong, it is a different run. */
+.ck-demo {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--brand);
+  border-radius: 10px;
+  background: var(--surface);
   color: var(--text);
 }
-.legal-page {
-  max-width: 42rem;
-  margin: 0 auto;
-  padding: 24px 20px 48px;
-  background: var(--bg);
-  color: var(--text);
+
+/* A password box with its eye (PasswordInput.tsx). The eye sits inside the
+   field's right edge; the input keeps room for it so text never runs under. */
+.ck-secret { position: relative; display: flex; }
+.ck-secret .ck-input { flex: 1; padding-right: 46px; }
+.ck-eye {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
 }
-.legal-page h1 { font-size: 1.75rem; margin: 0 0 12px; line-height: 1.2; }
-.legal-page h2 { font-size: 1.15rem; margin: 28px 0 8px; line-height: 1.3; }
-.legal-page p,
-.legal-page li { font-size: 16px; line-height: 1.5; }
-.legal-intro { color: var(--muted); }
-.legal-back a,
-.legal-contact a {
+.ck-eye:hover { color: var(--text); }
+.ck-eye:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: -2px; }
+
+/* Toast.tsx: above dialogs (their backdrop is 50), under nothing. Neutral
+   surface; the tone is the text colour, never a sunflower block. */
+.toast {
+  position: fixed;
+  top: calc(var(--vv-top, 0px) + var(--topbar-h) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  margin: 0;
+  width: max-content;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ok);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(42, 26, 20, 0.16);
+}
+.toast.is-error { color: var(--warn-ink); }
+
+/* Resolver alert in the checkout (lib/checkout/resolver-alert.ts). */
+.ck-alert {
+  border-left: 3px solid var(--warn);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ck-alert-title { margin: 0; font-size: 14px; font-weight: 600; color: var(--warn-ink); }
+
+
+/* First-visit beta explainer (components/BetaOnboarding.tsx). Desktop shows
+   .onb-body; phones show the one-paragraph .onb-short beside the button. The
+   hidden one is display:none, so screen readers only read what is shown. */
+.onb {
+  border: 1px solid rgba(42, 26, 20, 0.12);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin: 0 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.onb-body { display: flex; flex-direction: column; gap: 8px; }
+.onb-title { margin: 0; font-size: 16px; }
+.onb-steps { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.55; }
+.onb-note { margin: 0; font-size: 13px; color: var(--muted); }
+.onb-actions { display: flex; justify-content: flex-end; }
+.onb-short, .onb-label-short { display: none; }
+.onb-link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--chg-espresso);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.onb-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 2px; }
+
+/* Privacy link in the shop footer. Same 44px row as the language switch. */
+.app-legal {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 10px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.35;
+  text-decoration: none;
+}
+.app-legal:hover {
+  color: var(--text);
+  background: rgba(42, 26, 20, 0.06);
+}
+.app-legal:focus-visible {
+  outline: 3px solid var(--chg-espresso);
+  outline-offset: -3px;
+}
+
+/* Account deletion, inside the profile dialog. The confirm is filled so the
+   words are not the only signal, and the text still says what it does. */
+.account-delete {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 8px;
+}
+.account-delete-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+.account-delete-panel p,
+.account-delete-error {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.account-delete-error { color: var(--warn-ink); }
+.account-delete a {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
   color: var(--text);
   font-weight: 600;
+}
+.account-delete-confirm {
+  background: var(--warn-ink);
+  color: #fff;
+  border-color: var(--warn-ink);
+}
+.account-delete-confirm:hover { background: #5c220e; }
+.account-delete-confirm:focus-visible {
+  outline: 3px solid var(--chg-espresso);
+  outline-offset: 2px;
+}
+
+/* A document page (privacy) is not the shop shell: the shell locks scroll. */
+html.doc-scroll,
+html.doc-scroll body {
+  height: auto;
+  overflow: auto;
+}
+.legal-page {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+}
+.legal-page h1 { font-size: 1.75rem; margin: 0 0 12px; }
+.legal-page h2 { font-size: 1.15rem; margin: 28px 0 8px; }
+.legal-page p,
+.legal-page li { font-size: 16px; line-height: 1.5; }
+.legal-intro { color: var(--muted); }
+.legal-gaps {
+  margin-top: 28px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.legal-back a,
+.legal-contact a,
+.legal-page a {
+  color: var(--text);
+}
+.legal-contact a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.legal-page a:focus-visible {
-  outline: 3px solid var(--chg-espresso);
-  outline-offset: 3px;
+.legal-back a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
 }
 .legal-footer { margin-top: 24px; }
+@media (max-width: 560px) {
+  .onb { flex-direction: row; align-items: center; gap: 10px; padding: 8px 10px 8px 12px; margin-bottom: 10px; border-radius: 12px; }
+  .onb-body, .onb-label-full { display: none; }
+  .onb-short { display: block; flex: 1; min-width: 0; margin: 0; font-size: 13px; line-height: 1.35; }
+  .onb-label-short { display: inline; }
+  .onb-actions { flex: none; }
+}

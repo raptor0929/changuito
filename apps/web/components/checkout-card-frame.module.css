@@ -1,0 +1,68 @@
+/* The card iframe used to share .ck-flow-frame's 640px floor with the remote
+   browser, so the short form left a blank band under "Cargar en Día".
+   The form reports its own height; this is the size until that message lands,
+   and the frame scrolls if the message never does. */
+
+.formFrame {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: 480px;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  overflow: auto;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  .formFrame { color-scheme: dark; }
+}
+
+/* A grid item's min-height:auto will not shrink, so a tall card step on a
+   ~400px Seeker shell was clipped by the locked page with nowhere to scroll.
+   safe center keeps a short dialog centred and lets a tall one start at the top. */
+:global(.modal-backdrop:has(.modal-wide)) {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  align-items: safe center;
+  justify-content: center;
+  padding-top: max(16px, env(safe-area-inset-top, 0px));
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+}
+
+:global(.modal.modal-wide) {
+  min-height: 0;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+}
+
+/* The shop shell stays light. This dialog follows the OS so the card step,
+   which is a separate document, and the chrome around it switch together.
+   Espresso on sunflower still clears 4.5:1. --ok and --warn are lifted
+   because the light values do not. */
+@media (prefers-color-scheme: dark) {
+  :global(.modal.modal-wide) {
+    --surface: #241814;
+    --bg: #1a120f;
+    --text: #fafaf7;
+    --muted: #e4d5cc;
+    --border: rgba(250, 250, 247, 0.22);
+    --placeholder: #cbb8ae;
+    --ok: #3dbe78;
+    --warn: #ffc7b8;
+    --warn-ink: #ffc7b8;
+    color-scheme: dark;
+    background: #241814;
+    color: #fafaf7;
+  }
+
+  :global(.modal.modal-wide) :global(:focus-visible) {
+    outline-color: #f4b942;
+  }
+
+  :global(.modal.modal-wide) :global(.btn-ghost:hover) {
+    background: rgba(250, 250, 247, 0.08);
+  }
+}

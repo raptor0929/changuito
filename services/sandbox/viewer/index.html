@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DIA checkout / Pago en DIA</title>
+<style>
+html,body{margin:0;height:100%;font:14px Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#111827;color:#fff}
+body{display:flex;flex-direction:column}
+header{display:flex;gap:8px;align-items:center;padding:8px;flex-wrap:wrap}
+button,input,select{font:inherit}
+header button,header input{padding:8px;border:1px solid #9ca3af;border-radius:4px;background:#fff;color:#111827}
+header input{width:140px}
+#status{flex:1}
+header button,header input{cursor:pointer;min-height:44px}
+#screen{flex:1;min-height:180px;overflow:auto;background:#fff}
+/* Card step. width:100% plus padding overflowed the iframe under content-box,
+   and #card-form input beat .kinds input, so the radios stretched to the pill.
+   Radios stay 18px inside a 44px segmented control. The checked segment uses
+   weight, an inset ring and the radio itself, not the yellow fill alone. */
+#card-form,#card-form *{box-sizing:border-box}
+#card-form{
+  --card-bg:#fafaf7;--card-surface:#ffffff;--card-text:#2a1a14;--card-muted:#4a332c;
+  --card-border:rgba(42,26,20,.22);--card-error:#7a2e12;--card-focus:#2a1a14;
+  --card-brand:#f4b942;--card-brand-ink:#2a1a14;--card-invalid:#fff6f3;--card-ok:#1a7f4b;
+  background:var(--card-bg);color:var(--card-text);color-scheme:light;
+  padding:6px;margin:0;display:flex;flex-direction:column;gap:12px;
+  max-width:100%;min-width:0
+}
+#card-form p{margin:0;font-size:13px;line-height:1.4;color:var(--card-muted)}
+#card-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--card-muted);min-width:0;max-width:100%}
+.lbl{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
+.field-hint{font-weight:400;font-size:12px;line-height:1.3;color:var(--card-muted)}
+#card-form input:not([type="radio"]),#card-form select,#apply-card{
+  font-size:16px;line-height:1.3;color:var(--card-text);background:var(--card-surface);
+  border:1px solid var(--card-border);border-radius:10px;padding:10px 12px;
+  min-height:44px;width:100%;max-width:100%;min-width:0
+}
+#cvv{-webkit-text-security:disc;text-security:disc}
+#card-form input:not([type="radio"]):focus-visible,#card-form select:focus-visible,#apply-card:focus-visible,
+header button:focus-visible,header input:focus-visible{outline:2px solid var(--card-focus);outline-offset:2px}
+#card-form input[aria-invalid="true"]:not([type="radio"]),#card-form select[aria-invalid="true"]{
+  border-color:var(--card-error);background:var(--card-invalid)
+}
+#card-form .kinds{display:flex;gap:0;min-width:0;max-width:100%;padding:0;border:1px solid var(--card-border);border-radius:10px;background:var(--card-surface)}
+#card-form .kinds label{flex:1 1 0;flex-direction:row;align-items:center;justify-content:center;gap:8px;
+  min-height:44px;height:44px;padding:0 12px;border:0;border-radius:0;background:transparent;
+  font-size:14px;font-weight:600;color:var(--card-text);cursor:pointer}
+#card-form .kinds label:first-child{border-radius:9px 0 0 9px}
+#card-form .kinds label:last-child{border-radius:0 9px 9px 0}
+#card-form .kinds label + label{box-shadow:inset 1px 0 0 var(--card-border)}
+#card-form .kinds label:has(input:checked){background:var(--card-brand);color:var(--card-brand-ink);font-weight:700;box-shadow:inset 0 0 0 2px var(--card-brand-ink)}
+#card-form .kinds label:has(input:focus-visible){outline:2px solid var(--card-focus);outline-offset:2px}
+#card-form .kinds input{appearance:auto;width:18px;height:18px;min-height:18px;min-width:18px;max-width:18px;flex:0 0 18px;padding:0;margin:0;border:0;background:transparent;accent-color:var(--card-brand-ink)}
+#card-form .kinds input:focus-visible{outline:none}
+.expiry{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr) minmax(0,1fr);gap:10px;min-width:0}
+.err{display:flex;align-items:flex-start;gap:6px;min-width:0;max-width:100%;overflow-wrap:anywhere;font-size:12px;font-weight:400;line-height:1.35;color:#7a2e12;color:var(--card-error)}
+.err[hidden]{display:none}
+.err::before{content:"";flex:0 0 16px;width:16px;height:16px;margin-top:1px;background:currentColor;-webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='black' d='M8 1.2 15 14.2H1L8 1.2zm0 4.1a.75.75 0 0 0-.75.75v3.2a.75.75 0 0 0 1.5 0V6.05A.75.75 0 0 0 8 5.3zm0 6.15a.9.9 0 1 0 0 1.8.9.9 0 0 0 0-1.8z'/></svg>") center/contain no-repeat;mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='black' d='M8 1.2 15 14.2H1L8 1.2zm0 4.1a.75.75 0 0 0-.75.75v3.2a.75.75 0 0 0 1.5 0V6.05A.75.75 0 0 0 8 5.3zm0 6.15a.9.9 0 1 0 0 1.8.9.9 0 0 0 0-1.8z'/></svg>") center/contain no-repeat}
+#apply-card{display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;border:2px solid transparent;border-radius:999px;background:var(--card-brand);color:var(--card-brand-ink);cursor:pointer}
+#apply-card:disabled{opacity:.45;cursor:not-allowed}
+#apply-card[aria-busy="true"]{cursor:progress}
+#apply-card[aria-busy="true"]::before{content:"";width:16px;height:16px;flex:0 0 16px;border-radius:50%;border:2px solid rgba(42,26,20,.28);border-top-color:currentColor;animation:card-spin .8s linear infinite}
+@keyframes card-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#apply-card[aria-busy="true"]::before{animation:none}}
+#card-status:empty{display:none}
+#card-status.ok{color:var(--card-ok)}
+html[data-part=form] header, html[data-part=form] #screen { display: none }
+html[data-part=form], html[data-part=form] body { height: auto; min-height: 0; background: #fafaf7; color: #2a1a14 }
+html[data-part=screen] #card-form { display: none }
+@media(max-width:520px){
+  .expiry{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .expiry label:last-child{grid-column:1 / -1}
+}
+html[data-theme="dark"] #card-form{
+  --card-bg:#241814;--card-surface:#2a1e19;--card-text:#fafaf7;--card-muted:#e4d5cc;
+  --card-border:rgba(250,250,247,.28);--card-error:#ffc7b8;--card-focus:#f4b942;
+  --card-brand:#f4b942;--card-brand-ink:#2a1a14;--card-invalid:#3a2420;--card-ok:#3dbe78;
+  color-scheme:dark
+}
+html[data-theme="dark"][data-part=form], html[data-theme="dark"][data-part=form] body{background:#241814;color:#fafaf7;color-scheme:dark}
+@media (prefers-color-scheme: dark){
+  html:not([data-theme="light"]) #card-form{
+    --card-bg:#241814;--card-surface:#2a1e19;--card-text:#fafaf7;--card-muted:#e4d5cc;
+    --card-border:rgba(250,250,247,.28);--card-error:#ffc7b8;--card-focus:#f4b942;
+    --card-brand:#f4b942;--card-brand-ink:#2a1a14;--card-invalid:#3a2420;--card-ok:#3dbe78;
+    color-scheme:dark
+  }
+  html:not([data-theme="light"])[data-part=form], html:not([data-theme="light"])[data-part=form] body{background:#241814;color:#fafaf7;color-scheme:dark}
+}
+</style>
+<script>
+  var viewerPart = new URLSearchParams(location.search).get('part');
+  if (viewerPart === 'form' || viewerPart === 'screen') document.documentElement.dataset.part = viewerPart;
+</script>
+<header>
+  <span id="status" role="status">Conectando / Connecting…</span>
+  <button id="reconnect" type="button">Reconectar / Reconnect</button>
+  <label>Teclado / Keyboard <input id="keyboard" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Teclado remoto / Remote keyboard"></label>
+  <button id="tab" type="button">Tab ↹</button>
+  <button id="backspace" type="button">⌫</button>
+</header>
+<form id="card-form" autocomplete="on">
+  <p id="card-hint">La usamos solo para este pago en Día. No queda guardada.</p>
+  <div class="kinds" id="kinds" role="radiogroup" aria-label="Tipo de tarjeta">
+    <label><input type="radio" name="kind" value="debit" checked><span id="lbl-debit">Débito</span></label>
+    <label><input type="radio" name="kind" value="credit"><span id="lbl-credit">Crédito</span></label>
+  </div>
+  <label>
+    <span id="lbl-pan">Número de tarjeta</span>
+    <input id="pan" name="pan" inputmode="numeric" autocomplete="cc-number" maxlength="23" spellcheck="false" aria-describedby="pan-error" aria-invalid="false">
+    <span id="pan-error" class="err" hidden></span>
+  </label>
+  <label>
+    <span id="lbl-holder">Nombre y apellido</span>
+    <input id="holder" name="holder" autocomplete="cc-name" maxlength="80" autocapitalize="words" aria-describedby="holder-error" aria-invalid="false">
+    <span id="holder-error" class="err" hidden></span>
+  </label>
+  <div class="expiry">
+    <label>
+      <span id="lbl-month">Mes</span>
+      <select id="month" name="month" autocomplete="cc-exp-month" aria-describedby="month-error" aria-invalid="false"></select>
+      <span id="month-error" class="err" hidden></span>
+    </label>
+    <label>
+      <span id="lbl-year">Año</span>
+      <select id="year" name="year" autocomplete="cc-exp-year" aria-describedby="year-error" aria-invalid="false"></select>
+      <span id="year-error" class="err" hidden></span>
+    </label>
+    <label>
+      <span class="lbl"><span id="lbl-cvv">Código de seguridad</span><span id="cvv-hint" class="field-hint">3 o 4 dígitos</span></span>
+      <input id="cvv" name="cvv" inputmode="numeric" autocomplete="cc-csc" maxlength="4" spellcheck="false" aria-describedby="cvv-error" aria-invalid="false">
+      <span id="cvv-error" class="err" hidden></span>
+    </label>
+  </div>
+  <p id="card-status" role="status" tabindex="-1"></p>
+  <button id="apply-card" type="button">Cargar en Día</button>
+</form>
+<div id="screen" aria-label="DIA checkout / Pago en DIA"></div>
+<script>window.viewerParents=__PARENTS__;</script>
+<script type="module" src="/viewer/viewer.js"></script>
+</html>

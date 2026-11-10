@@ -27,7 +27,7 @@ test('the trust sentence stays registered, and the shopper footer prints only th
   const ui = readFileSync(join(root, 'components/FounderTrust.tsx'), 'utf8');
 
   // The home footer prints the mark once and leaves the founder sentence off.
-  const footerStart = page.indexOf('<footer className="app-footer">');
+  const footerStart = page.indexOf('className="app-footer"');
   const footerEnd = page.indexOf('</footer>', footerStart);
   const footer = page.slice(footerStart, footerEnd);
   assert.ok(footerStart !== -1 && footerEnd !== -1);

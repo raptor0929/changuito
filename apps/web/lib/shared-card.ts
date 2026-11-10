@@ -134,3 +134,83 @@ export async function sharedCardIfMember(net: NetworkId, address: string): Promi
   if (!(await isSharedMember(net, address))) return null;
   return sharedCardFor(net);
 }
+
+/**
+ * The checkout sandbox's view of the same card. The shopper UI asks
+ * `cardAccess` and `checkoutMode` before it opens a run; the PAN stays here.
+ */
+export interface CheckoutCard {
+  pan: string;
+  cvv: string;
+  exp_month: string;
+  exp_year: string;
+  holder: string;
+  kind: 'debit' | 'credit';
+  network: string;
+}
+
+export function cardKind(brand: string | null | undefined): 'debit' | 'credit' {
+  return /cr[eé]dit/i.test(brand ?? '') ? 'credit' : 'debit';
+}
+
+export type CardAccess = 'mock' | 'ok' | 'no-card' | 'not-member';
+
+export function decideAccess(i: { mock: boolean; cardNetwork: string | undefined; member: boolean }): CardAccess {
+  if (i.mock) return 'mock';
+  if (!i.cardNetwork) return 'no-card';
+  return i.member ? 'ok' : 'not-member';
+}
+
+export type CheckoutMode = 'live' | 'demo' | 'mock';
+
+export function checkoutMode(access: CardAccess): CheckoutMode {
+  if (access === 'mock') return 'mock';
+  return access === 'ok' ? 'live' : 'demo';
+}
+
+export async function cardNetwork(env: NodeJS.ProcessEnv = process.env): Promise<string | undefined> {
+  if (!hasDatabase(env)) return undefined;
+  const rows = await db(env)`
+    select network from shared_card where network in ('testnet', 'mainnet')
+    order by (network = 'testnet') desc limit 1`;
+  return rows[0]?.network as string | undefined;
+}
+
+export async function isCardMember(network: string, address: string, env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  if (!hasDatabase(env)) return false;
+  try {
+    const rows = await db(env)`
+      select 1 from shared_card_member where network = ${network} and address = ${address}`;
+    return rows.length > 0;
+  } catch (err) {
+    console.error('[shared-card] member list unreadable; treating as not a member:', err instanceof Error ? err.name : err);
+    return false;
+  }
+}
+
+export async function cardAccess(address: string, mock: boolean): Promise<CardAccess> {
+  if (mock) return 'mock';
+  const net = await cardNetwork().catch(() => undefined);
+  return decideAccess({ mock, cardNetwork: net, member: net ? await isCardMember(net, address) : false });
+}
+
+export async function checkoutCardFor(address: string, env: NodeJS.ProcessEnv = process.env): Promise<CheckoutCard | undefined> {
+  if (!hasDatabase(env)) return undefined;
+  const rows = await db(env)`
+    select network, pan, cvv, exp_month, exp_year, holder, brand from shared_card
+    where network in ('testnet', 'mainnet')
+    order by (network = 'testnet') desc
+    limit 1`;
+  const r = rows[0];
+  if (!r) return undefined;
+  if (!(await isCardMember(r.network as string, address, env))) return undefined;
+  return {
+    pan: r.pan as string,
+    cvv: r.cvv as string,
+    exp_month: r.exp_month as string,
+    exp_year: r.exp_year as string,
+    holder: r.holder as string,
+    kind: cardKind(r.brand as string),
+    network: r.network as string,
+  };
+}

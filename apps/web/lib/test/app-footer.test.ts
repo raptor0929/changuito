@@ -14,7 +14,7 @@ test('the shopper footer is the mark, the privacy link and the language switch',
   assert.equal(COPYRIGHT_LINE.includes('Hecho en'), false);
 
   const page = readFileSync(join(root, 'app/page.tsx'), 'utf8');
-  const footerStart = page.indexOf('<footer className="app-footer">');
+  const footerStart = page.indexOf('className="app-footer"');
   const footerEnd = page.indexOf('</footer>', footerStart);
   const footer = page.slice(footerStart, footerEnd);
   assert.equal(footer.split('<LangToggle').length - 1, 1);

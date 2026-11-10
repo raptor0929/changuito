@@ -16,6 +16,8 @@ import {
   type Receipt,
   type StoredChat,
 } from '../lib/chat-store.ts';
+import { accountDecision, readOwner, wipeLocalAccount, writeOwner } from '../lib/local-account.ts';
+import { useWallet } from '../lib/use-wallet.ts';
 
 /**
  * What the two rails know, what the chat publishes into them, and where a
@@ -82,6 +84,13 @@ interface ShopValue {
   ack: () => void;
   historyOpen: boolean;
   setHistoryOpen: (open: boolean) => void;
+  /**
+   * Bumped by a Pagar outside the thread — the cart rail's. The payment
+   * dialog lives in Chat, which watches this and opens it over the current
+   * basket, the same way the card's own Pagar does.
+   */
+  payRequest: number;
+  requestPay: () => void;
 }
 
 const ShopContext = createContext<ShopValue | null>(null);
@@ -97,13 +106,42 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const [readOnly, setReadOnly] = useState(false);
   const [request, setRequest] = useState<ChatRequest | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [payRequest, setPayRequest] = useState(0);
+  const requestPay = useCallback(() => setPayRequest((n) => n + 1), []);
 
   // After hydration, never during render: reading storage while rendering
   // makes the server's HTML and the browser's first paint disagree, and React
   // throws the whole tree away to fix it. NetworkProvider.tsx does the same.
+  //
+  // And only once we know whose chats they are (lib/local-account.ts): a
+  // browser that last held another account's chats, or one that signed out,
+  // is wiped before anything is listed. A switch after they are on screen
+  // wipes and reloads, so no history, cart, receipt or postcode of the
+  // previous account survives in memory either.
+  const wallet = useWallet();
+  const [scoped, setScoped] = useState(false);
   useEffect(() => {
-    setChats(listChats());
-  }, []);
+    const decision = accountDecision({
+      ready: wallet.ready,
+      authenticated: wallet.authenticated,
+      address: wallet.address,
+      owner: readOwner(),
+    });
+    if (decision === 'wait') return;
+    if (decision === 'wipe') {
+      wipeLocalAccount();
+      if (scoped) {
+        if (wallet.address) writeOwner(wallet.address);
+        window.location.reload();
+        return;
+      }
+    }
+    if (wallet.address) writeOwner(wallet.address);
+    if (!scoped) {
+      setScoped(true);
+      setChats(listChats());
+    }
+  }, [wallet.ready, wallet.authenticated, wallet.address, scoped]);
 
   const publish = useCallback(
     ({ state, sessionId }: PublishInput) => {
@@ -219,10 +257,13 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       ack,
       historyOpen,
       setHistoryOpen,
+      payRequest,
+      requestPay,
     }),
     [
       chats, activeChatId, cart, handoffUrl, orderState, receipt, readOnly,
       publish, openChat, newChat, forgetChat, settle, request, ack, historyOpen,
+      payRequest, requestPay,
     ],
   );
 

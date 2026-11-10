@@ -1,10 +1,10 @@
-import { NEW_TAB_HINT } from '@changuito/trust';
 import { FounderTrust } from '@changuito/trust/ui';
 
 import { FOOTER, NAV, SOCIAL } from '../../lib/copy';
-import { PARTNERS } from '../../lib/partners';
+import { DELETION_FOOTER_LINKS, LEGAL_FOOTER_LINKS, SUPPORT_FOOTER_LINK } from '../../lib/legal';
 import { BrandLockup } from './brand-lockup';
 import { InstagramIcon, LinkedInIcon, XIcon } from './icons';
+import { PoweredBy } from './powered-by';
 
 import styles from './landing.module.css';
 
@@ -14,6 +14,12 @@ import styles from './landing.module.css';
  * other routes. trust=false skips the founder line on pages that already
  * show it above the fold.
  */
+const SOCIAL_ICONS = {
+  instagram: InstagramIcon,
+  linkedin: LinkedInIcon,
+  x: XIcon,
+} as const;
+
 export function SiteFooter({ navBase = '', trust = true }: { navBase?: string; trust?: boolean }) {
   return (
     <footer className={styles.footer} data-testid="landing-footer">
@@ -21,27 +27,6 @@ export function SiteFooter({ navBase = '', trust = true }: { navBase?: string; t
         <a className={styles.logoLink} href="/">
           <BrandLockup className={styles.footerBrand} />
         </a>
-        <div className={styles.powered} role="group" aria-labelledby="landing-powered-label" data-testid="landing-powered">
-          <span id="landing-powered-label" className={styles.poweredLabel} lang="en">
-            Powered by
-          </span>
-          <ul className={styles.poweredList}>
-            {PARTNERS.map((partner) => (
-              <li key={partner.id}>
-                <a
-                  className={partner.mono ? `${styles.poweredLink} ${styles.mono}` : `${styles.poweredLink} ${styles.color}`}
-                  href={partner.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`${partner.label} (${NEW_TAB_HINT})`}
-                  data-testid={`landing-powered-${partner.id}`}
-                >
-                  <img src={partner.src} alt="" width={partner.width} height={partner.height} decoding="async" />
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
         <div className={styles.footerMeta}>
           <nav aria-label="Pie" className={styles.footerNavWrap}>
             <ul className={styles.footerNav}>
@@ -57,6 +42,25 @@ export function SiteFooter({ navBase = '', trust = true }: { navBase?: string; t
                   Reportar un bug
                 </a>
               </li>
+              {LEGAL_FOOTER_LINKS.map((link) => (
+                <li key={link.href}>
+                  <a className={styles.footerLink} href={link.href} data-testid={link.testId}>
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+              {DELETION_FOOTER_LINKS.map((link) => (
+                <li key={link.href}>
+                  <a className={styles.footerLink} href={link.href} data-testid={link.testId}>
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+              <li>
+                <a className={styles.footerLink} href={SUPPORT_FOOTER_LINK.href} data-testid={SUPPORT_FOOTER_LINK.testId}>
+                  {SUPPORT_FOOTER_LINK.label}
+                </a>
+              </li>
               <li>
                 <a className={styles.footerLink} href="/">
                   {FOOTER.siteLabel}
@@ -65,26 +69,28 @@ export function SiteFooter({ navBase = '', trust = true }: { navBase?: string; t
             </ul>
           </nav>
           <ul className={styles.footerSocial} data-testid="landing-social">
-            {SOCIAL.map((link) => (
-              <li key={link.href}>
-                <a
-                  className={styles.socialLink}
-                  href={link.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={link.ariaLabel}
-                  data-testid={`landing-social-${link.icon}`}
-                >
-                  {link.icon === 'instagram' ? <InstagramIcon className={styles.socialIcon} /> : null}
-                  {link.icon === 'x' ? <XIcon className={styles.socialIcon} /> : null}
-                  {link.icon === 'linkedin' ? <LinkedInIcon className={styles.socialIcon} /> : null}
-                  <span>{link.label}</span>
-                </a>
-              </li>
-            ))}
+            {SOCIAL.map((link) => {
+              const Icon = SOCIAL_ICONS[link.icon];
+              return (
+                <li key={link.href}>
+                  <a
+                    className={styles.socialLink}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={link.ariaLabel}
+                    data-testid={`landing-social-${link.icon}`}
+                  >
+                    <Icon className={styles.socialIcon} />
+                    <span>{link.label}</span>
+                  </a>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </div>
+      <PoweredBy />
       <p className={styles.fine}>{FOOTER.legal}</p>
       {trust ? <FounderTrust className={styles.fine} /> : null}
     </footer>

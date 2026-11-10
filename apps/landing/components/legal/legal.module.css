@@ -1,0 +1,210 @@
+/* Legal pages: light by default, dark with prefers-color-scheme.
+   Contrast (WCAG AA): ink #2a1a14 on paper #fafaf7 15.9:1; soft #5c534c 7.2:1.
+   Dark: #f3ece4 on #1c1310 15.6:1; soft #cbbfb3 10.1:1; link sun #f4b942 9.6:1. */
+.page {
+  --ink: #2a1a14;
+  --ink-soft: #5c534c;
+  --paper: #fafaf7;
+  --card: #ffffff;
+  --line: rgba(42, 26, 20, 0.14);
+  --link: #2a1a14;
+  --accent: #f4b942;
+  min-height: 100dvh;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+}
+
+@media (prefers-color-scheme: dark) {
+  .page {
+    --ink: #f3ece4;
+    --ink-soft: #cbbfb3;
+    --paper: #1c1310;
+    --card: #2a1a14;
+    --line: rgba(243, 236, 228, 0.18);
+    --link: #f4b942;
+    --accent: #f4b942;
+  }
+}
+
+.page :focus {
+  outline: none;
+}
+
+.page :focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.skip {
+  position: absolute;
+  left: 16px;
+  top: 12px;
+  z-index: 10;
+  transform: translateY(-200%);
+  background: #f4b942;
+  color: #2a1a14;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.skip:focus {
+  transform: none;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.header {
+  background: #f4b942;
+  color: #2a1a14;
+  border-bottom: 1px solid var(--line);
+}
+
+.headerInner {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.header .brand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: #2a1a14;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.header .switch {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 2px solid #2a1a14;
+  border-radius: 999px;
+  color: #2a1a14;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.header :focus-visible {
+  outline-color: #2a1a14;
+}
+
+.main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 16px 48px;
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: clamp(2rem, 6vw, 2.75rem);
+  line-height: 1.15;
+  font-weight: 800;
+}
+
+.updated {
+  margin: 0 0 24px;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.intro {
+  font-size: 1.125rem;
+}
+
+.toc {
+  margin: 24px 0 8px;
+  padding: 16px 20px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.tocTitle {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.tocList {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.tocList a {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  min-height: 44px;
+}
+
+.page a {
+  color: var(--link);
+  text-underline-offset: 3px;
+}
+
+.section {
+  scroll-margin-top: 16px;
+}
+
+.heading {
+  margin: 32px 0 8px;
+  font-size: 1.375rem;
+  line-height: 1.3;
+}
+
+.section p {
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
+}
+
+.section a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.footer {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  align-items: center;
+}
+
+.footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+}
+
+.fine {
+  flex-basis: 100%;
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}

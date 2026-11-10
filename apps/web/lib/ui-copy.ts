@@ -88,6 +88,26 @@ export interface WalletCopy {
   cardAria: string;
   purchasesAria: string;
   signOutAria: string;
+  /** Short label on the phone-account button. */
+  phoneCta: string;
+  /** Spoken name: which account the button signs in. */
+  phoneAria: string;
+  /** While the phone account sheet is open. */
+  nativeBusy: string;
+  /** Android: one sentence for the three ways in. Read, not always shown. */
+  androidLead: string;
+  emailCta: string;
+  emailAria: string;
+  googleCta: string;
+  googleAria: string;
+  /** Visible label on the phone-account button. English says "Connect wallet". */
+  connectCta: string;
+  connectAria: string;
+  /** Shown once an email or Google session can still attach the phone account. */
+  linkCta: string;
+  linkAria: string;
+  /** After Salir, until the next attempt. */
+  signedOut: string;
 }
 
 export interface PaymentCopy {
@@ -159,6 +179,10 @@ export interface ChatCopy {
   /** Mic control. The stop label replaces it while dictation is open. */
   voice: string;
   voiceStop: string;
+  /** Builds the cart from the conversation already on screen. */
+  buildCart: string;
+  /** The message that click sends, in this language. */
+  buildCartAsk: string;
   /** Shown while the recognizer is open, under the composer. */
   listening: string;
   attach: string;
@@ -247,7 +271,7 @@ const ES: UiCopy = {
     aria: 'Carrito',
     title: 'Tu changuito',
     total: 'Total',
-    payCta: 'Pagá con USDC',
+    payCta: 'Proceder al pago',
     openAt: (store) => `Abrir en ${store}`,
     oosOne: '1 producto quedó sin stock.',
     oosMany: (n) => `${n} productos quedaron sin stock.`,
@@ -297,6 +321,19 @@ const ES: UiCopy = {
     cardAria: 'Mi tarjeta',
     purchasesAria: 'Mis compras',
     signOutAria: 'Salir',
+    phoneCta: 'Teléfono',
+    phoneAria: 'Entrar con la cuenta de este teléfono',
+    nativeBusy: 'Entrando…',
+    androidLead: 'Entrá con email, con Google, o con la cuenta de este teléfono.',
+    emailCta: 'Email',
+    emailAria: 'Continuar con email',
+    googleCta: 'Google',
+    googleAria: 'Continuar con Google',
+    connectCta: 'Conectar cuenta',
+    connectAria: 'Conectar cuenta de este teléfono',
+    linkCta: 'Conectar cuenta',
+    linkAria: 'Conectar cuenta de este teléfono para firmar',
+    signedOut: 'Saliste. Cuando quieras, volvé a entrar.',
   },
   payment: {
     aria: 'Confirmar el pago',
@@ -362,6 +399,8 @@ const ES: UiCopy = {
     send: 'Enviar',
     voice: 'Buscar por voz',
     voiceStop: 'Parar el dictado',
+    buildCart: 'Armar carrito',
+    buildCartAsk: 'Armá el carrito con lo que charlamos y mostrame el pedido listo para pagar.',
     listening: 'Escuchando… hablá y lo busco.',
     attach: 'Adjuntar una imagen',
     camera: 'Sacar una foto',
@@ -383,15 +422,15 @@ const ES: UiCopy = {
     placeholders: [
       {
         long: '¿Qué necesitás del súper? Contanos para cuántos cocinás y te armamos la lista de lo que necesitás.',
-        short: '¿Qué necesitás del súper y para cuántos?',
+        short: '¿Qué necesitás del súper?',
       },
       {
         long: '¿Asado, milanesas o algo light? Decime para cuántos y Changuito arma la lista.',
-        short: '¿Asado, milanesas o algo light?',
+        short: '¿Asado o algo light?',
       },
       {
         long: 'Contame la receta y para cuántos cocinás. Yo me encargo del súper.',
-        short: 'Decime qué cocinás y para cuántos.',
+        short: '¿Qué cocinás y para cuántos?',
       },
       {
         long: '¿Semana laboral o juntada? Decime cuántos son y qué comen, y armamos el carrito.',
@@ -443,7 +482,7 @@ const EN: UiCopy = {
     // would rename the product on one of the two screens it appears on.
     title: 'Your changuito',
     total: 'Total',
-    payCta: 'Pay with USDC',
+    payCta: 'Proceed to checkout',
     openAt: (store) => `Open in ${store}`,
     oosOne: '1 item went out of stock.',
     oosMany: (n) => `${n} items went out of stock.`,
@@ -495,6 +534,19 @@ const EN: UiCopy = {
     cardAria: 'My card',
     purchasesAria: 'My purchases',
     signOutAria: 'Sign out',
+    phoneCta: 'Phone',
+    phoneAria: 'Sign in with the account on this phone',
+    nativeBusy: 'Signing in…',
+    androidLead: 'Continue with email, with Google, or with the account on this phone.',
+    emailCta: 'Email',
+    emailAria: 'Continue with email',
+    googleCta: 'Google',
+    googleAria: 'Continue with Google',
+    connectCta: 'Connect wallet',
+    connectAria: 'Connect wallet on this phone',
+    linkCta: 'Connect wallet',
+    linkAria: 'Connect wallet on this phone to sign',
+    signedOut: 'You signed out. You can sign in again whenever you want.',
   },
   payment: {
     aria: 'Confirm the payment',
@@ -558,6 +610,8 @@ const EN: UiCopy = {
     send: 'Send',
     voice: 'Search by voice',
     voiceStop: 'Stop dictation',
+    buildCart: 'Build cart',
+    buildCartAsk: 'Build the cart from what we discussed and show me the order ready to pay.',
     listening: "Listening… speak and I'll search.",
     attach: 'Attach an image',
     camera: 'Take a photo',
@@ -581,19 +635,19 @@ const EN: UiCopy = {
     placeholders: [
       {
         long: 'What do you need from the store? Tell us how many you cook for and we put the list together.',
-        short: 'What do you need, and for how many?',
+        short: 'What do you need today?',
       },
       {
         long: 'A roast, milanesas or something light? Say how many and Changuito makes the list.',
-        short: 'A roast, milanesas or something light?',
+        short: 'A roast or something light?',
       },
       {
         long: 'Tell me the recipe and how many you cook for. I take care of the store.',
-        short: 'Tell me what you are cooking, and for how many.',
+        short: 'Cooking what, for how many?',
       },
       {
         long: 'A work week or a get-together? Say how many and what they eat, and we fill the trolley.',
-        short: 'A work week or a get-together?',
+        short: 'Work week or get-together?',
       },
     ],
   },

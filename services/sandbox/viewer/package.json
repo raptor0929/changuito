@@ -1,0 +1,7 @@
+{
+  "name": "changuito-sandbox-viewer",
+  "private": true,
+  "scripts": { "build": "esbuild viewer.js --bundle --format=esm --outfile=dist/viewer.js --minify" },
+  "dependencies": { "@novnc/novnc": "1.7.0" },
+  "devDependencies": { "esbuild": "0.28.2" }
+}

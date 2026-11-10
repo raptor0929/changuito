@@ -1,18 +1,19 @@
+import { PUBLIC_LEGAL } from '@changuito/trust';
+
+import { BetaOnboarding } from '../components/BetaOnboarding';
 import { Chat } from '../components/Chat';
 import { Deck } from '../components/Deck';
-import { HistoryToggle } from '../components/HistoryToggle';
 import { HumanGate } from '../components/HumanGate';
 import { LangProvider } from '../components/LangProvider';
 import { LangToggle } from '../components/LangToggle';
 import { NetworkProvider } from '../components/NetworkProvider';
 import { ShopProvider } from '../components/ShopProvider';
+import { TopBar } from '../components/TopBar';
 import { WalletProvider } from '../components/WalletProvider';
-import { WalletWidget } from '../components/WalletWidget';
 import { COPYRIGHT_LINE } from '../lib/founder-trust-copy';
 import { turnstileSiteKey } from '../lib/human-gate';
 import { inLang } from '../lib/lang.ts';
 import { langFromCookie } from '../lib/lang-server.ts';
-
 // The site key has to be read per request. A static prerender baked siteKey:""
 // and the widget never appeared, even after the env var existed at runtime.
 export const dynamic = 'force-dynamic';
@@ -33,65 +34,40 @@ export default async function Home() {
       <NetworkProvider>
         <WalletProvider>
           <ShopProvider>
+            {/* Above the deck and outside it: the bar spans the window at
+                every width, including the three-column one. */}
+            <TopBar />
             <Deck>
               <main className="shell">
+                {/* The wordmark and the wallet moved up into the bar; what is
+                    left here is the one sentence that says what this is. */}
                 <header className="masthead">
-                  <div className="brand">
-                    {/* First, so a keyboard lands on the way into the history
-                        before the way into the chat. Renders nothing at the wide
-                        breakpoint, where the rail is already a column. */}
-                    <HistoryToggle />
-                    {/* No mark here. The mascot is already in the corner of the
-                        cart rail, a few hundred pixels away and at the same size,
-                        and two of the same drawing on one screen read as a
-                        mistake rather than as branding. The wordmark carries the
-                        name on its own. */}
-                    <div className="brand-copy">
-                      {/* The name is text, not only an alt: tools that read a
-                          heading's text content (crawlers, some audits) saw an
-                          empty h1. The image is then decorative, so it is not read
-                          twice. */}
-                      <h1 className="brand-name">
-                        <span className="sr-only">Changuito</span>
-                        <img
-                          className="brand-wordmark"
-                          src="/brand/wordmark.png"
-                          alt=""
-                          aria-hidden="true"
-                          width={1097}
-                          height={249}
-                        />
-                      </h1>
-                      {/* Rendered on the server, so LangToggle reaches it
-                          through router.refresh() and not through the
-                          context. See that component. */}
-                      <p className="tagline">
-                        {inLang(lang, {
-                          es: 'Contale a Changuito lo que necesitás y dejá que se encargue de planear todo.',
-                          en: 'Tell Changuito what you need and let it take care of the planning.',
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                  <WalletWidget />
+                  {/* Rendered on the server, so LangToggle reaches it through
+                      router.refresh() and not through the context. See that
+                      component. */}
+                  <p className="tagline">
+                    {inLang(lang, {
+                      es: 'Contale a Changuito lo que necesitás y dejá que se encargue de planear todo.',
+                      en: 'Tell Changuito what you need and let it take care of the planning.',
+                    })}
+                  </p>
                 </header>
+                <BetaOnboarding />
                 <HumanGate siteKey={siteKey}>
                   <Chat />
                 </HumanGate>
-                <footer className="app-footer">
-                  <ul className="app-footer-line">
-                    <li className="app-footer-copy" data-testid="app-copyright">
-                      {COPYRIGHT_LINE}
-                    </li>
-                    <li>
-                      <a className="app-legal" href="/privacidad" data-testid="app-privacy">
-                        {inLang(lang, { es: 'Privacidad', en: 'Privacy' })}
-                      </a>
-                    </li>
-                    <li>
-                      <LangToggle />
-                    </li>
-                  </ul>
+                <footer className="app-footer" data-testid="app-footer">
+                  <span className="app-footer-copy">{COPYRIGHT_LINE}</span>
+                  <a className="app-legal" href="/privacidad">
+                    {inLang(lang, { es: 'Privacidad', en: 'Privacy' })}
+                  </a>
+                  <a className="app-legal" href={inLang(lang, PUBLIC_LEGAL.terms)}>
+                    {inLang(lang, { es: 'Términos', en: 'Terms' })}
+                  </a>
+                  <a className="app-legal" href={inLang(lang, PUBLIC_LEGAL.deletion)}>
+                    {inLang(lang, { es: 'Eliminar cuenta', en: 'Delete account' })}
+                  </a>
+                  <LangToggle />
                 </footer>
               </main>
             </Deck>
