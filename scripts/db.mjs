@@ -9,6 +9,7 @@
  *
  *   node scripts/db.mjs migrate     apply supabase/migrations/*.sql, in order
  *   node scripts/db.mjs status      what is applied, and what is pending
+ *   node scripts/db.mjs check       exit 1 when a file is pending; applies nothing
  *   node scripts/db.mjs psql <sql>  one statement, for inspection
  *
  * Migrations run over DIRECT_URL (5432). The pooler on 6543 is transaction
@@ -88,6 +89,26 @@ async function migrate(sql) {
   }
 }
 
+async function check(sql) {
+  // Read only. A missing ledger means nothing has been applied; creating it
+  // here would be a write the build is not allowed to make.
+  const found = await sql`select to_regclass('public.schema_migrations') as rel`;
+  const done = new Set();
+  if (found[0]?.rel) {
+    for (const row of await sql`select name from schema_migrations`) done.add(row.name);
+  }
+  const pending = files().filter((name) => !done.has(name));
+  for (const name of files()) console.log(`${done.has(name) ? 'applied ' : 'PENDING '} ${name}`);
+  if (pending.length === 0) {
+    console.log('Nothing to apply.');
+    return;
+  }
+  console.error(
+    `${pending.length} migration(s) pending. A person runs npm run db:migrate; the build does not apply SQL.`,
+  );
+  process.exitCode = 1;
+}
+
 async function status(sql) {
   await ensureLedger(sql);
   const done = new Set((await sql`select name from schema_migrations`).map((r) => r.name));
@@ -103,9 +124,10 @@ const { sql, at } = connect();
 try {
   if (cmd === 'migrate') await migrate(sql);
   else if (cmd === 'status') await status(sql);
+  else if (cmd === 'check') await check(sql);
   else if (cmd === 'psql') console.table(await sql.unsafe(rest.join(' ')));
   else {
-    console.error('usage: node scripts/db.mjs migrate|status|psql <sql>');
+    console.error('usage: node scripts/db.mjs migrate|status|check|psql <sql>');
     process.exitCode = 1;
   }
 } catch (err) {

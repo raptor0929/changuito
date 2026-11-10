@@ -19,13 +19,8 @@ const publicEnv = Object.fromEntries(
 
 // Which Postgres this Worker reaches is a decision, not a default: the
 // database is a privacy boundary between the two apps. No id, no binding, and
-// the app runs without a database the way a fresh clone does — except on
-// Workers Builds, where a deploy without it would ship a production app with
-// no database, so it stops there instead.
+// the app runs without a database the way a fresh clone does.
 const hyperdriveId = process.env.CHG_HYPERDRIVE_ID?.trim();
-if (!hyperdriveId && process.env.WORKERS_CI === "1") {
-  throw new Error("CHG_HYPERDRIVE_ID is not set as a build variable: refusing to deploy without the database.");
-}
 
 export default defineConfig({
   worker: defineWorker({

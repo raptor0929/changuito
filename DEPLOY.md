@@ -154,12 +154,12 @@ that file. `next build` keeps working for local checks.
 | Builds for non-production branches | off |
 | API token | the one Workers Builds creates. The deploy reads it from `CLOUDFLARE_API_TOKEN`, so nothing logs in interactively |
 
-The build command compiles `packages/mcp`, runs the Vite build, and then
-applies the database migrations (`scripts/migrate-on-build.mjs` →
-`scripts/db.mjs migrate`). Migrations are idempotent: every applied file is
-recorded in `schema_migrations` in the same transaction, so a rebuild applies
-nothing. The deploy command uploads that build (`--skip-build`), so run it
-only after the build command.
+The build command compiles `packages/mcp` and runs the Vite build. It does
+not read `DIRECT_URL` and it applies no SQL. A person runs `npm run db:migrate`
+on a machine that has that URL when the schema should change; that command is
+the approval, including for a migration that drops or rewrites something. The
+deploy command uploads the build (`--skip-build`), so run it only after the
+build command.
 
 **Build variables and secrets.** `NEXT_PUBLIC_*` is inlined into the bundle
 at build time, so it is set here, not under the Worker's runtime variables:
@@ -168,13 +168,15 @@ at build time, so it is set here, not under the Worker's runtime variables:
 |---|---|---|
 | `NEXT_PUBLIC_POLLAR_API_KEY` | variable | the **testnet** Pollar publishable key |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | variable | the Turnstile site key for `app.changuito.me` |
-| `CHG_HYPERDRIVE_ID` | variable | **required**: the Stellar Hyperdrive config (`changuito-ste`), bound as `HYPERDRIVE`. Without it the build fails on Workers Builds |
-| `DIRECT_URL` | **secret** | **required**: the Stellar Supabase connection for migrations, on port 5432. Use the *session pooler* host, because Supabase's direct host is IPv6-only and a build machine may not reach it. Without it the build fails on Workers Builds |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID`, `NEXT_PUBLIC_META_PIXEL_ID`, `NEXT_PUBLIC_CLARITY_PROJECT_ID` | variable | optional |
 
+`CHG_HYPERDRIVE_ID` and `DIRECT_URL` are not build settings. Without the
+Hyperdrive id the Worker deploys with no database binding and the app runs
+the way a fresh clone does. `DIRECT_URL` stays on the laptop that runs
+`npm run db:migrate`.
+
 Never set `NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` there: whatever it holds is
-inlined. On a local machine the same names can come from the shell; a local
-`build:vinext` with no `DIRECT_URL` in the environment skips the migration.
+inlined. On a local machine the same public names can come from the shell.
 
 **Worker secrets** (`changuito-web` → Settings → Variables and Secrets, type
 *Secret*). Same names and meanings as the tables in
@@ -389,6 +391,7 @@ npm run db:invariants  # the constraints, against the real database
 ```
 
 5. In Vercel, set **`DATABASE_URL` only**. Migrations are a laptop operation.
+   Workers Builds does not run them and does not need `DIRECT_URL`.
 
 **The 6543/5432 difference is the part that fails only under load**, which is
 why it is spelled out here rather than left to the connection-string picker.
