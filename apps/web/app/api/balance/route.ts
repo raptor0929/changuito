@@ -26,6 +26,19 @@
  * balance lives in contract storage and not on any Horizon account, and a
  * network whose USDC has no issuer at all.
  *
+ * ## The balance is the money the checkout spends
+ *
+ * The paragraph above is still true of a network with no token, and it was
+ * applied to one that has one. Testnet has a classic USDC issuer *and* a
+ * Soroban token: the faucet mints the token and the escrow the checkout opens
+ * is denominated in it, while this route read the classic trustline. A shopper
+ * topped up twice, watched the number stay at zero, and was told at checkout
+ * that the balance was short of money they were holding.
+ *
+ * So where a token is deployed, the token is what is read, for every kind of
+ * holder. The classic line is the answer only where there is no token, which
+ * is the mainnet case the paragraph above was written for.
+ *
  * ## There is no `funded` field, and its absence is the decision
  *
  * There was one. It meant "holds at least MIN_XLM, so it can pay a fee", and
@@ -51,6 +64,7 @@
  * `tx_insufficient_fee`; the honest answer then is to bring the field back,
  * not to widen the error copy.
  */
+import { contractIds } from '../../../lib/contract-ids.ts';
 import type { NetworkId } from '../../../lib/deployments.ts';
 import { requireHuman } from '../../../lib/human-gate.ts';
 import { networkNotServed, requestNetwork } from '../../../lib/server-network.ts';
@@ -101,25 +115,37 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   const asset = usdcAsset(network);
+  // Derived from the deployment itself, not from the network's name: a
+  // network has a token to read exactly when one is recorded for it.
+  const escrowToken = Boolean(contractIds(network).usdcId);
 
   try {
+    // The token read is started first and awaited second, so it runs beside
+    // the Horizon one rather than after it.
+    const tokenRead = escrowToken ? usdcBalance(address, network) : null;
+    // Awaited below; a Horizon failure must not leave this one unhandled.
+    tokenRead?.catch(() => undefined);
+
     // The whole Horizon account rather than just its XLM: the trustline and
-    // the USDC on it come out of the same answer, and asking separately would
-    // be three round trips for one read.
+    // the classic USDC on it come out of the same answer, and asking
+    // separately would be three round trips for one read.
     const balances = kind === 'account' ? await accountBalances(address, network) : null;
     const xlm = balances === null ? null : (balances.find((b) => b.asset_type === 'native')?.balance ?? '0');
 
-    // A G-address holding a classic asset: the number is on the line Horizon
-    // just returned, and zero for an account with no such line is the honest
-    // answer rather than a failure — that is the normal state of a wallet that
-    // has only just signed in.
+    // Where a token is deployed, the token is the balance: see "The balance
+    // is the money the checkout spends" above.
     //
-    // Anything else has to ask the token. A contract holder keeps its balance
-    // in contract storage, and a network whose USDC has no issuer has no
-    // trustline to read. Both throw where no token is deployed, which is
-    // caught below and is the truth: on that combination we cannot know.
-    const usdc =
-      kind === 'account' && asset
+    // Otherwise, a G-address holding a classic asset: the number is on the
+    // line Horizon just returned, and zero for an account with no such line is
+    // the honest answer rather than a failure — that is the normal state of a
+    // wallet that has only just signed in.
+    //
+    // What is left is a contract holder on a network with no token, which
+    // throws in `usdcBalance`, is caught below, and is the truth: on that
+    // combination we cannot know.
+    const usdc = tokenRead
+      ? await tokenRead
+      : kind === 'account' && asset
         ? classicBalance(balances, asset.code, asset.issuer)
         : await usdcBalance(address, network);
 
