@@ -1,5 +1,8 @@
 import { signWalletProof, type WalletSigner } from './wallet-proof.ts';
 
+/** What `fetchAs` asks for. On this chain that is the wallet signer, not a bearer token. */
+export type TokenSource = WalletSigner;
+
 /**
  * Mint the httpOnly `chg_user` cookie that lifts the guest turn limit.
  *

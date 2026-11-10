@@ -36,3 +36,20 @@ export const TRUST_LINE = `${COPYRIGHT_LINE}${TRUST_SEPARATOR}${FOUNDER_SENTENCE
 
 /** Spoken after each name. The visible label stays the name itself. */
 export const NEW_TAB_HINT = 'se abre en una pestaña nueva';
+
+/**
+ * Temporary support address until a Changuito workspace mailbox exists.
+ * Legal pages, the account-deletion page and the landing footer all read
+ * this one constant.
+ */
+export const SUPPORT_EMAIL = 'contact@simonethg.com';
+
+/** Marketing site. The public legal and account-deletion pages live here. */
+export const PUBLIC_SITE_URL = 'https://www.changuito.me';
+
+/** Absolute URLs for the pages a store listing links to. */
+export const PUBLIC_LEGAL = {
+  terms: { en: `${PUBLIC_SITE_URL}/terms`, es: `${PUBLIC_SITE_URL}/terminos` },
+  privacy: { en: `${PUBLIC_SITE_URL}/privacy`, es: `${PUBLIC_SITE_URL}/privacidad` },
+  deletion: { en: `${PUBLIC_SITE_URL}/delete-account`, es: `${PUBLIC_SITE_URL}/eliminar-cuenta` },
+} as const;

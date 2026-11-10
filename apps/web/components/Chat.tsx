@@ -1,6 +1,5 @@
 'use client';
 
-import { usePollar } from '@pollar/react';
 import { useEffect, useRef, useState } from 'react';
 
 import type { Cart } from '@changuito/mcp/types';
@@ -20,22 +19,17 @@ import {
   loginGateBannerText,
   loginRequiredMessage,
 } from '../lib/login-constants';
-import type { OpenedOrder } from '../lib/order.ts';
-import { pollarEnabled } from '../lib/pollar';
-import { ensureUserCookie } from '../lib/session-login';
-import { formatUsdc } from '../lib/stellar.ts';
+import { ensureUserCookie, type TokenSource } from '../lib/session-login';
 import { storeOrderUrl, storeOrdersUrl } from '../lib/storefront.ts';
 import { progressCopy } from '../lib/turn-progress.ts';
 import { uiCopy } from '../lib/ui-copy.ts';
 import { useChat } from '../lib/use-chat';
-import { useWalletSigner } from '../lib/use-wallet-signer.ts';
-import type { WalletSigner } from '../lib/wallet-proof.ts';
+import { useWallet } from '../lib/use-wallet.ts';
 import { CartCard } from './CartCard';
 import { useLang } from './LangProvider';
 import { useNetwork } from './NetworkProvider';
 import { CameraIcon, ImageIcon, MicIcon, RetryIcon } from './icons';
 import { CheckoutModal } from './CheckoutModal';
-import { OrderPanel } from './OrderPanel';
 import { ProductGrid } from './ProductGrid';
 import { useShop } from './ShopProvider';
 import { MarkdownText } from './MarkdownText';
@@ -61,7 +55,8 @@ const VOICE_NOTE: Record<DictationError, 'voiceUnsupported' | 'voiceDenied' | 'v
  *
  * Each prompt has a short twin for phones. The long ones run four lines in a
  * 390px field, which is past the height cap, so an empty box showed a
- * scrollbar and a sentence cut in half. The short ones fit two lines at 360px.
+ * scrollbar and a sentence cut in half. The short ones fit one line at 360px
+ * (with the 14px phone placeholder, globals.css), so the field stays one line.
  * Both halves live in `ui-copy.ts`, in both languages.
  */
 function useComposerPlaceholder(lang: Lang): string {
@@ -79,15 +74,16 @@ function useComposerPlaceholder(lang: Lang): string {
 }
 
 export function Chat() {
-  // Same split as WalletWidget: usePollar only mounts inside a real provider.
-  return pollarEnabled ? <ChatWithPollar /> : <ChatCore />;
-}
-
-function ChatWithPollar() {
-  const { isAuthenticated, openLoginModal, wallet } = usePollar();
-  const sign = useWalletSigner();
-  const address = isAuthenticated ? (wallet?.address ?? null) : null;
-  return <ChatCore isAuthenticated={isAuthenticated} openLoginModal={openLoginModal} address={address} sign={sign} />;
+  const wallet = useWallet();
+  if (!wallet.enabled) return <ChatCore />;
+  return (
+    <ChatCore
+      isAuthenticated={wallet.authenticated && Boolean(wallet.address)}
+      openLoginModal={wallet.login}
+      address={wallet.address}
+      sign={wallet.accessToken}
+    />
+  );
 }
 
 function ChatCore({
@@ -99,8 +95,8 @@ function ChatCore({
   isAuthenticated?: boolean;
   address?: string | null;
   openLoginModal?: () => void;
-  /** The wallet's SEP-53 signer. Absent in a build without Pollar. */
-  sign?: WalletSigner;
+  /** The Pollar SEP-53 signer. Absent in a build without Pollar. */
+  sign?: TokenSource;
 }) {
   const { network } = useNetwork();
   const lang = useLang();
@@ -123,8 +119,6 @@ function ChatCore({
   // The basket the payment modal is open over. A cart, not a block id: the
   // user pays for what a card showed, and that object is the record of it.
   const [paying, setPaying] = useState<{ cart: Cart; handoffUrl?: string } | null>(null);
-  // Escrow `open` succeeded: money is locked until settle/refund on OrderPanel.
-  const [opened, setOpened] = useState<OpenedOrder | null>(null);
   const thread = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
 
@@ -139,6 +133,18 @@ function ChatCore({
     publish({ state, sessionId: currentSessionId() });
   }, [publish, state, currentSessionId]);
 
+  // The cart rail's Pagar (ShopProvider.requestPay): the same dialog, over the
+  // basket as it is now. Keyed on the counter so a re-render does not reopen it.
+  const payRequest = shop?.payRequest ?? 0;
+  const seenPay = useRef(payRequest);
+  useEffect(() => {
+    if (payRequest === seenPay.current) return;
+    seenPay.current = payRequest;
+    if (!shop?.canOrder || !shop.cart) return;
+    track('payment_start', { flow: 'rail' });
+    setPaying({ cart: shop.cart, handoffUrl: shop.handoffUrl ?? undefined });
+  }, [payRequest, shop]);
+
   // The provider asks, this answers. Both halves of a restore land together —
   // transcript and session id — which is the whole point of CLAUDE.md §4.
   const request = shop?.request;
@@ -151,7 +157,6 @@ function ChatCore({
     setPhoto(null);
     setPhotoNote(null);
     setPaying(null);
-    setOpened(null);
     ack();
   }, [request, ack, resume, reset]);
 
@@ -185,7 +190,7 @@ function ChatCore({
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [state.blocks]);
 
-  // After Pollar login, drop the guest latch and any soft-limit line already
+  // After login, drop the guest latch and any soft-limit line already
   // written into the transcript. The banner also keys off isAuthenticated, so
   // a signed-in shopper never keeps the red gate for this render.
   useEffect(() => {
@@ -378,6 +383,22 @@ function ChatCore({
     if (gated && !sawGate.current) track('search_limit_hit');
     sawGate.current = gated;
   }, [gated]);
+
+  // cart_built: once per cart block that arrives in this tab. Carts already
+  // on screen at first render (a restored chat) are not new.
+  const seenCarts = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const ids = state.blocks.filter((b) => b.kind === 'cart').map((b) => b.id);
+    if (!seenCarts.current) {
+      seenCarts.current = new Set(ids);
+      return;
+    }
+    for (const id of ids) {
+      if (seenCarts.current.has(id)) continue;
+      seenCarts.current.add(id);
+      track('cart_built');
+    }
+  }, [state.blocks]);
 
   const seenError = useRef<string | null>(null);
   useEffect(() => {
@@ -595,6 +616,17 @@ function ChatCore({
           </button>
         )}
         <div className="composer-tools">
+          {state.blocks.length > 0 ? (
+            <button
+              type="button"
+              className="btn btn-ghost composer-tool"
+              data-testid="composer-build-cart"
+              disabled={state.streaming || gated || readOnly}
+              onClick={() => submit(copy.buildCartAsk)}
+            >
+              {copy.buildCart}
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn-ghost composer-tool"
@@ -674,6 +706,7 @@ function ChatCore({
       {paying ? (
         <CheckoutModal
           cart={paying.cart}
+          location={state.snapshot?.location}
           handoffUrl={paying.handoffUrl}
           // The chat the server knows, which is the one `archiveChat` wrote —
           // `publish` files the record under the agent's session id, so this
@@ -688,31 +721,7 @@ function ChatCore({
             setPaying(null);
             shop?.settle(receipt);
           }}
-          onOpened={(order) => {
-            const cart = paying.cart;
-            setPaying(null);
-            setOpened(order);
-            // Lock the chat the same way the deposit rail does: Pagar on a
-            // paid card would invite a second open against the same basket.
-            shop?.settle({
-              orderId: order.orderId,
-              retailer: order.retailer,
-              paidDisplay: `${formatUsdc(BigInt(order.amountUnits))} USDC`,
-              paidAt: Date.now(),
-              lines: cart.lines
-                .filter((l) => l.available)
-                .map((l) => ({
-                  name: l.name,
-                  quantity: l.quantity,
-                  lineTotal: l.lineTotal.display,
-                })),
-              total: order.totalDisplay,
-            });
-          }}
         />
-      ) : null}
-      {opened ? (
-        <OrderPanel order={opened} sign={sign} onDismiss={() => setOpened(null)} />
       ) : null}
     </div>
   );
@@ -725,7 +734,7 @@ function ChatCore({
  * carried through storage untouched. Nothing here is recomputed from a number
  * now: a receipt that re-prices itself when a rate moves is not a receipt.
  */
-function ReceiptCard({ receipt }: { receipt: Receipt }) {
+export function ReceiptCard({ receipt }: { receipt: Receipt }) {
   const lang = useLang();
   const copy = uiCopy(lang).chat;
   // The order's own page when the store named it, the orders list when it did

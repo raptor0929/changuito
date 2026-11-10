@@ -20,8 +20,8 @@ import { useShop } from './ShopProvider';
  * the shell un-fix into the middle grid cell. See globals.css.
  *
  * The drawer's open state is in ShopProvider, not here: the button that opens
- * it sits in the masthead, which is inside `children`, so this component is
- * below the two of them rather than above both.
+ * it sits in the top bar, which is a sibling of this one, so the state lives
+ * above the two of them.
  */
 export function Deck({ children }: { children: ReactNode }) {
   const shop = useShop();

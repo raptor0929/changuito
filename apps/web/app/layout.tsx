@@ -21,6 +21,7 @@ export const viewport: Viewport = {
   // Chrome resizes the layout viewport with the keyboard. iOS ignores this
   // and is covered by ViewportLock reading visualViewport.
   interactiveWidget: 'resizes-content',
+  themeColor: '#FAFAF7',
 };
 
 /**
@@ -45,6 +46,7 @@ export async function generateMetadata(): Promise<Metadata> {
       es: 'Asistente de IA para hacer el súper en Argentina. Pedí lo que necesitás, compará precios, armá el carrito y pagá con tarjeta o USDC.',
       en: 'An AI assistant for the weekly shop in Argentina. Ask for what you need, compare prices, fill the trolley and pay by card or with USDC.',
     }),
+    appleWebApp: { capable: true, title: 'Changuito', statusBarStyle: 'default' },
   };
 }
 

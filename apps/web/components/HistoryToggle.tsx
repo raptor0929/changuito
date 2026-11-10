@@ -5,7 +5,7 @@ import { useLang } from './LangProvider';
 import { useShop } from './ShopProvider';
 
 /**
- * Opens the history drawer. Lives in the masthead, beside the brand.
+ * Opens the history drawer. Lives in the top bar, before the wordmark.
  *
  * It used to be `position: fixed` in the top-left corner, which put a 44px
  * button exactly on top of the brand mark at every width below the wide
@@ -17,9 +17,9 @@ import { useShop } from './ShopProvider';
  *
  * The name is "Tus conversaciones" and not "Tus compras", which is what it
  * said until the profile landed. This drawer lists the chats *this browser*
- * kept; Mis compras is a tab in the profile a few pixels away listing what
- * was actually bought, on any device. One accessible name for the two of them
- * was a promise the drawer could not keep.
+ * kept; Mis compras, in the profile's General tab a few pixels away, lists
+ * what was actually bought, on any device. One accessible name for the two
+ * of them was a promise the drawer could not keep.
  *
  * Hidden at the wide breakpoint: there the rail is a permanent column, and a
  * button that opens what is already open is a dead end.

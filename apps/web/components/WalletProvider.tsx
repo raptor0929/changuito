@@ -9,6 +9,7 @@ import { gatedFreighter } from '../lib/freighter-gate.ts';
 import { LOGIN_NETWORK, pollarApiKey, pollarEnabled, pollarNetwork } from '../lib/pollar.ts';
 import { ModeSync } from './ModeSync';
 import { PollarSpanish } from './PollarSpanish';
+import { WalletBridge } from './WalletBridge';
 
 // Freighter next to email / Google: WalletType.FREIGHTER = 'freighter-native'.
 void WalletType.FREIGHTER;
@@ -69,7 +70,7 @@ function PollarMount({ network, children }: { network: 'testnet' | 'mainnet'; ch
           {mismatch}
         </p>
       ) : null}
-      {children}
+      <WalletBridge>{children}</WalletBridge>
     </PollarProvider>
   );
 }

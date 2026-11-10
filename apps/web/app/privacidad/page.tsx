@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { LangToggle } from '../../components/LangToggle';
 import { LangProvider } from '../../components/LangProvider';
 import { ScrollPage } from '../../components/ScrollPage';
+import { PUBLIC_LEGAL, SUPPORT_EMAIL } from '@changuito/trust';
 import { inLang } from '../../lib/lang.ts';
 import { langFromCookie } from '../../lib/lang-server.ts';
 import { privacyCopy } from '../../lib/privacy-copy.ts';
@@ -57,9 +58,13 @@ export default async function PrivacyPage() {
           <p>{copy.contactLead}</p>
           <ul className="legal-contact">
             <li>
-              <a href={BUG} target="_blank" rel="noopener noreferrer">
-                {BUG}
-              </a>
+              <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+            </li>
+            <li>
+              <a href={inLang(lang, PUBLIC_LEGAL.privacy)}>{inLang(lang, { es: 'Política publicada', en: 'Published policy' })}</a>
+            </li>
+            <li>
+              <a href={inLang(lang, PUBLIC_LEGAL.deletion)}>{inLang(lang, { es: 'Eliminar la cuenta', en: 'Delete the account' })}</a>
             </li>
             {profiles.map((link) => (
               <li key={link.href}>

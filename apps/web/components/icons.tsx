@@ -5,8 +5,9 @@
  * apps draw one family: currentColor stroke, width 2, round cap and join, no
  * fill, aria-hidden. The 24-unit box at 16px matches that file's social icons
  * rather than its 32px feature icons — this one sits inline with 12px button
- * text, not in a card. Footer marks use the same box: Instagram is the
- * landing stroke glyph, and X is filled so it does not read as a close icon.
+ * text, not in a card. Instagram matches the landing stroke glyph. X is
+ * filled so it does not read as a close icon. The shopper footer does not
+ * draw these; the landing footer does.
  */
 export function RetryIcon({ className }: { className?: string }) {
   return (
@@ -56,10 +57,9 @@ export function InstagramIcon({ className }: { className?: string }) {
 }
 
 /**
- * X mark. The landing prints the word "X" instead of a glyph, because the
- * glyph next to that word reads as a second link. Here the control is the
- * icon alone, so the mark is the logo, slightly smaller than the stroked
- * camera so the two weights match.
+ * X mark. Filled, and slightly smaller than the stroked camera, so the
+ * weight matches the other social glyphs and it does not read as a close
+ * icon. aria-hidden when a link draws it next to a visible name.
  */
 export function XIcon({ className }: { className?: string }) {
   return (
@@ -70,8 +70,9 @@ export function XIcon({ className }: { className?: string }) {
 }
 
 /**
- * LinkedIn mark. Filled, same weight as X: the footer control is the glyph
- * alone, and the outline camera is the only stroked mark in that row.
+ * LinkedIn mark. Filled, like X, and the same 16px box: a stroked "in"
+ * next to the stroked camera reads as a third weight. The path is the
+ * company logo, painted with currentColor so it follows the footer grey.
  */
 export function LinkedInIcon({ className }: { className?: string }) {
   return (

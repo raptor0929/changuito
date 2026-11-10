@@ -46,7 +46,9 @@ export function CartRail() {
         {receipt ? (
           <RailReceipt receipt={receipt} />
         ) : cart && cart.lines.length > 0 ? (
-          <RailLines cart={cart} />
+          // Pagar under the basket too, not only on the card in the thread,
+          // which has usually scrolled away by the time the basket is ready.
+          <RailLines cart={cart} onPay={shop?.canOrder ? shop.requestPay : undefined} />
         ) : (
           <EmptyRail />
         )}
@@ -108,8 +110,10 @@ function EmptyRail() {
   return <p className="rail-cart-empty">{uiCopy(useLang()).rail.empty}</p>;
 }
 
-function RailLines({ cart }: { cart: Cart }) {
-  const copy = uiCopy(useLang()).rail;
+function RailLines({ cart, onPay }: { cart: Cart; onPay?: () => void }) {
+  const lang = useLang();
+  const copy = uiCopy(lang).rail;
+  const payable = cart.lines.some((l) => l.available && l.quantity > 0) && cart.total.centavos > 0;
   const unavailable = cart.lines.filter((l) => !l.available).length;
   return (
     <>
@@ -135,6 +139,11 @@ function RailLines({ cart }: { cart: Cart }) {
           <span>{copy.total}</span>
           <strong>{cart.total.display}</strong>
         </div>
+        {onPay && payable ? (
+          <button type="button" className="btn btn-pay rail-cart-pay" data-testid="rail-pay" onClick={onPay}>
+            {uiCopy(lang).cart.payCta}
+          </button>
+        ) : null}
       </footer>
     </>
   );
