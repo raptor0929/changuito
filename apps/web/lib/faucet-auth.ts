@@ -1,64 +1,27 @@
-import { StrKey } from '@stellar/stellar-sdk';
-
 import { DEFAULT_NETWORK, DEPLOYMENTS, type NetworkId } from './deployments.ts';
-import { envFlag } from './env-flag.ts';
 import type { FaucetAccess, FaucetProof } from './faucet-proof.ts';
 import { verifyWalletProof } from './wallet-proof-verify.ts';
 
 /**
  * Who may mint demo USDC. Server-only.
  *
- * The faucet signs with our one admin key, so "anyone who can POST an
- * address" was "anyone on the internet". Now only the wallets listed in
- * FAUCET_ALLOWLIST_ADDRESSES may mint, and only with a fresh SEP-53 signature
- * from that wallet.
+ * The list is not an environment variable. `config.faucet_open_to_all` and
+ * the `wallet.faucet_allowed` column are the whole of it, and a banned row
+ * wins over both. This module only checks the two things that are not that
+ * row: the network has a faucet, and the wallet signed a fresh SEP-53 proof.
+ * The caller decides `admitted` from the database.
  *
- * Why a wallet address and not an email or a Pollar user id: those are
- * things the browser can say, not things the server can check. Pollar's
- * tokens are DPoP-bound to a key that never leaves the browser, so the server
- * cannot call Pollar as the user to learn who they are. A signature over a
- * message naming the address can be checked here with nothing but the
- * address — and for custodial (email, Google) wallets Pollar only produces
- * one for a logged-in session. Passkey smart wallets (C…) cannot sign
+ * The proof is not waived when the faucet is open to every wallet. The
+ * grants share one hourly ceiling, so an unsigned request is a way to spend
+ * that ceiling. A signature over a message naming the address can be checked
+ * here with nothing but the address. Passkey smart wallets (C…) cannot sign
  * SEP-53, so testers use a custodial G… wallet.
- *
- * Deny by default: in production an empty list disables the faucet for
- * everyone, including Vercel previews, which also run as production.
- *
- * FAUCET_OPEN_TO_ALL is the way out of that when the point is a demo anyone
- * can try: set it and the allowlist stops being consulted at all, whatever it
- * contains. What it does *not* waive is the signature — "anybody may ask" and
- * "nobody has to prove anything" are different sentences, and only the first
- * one was asked for. The wallet still signs, which costs a logged-in visitor
- * nothing (Pollar signs for a live session) and costs a script the whole
- * exercise. That matters here more than it looks: the grants share one hourly
- * ceiling, so an unauthenticated faucet is a way to spend everyone else's
- * twenty before a tester arrives.
  *
  * And it is per network, because free money is a testnet idea. See
  * `faucetOnNetwork`.
  */
 
 export type FaucetMode = FaucetAccess['mode'];
-
-/** Comma, space or newline separated; anything that is not a G… address is dropped. */
-export function faucetAllowlist(env: NodeJS.ProcessEnv = process.env): Set<string> {
-  const raw = env.FAUCET_ALLOWLIST_ADDRESSES ?? '';
-  const out = new Set<string>();
-  for (const part of raw.split(/[\s,]+/)) {
-    const address = part.trim().toUpperCase();
-    if (StrKey.isValidEd25519PublicKey(address)) out.add(address);
-  }
-  return out;
-}
-
-export function faucetMode(env: NodeJS.ProcessEnv = process.env): FaucetMode {
-  // First, so it is an override and not a tie-break: a list left behind from
-  // an earlier tester round must not quietly keep everyone else out.
-  if (envFlag('FAUCET_OPEN_TO_ALL', env)) return 'public';
-  if (faucetAllowlist(env).size > 0) return 'allowlist';
-  return env.NODE_ENV === 'production' ? 'disabled' : 'open';
-}
 
 /**
  * Whether this network has a faucet at all.
@@ -72,16 +35,11 @@ export function faucetOnNetwork(net: NetworkId): boolean {
   return DEPLOYMENTS[net].friendbotUrl !== null;
 }
 
-export function faucetAccess(
-  address: string,
-  env: NodeJS.ProcessEnv = process.env,
-  net: NetworkId = DEFAULT_NETWORK,
-): FaucetAccess {
+/** What GET /api/faucet tells the widget. `admitted` already includes the ban. */
+export function faucetView(net: NetworkId, opts: { admitted: boolean; openToAll: boolean }): FaucetAccess {
   if (!faucetOnNetwork(net)) return { mode: 'disabled', allowed: false };
-  const mode = faucetMode(env);
-  if (mode === 'open' || mode === 'public') return { mode, allowed: true };
-  if (mode === 'disabled') return { mode, allowed: false };
-  return { mode, allowed: faucetAllowlist(env).has(address) };
+  if (!opts.admitted) return { mode: opts.openToAll ? 'public' : 'disabled', allowed: false };
+  return { mode: opts.openToAll ? 'public' : 'allowlist', allowed: true };
 }
 
 export type FaucetAuth =
@@ -91,35 +49,22 @@ export type FaucetAuth =
 const deny = (status: 401 | 403, error: string, message: string): FaucetAuth => ({ ok: false, status, error, message });
 
 /**
- * The whole decision, before friendbot or the mint run. Cheapest checks
- * first: a stranger's own address is refused without touching crypto.
+ * The network and the signature. Who is admitted is the database's answer,
+ * passed in. A wallet that is not admitted is refused before the proof.
  */
 export function authorizeFaucet(args: {
   address: string;
   proof?: Partial<FaucetProof> | null;
   now: number;
-  env?: NodeJS.ProcessEnv;
   net?: NetworkId;
+  admitted: boolean;
 }): FaucetAuth {
-  const env = args.env ?? process.env;
   const net = args.net ?? DEFAULT_NETWORK;
 
-  // Before the allowlist, because this one is not about who is asking. There
-  // is nothing to mint on a public network, so the refusal is flat.
   if (!faucetOnNetwork(net)) {
     return deny(403, 'faucet_not_on_network', 'No hay carga de prueba en el modo real.');
   }
-
-  const access = faucetAccess(args.address, env, net);
-
-  // 'open' is the local-development mode and the only one that skips the
-  // signature: there is no allowlist, no deploy and nothing to farm. 'public'
-  // falls through to the proof below with everybody else.
-  if (access.mode === 'open') return { ok: true };
-  if (access.mode === 'disabled') {
-    return deny(403, 'faucet_disabled', 'La carga de USDC de prueba no está habilitada.');
-  }
-  if (!access.allowed) {
+  if (!args.admitted) {
     return deny(403, 'faucet_not_allowed', 'Esta cuenta no puede cargar USDC de prueba.');
   }
 

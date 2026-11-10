@@ -60,9 +60,9 @@ describe('real mode allowlist', () => {
     assert.equal(access.usable, access.allowed && access.configured);
   });
 
-  it('is its own switch, not the faucet\'s', () => {
-    // Play money and a stranger opening an escrow with real USDC are not the
-    // same decision, so one variable must never turn on the other.
+  it('is its own switch, not a leftover faucet variable', () => {
+    // The faucet no longer reads an environment variable. A value left behind
+    // under the old name must not open modo real either.
     const faucetOnly = { NODE_ENV: 'production', FAUCET_OPEN_TO_ALL: '1' } as NodeJS.ProcessEnv;
     assert.equal(realModeMode(faucetOnly), 'disabled');
   });

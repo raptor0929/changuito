@@ -173,13 +173,14 @@ describe('beta onboarding', () => {
     assert.doesNotMatch(widget.slice(signedOut, widget.indexOf('\n  }\n', signedOut)), /wallet-fund|setConfirming/);
   });
 
-  it('the faucet confirm asks for no address and the client posts none', () => {
+  it('the faucet confirm asks for no address and the client posts address, network and proof', () => {
     assert.doesNotMatch(read('../../components/FaucetConfirm.tsx'), /<input|<select|<textarea|address/i);
     const widget = read('../../components/WalletWidget.tsx');
-    const call = widget.match(/fetchAs\([^\n]*'\/api\/faucet'[^\n]*\)/)?.[0];
-    assert.ok(call, 'the faucet call is found');
-    assert.match(call, /\{ method: 'POST' \}\)$/);
-    assert.doesNotMatch(call, /body/);
+    assert.match(widget, /postFaucet\(\{ address, sign: wallet\.accessToken \}, network\)/);
+    const client = read('../faucet-client.ts');
+    assert.match(client, /signWalletProof\(who\.sign, 'faucet', who\.address\)/);
+    assert.match(client, /JSON\.stringify\(\{ address: who\.address, network, proof \}\)/);
+    assert.match(client, /'content-type': 'application\/json'/);
   });
 
   it('is inline, not a modal, so it never covers the login button', () => {

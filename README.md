@@ -278,7 +278,7 @@ The annotated list is `apps/web/.env.example`. The ones that change what works:
 | `ANTHROPIC_API_KEY` | server | the agent |
 | `NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` | browser | login, wallet, SEP-53, paying |
 | `DEPOSIT_ADDRESS_TESTNET` / `_MAINNET` | server | the deposit rail. Missing → `/api/deposit` 503s and logs the variable name |
-| `DATABASE_URL` | server | orders, kept cards, chat archive |
+| `DATABASE_URL` | server | orders, kept cards, chat archive, chat and faucet quotas |
 | `VYRION_API_KEY` | server | card issuance (currently 403 — see the honesty section) |
 | `STELLAR_RESOLVER_SECRET` | server | the testnet faucet and the escrow |
 | `KV_REST_API_URL` / `_TOKEN` | server | conversation history across restarts |

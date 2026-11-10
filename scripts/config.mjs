@@ -33,6 +33,10 @@ const KNOWN = {
       : 'new checkouts go to SANDBOX_URL, or are refunded when it is unset',
   sandbox_mock_fail: (on) =>
     on ? "the mock's card comes back declined (the refund path)" : 'the mock places the order (the settle path)',
+  faucet_open_to_all: (on) =>
+    on
+      ? 'any wallet that is not banned can use the faucet'
+      : 'the faucet answers only for a wallet row with faucet_allowed',
 };
 
 /** String keys. Anything other than the listed values reads as the default. */

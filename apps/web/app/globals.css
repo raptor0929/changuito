@@ -548,6 +548,10 @@ body:not(:has(.topbar)) .shell {
 .cart-warn { margin: 8px 0 0; font-size: 13px; color: var(--warn); }
 .cart-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 
+/* The cart offer sits in the thread, after the products. It is a normal
+   button, not one of the 44px composer icons. */
+.chat-build { display: flex; margin: 8px 0 4px; }
+
 /* -------------------------------------------------------------- controls */
 
 .btn {

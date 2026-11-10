@@ -1,5 +1,6 @@
 import { requireHuman } from './human-gate.ts';
 import { mintUserToken, sessionSecret, userCookieHeader } from './login-gate.ts';
+import { registerWallet, walletNetwork, type WalletDirectory } from './wallet-record.ts';
 import { proofFromBody, verifyWalletProof } from './wallet-proof-verify.ts';
 
 /**
@@ -22,6 +23,7 @@ export async function issueUserSession(
   req: Request,
   env: NodeJS.ProcessEnv = process.env,
   now: number = Date.now(),
+  wallets?: WalletDirectory,
 ): Promise<Response> {
   const gated = await requireHuman(req, env);
   if (gated) return gated;
@@ -55,6 +57,16 @@ export async function issueUserSession(
         message: 'No pudimos confirmar tu sesión. Iniciá sesión de nuevo.',
       },
       { status: 401 },
+    );
+  }
+
+  // First visit inserts the row. A ban written before this login is kept,
+  // and it stops the cookie: a banned wallet does not enter the app.
+  const standing = await registerWallet(address, env, walletNetwork(env), wallets);
+  if (standing.banned) {
+    return Response.json(
+      { error: 'wallet_banned', message: 'Esta cuenta no puede usar Changuito.' },
+      { status: 403 },
     );
   }
 

@@ -65,7 +65,7 @@ test.describe('app auth', () => {
     }
 
     // Whether this account may use the test faucet is the server's call
-    // (FAUCET_ALLOWLIST_ADDRESSES, #51). Listen before signing in: the widget
+    // (the wallet row, or config.faucet_open_to_all). Listen before signing in: the widget
     // asks as soon as the wallet address exists. A build without the GET
     // (before #51) never answers, and always showed the button.
     const faucetAccess = page

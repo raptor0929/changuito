@@ -1,10 +1,11 @@
 import type { NetworkId } from './deployments.ts';
-import { authorizeFaucet } from './faucet-auth.ts';
-import type { FaucetProof } from './faucet-proof.ts';
+import { authorizeFaucet, faucetView } from './faucet-auth.ts';
+import type { FaucetAccess, FaucetProof } from './faucet-proof.ts';
 import { requireHuman } from './human-gate.ts';
 import { guestTurnCounter, limiterUnavailableResponse, takeQuota, type TurnCounter } from './login-gate.ts';
 import { requestNetwork } from './server-network.ts';
 import { addressKind } from './stellar.ts';
+import { faucetAdmitted, faucetOpenToAll, walletStanding, type WalletDirectory } from './wallet-record.ts';
 
 /**
  * Everything POST /api/faucet decides before it touches the chain.
@@ -26,11 +27,27 @@ export const FAUCET_COOLDOWN_SECONDS = 60;
 
 /** Every tester together, per hour. The hot key signs each one. */
 export const FAUCET_GRANTS_PER_HOUR = 20;
+
+/** What the widget reads. A banned wallet and a wallet the database has not granted both hide the button. */
+export async function faucetButton(
+  address: string,
+  env: NodeJS.ProcessEnv,
+  network: NetworkId,
+  wallets?: WalletDirectory,
+): Promise<FaucetAccess> {
+  const openToAll = await faucetOpenToAll(env, wallets);
+  if (!addressKind(address)) return faucetView(network, { admitted: false, openToAll });
+  const standing = await walletStanding(address, env, network, wallets);
+  if (standing.banned) return { mode: 'disabled', allowed: false };
+  return faucetView(network, { admitted: faucetAdmitted(standing, openToAll), openToAll });
+}
+
 export async function gateFaucet(
   req: Request,
   env: NodeJS.ProcessEnv = process.env,
   now: number = Date.now(),
   store: TurnCounter = guestTurnCounter(env),
+  wallets?: WalletDirectory,
 ): Promise<{ address: string; kind: 'account' | 'contract'; network: NetworkId } | Response> {
   const gated = await requireHuman(req, env);
   if (gated) return gated;
@@ -55,7 +72,21 @@ export async function gateFaucet(
   const kind = addressKind(address);
   if (!kind) return Response.json({ error: 'not a Stellar address' }, { status: 400 });
 
-  const auth = authorizeFaucet({ address, proof, now, env, net: network });
+  // Read only. Login is what inserts a row, after a proof. A bare address
+  // posted here must not become a wallet.
+  const standing = await walletStanding(address, env, network, wallets);
+  if (standing.banned) {
+    return Response.json({ error: 'wallet_banned', message: 'Esta cuenta no puede usar Changuito.' }, { status: 403 });
+  }
+
+  const openToAll = await faucetOpenToAll(env, wallets);
+  const auth = authorizeFaucet({
+    address,
+    proof,
+    now,
+    net: network,
+    admitted: faucetAdmitted(standing, openToAll),
+  });
   if (!auth.ok) return Response.json({ error: auth.error, message: auth.message }, { status: auth.status });
 
   const wait = 'Esperá un momento antes de volver a pedir fondos.';

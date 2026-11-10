@@ -5,6 +5,8 @@ import { Keypair } from '@stellar/stellar-sdk';
 
 import { chain, mockBindings, mockResolver, RESOLVER_PUBLIC } from './support/fake-soroban.ts';
 import { signedProof } from './support/proof.ts';
+import { __setWalletDirectoryForTests, type WalletDirectory, type WalletStanding } from '../wallet-record.ts';
+import type { NetworkId } from '../deployments.ts';
 
 /**
  * GET/POST /api/faucet as handlers: Horizon and friendbot scripted through
@@ -17,14 +19,13 @@ env.NODE_ENV = 'test'; // in-memory quotas; the human gate is still enforced by 
 env.TURNSTILE_SECRET_KEY = 'turnstile-test-secret';
 env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = 'site-test';
 delete env.DATABASE_URL;
-delete env.FAUCET_OPEN_TO_ALL;
 
 mockBindings();
 mockResolver();
 
 // One tester per case: the per-address cooldown is real.
 const testers = Array.from({ length: 6 }, () => Keypair.random());
-env.FAUCET_ALLOWLIST_ADDRESSES = testers.map((k) => k.publicKey()).join(',');
+__setWalletDirectoryForTests(granted(testers.map((kp) => kp.publicKey())));
 
 describe('/api/faucet', () => {
   let GET: (req: Request) => Promise<Response>;
@@ -63,6 +64,7 @@ describe('/api/faucet', () => {
   after(() => {
     globalThis.fetch = real;
     console.error = realError;
+    __setWalletDirectoryForTests(undefined);
   });
   beforeEach(() => {
     chain.reset();
@@ -137,3 +139,23 @@ describe('/api/faucet', () => {
     assert.match(logs.join('\n'), /\[faucet\] failed/);
   });
 });
+
+function granted(addresses: string[]): WalletDirectory {
+  const rows = new Map(addresses.map((address) => [address, { faucetAllowed: true, banned: false }]));
+  function read(network: NetworkId, address: string): WalletStanding {
+    const row = rows.get(address);
+    if (!row) return { network, faucetAllowed: false, banned: false, stored: false };
+    return { network, ...row, stored: true };
+  }
+  return {
+    async register(network, address) {
+      return read(network, address);
+    },
+    async standing(network, address) {
+      return read(network, address);
+    },
+    async openToAll() {
+      return false;
+    },
+  };
+}
