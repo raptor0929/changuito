@@ -20,16 +20,30 @@ import {
   xdr,
 } from '@stellar/stellar-sdk';
 
+import { recoverOpenAttempt } from '../checkout/open-recovery.ts';
 import { checkoutStore } from '../checkout/store.ts';
 import { readOrder } from '../checkout/escrow-server.ts';
 import { contractIds } from '../contract-ids.ts';
 import { deployment, type NetworkId } from '../deployments.ts';
-import { DEFAULT_TIMEOUT_SECS, fromHex } from '../order.ts';
+import { DEFAULT_TIMEOUT_SECS, MAX_TIMEOUT_SECS, MIN_TIMEOUT_SECS, fromHex } from '../order.ts';
 import { rpcServer } from '../stellar.ts';
 
 const CHANNELS_TESTNET = 'https://channels.openzeppelin.com/testnet';
 const EXPIRY_LEDGERS = 60;
 const SUBMIT_TRIES = 3;
+const HASH_RE = /^[0-9a-f]{64}$/;
+
+const EXECUTION_CODES = new Set([
+  'FEE_LIMIT_EXCEEDED',
+  'POOL_CAPACITY',
+  'AUTH_EXPIRY_TOO_SHORT',
+  'SIMULATION_FAILED',
+  'SIMULATION_NETWORK_ERROR',
+  'SIMULATION_RPC_FAILURE',
+  'SIMULATION_SIGNED_AUTH_VALIDATION_FAILED',
+  'WAIT_TIMEOUT',
+  'ONCHAIN_FAILED',
+]);
 
 export interface OpenFields {
   orderId: string;
@@ -53,15 +67,30 @@ export interface AlreadyOpen {
   hash: string;
 }
 
+/** Slim checkout row used by prepare/submit and the recovery path. */
+export interface ChannelsRecord {
+  orderId: string;
+  buyer: string;
+  amount: string;
+  basketHash: string;
+  openSig?: string;
+  openAttemptSig?: string;
+}
+
+/** What deps may return; `orderId` is filled from the request when omitted. */
+export type ChannelsRecordRow = Omit<ChannelsRecord, 'orderId'> & { orderId?: string };
+
 export class ChannelsFailure extends Error {
   readonly status: number;
   readonly code: string;
+  readonly hash?: string;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, hash?: string) {
     super(message);
     this.name = 'ChannelsFailure';
     this.status = status;
     this.code = code;
+    this.hash = hash;
   }
 }
 
@@ -79,7 +108,9 @@ export interface ChannelsDeps {
   apiKey: string | undefined;
   sleep?: (ms: number) => Promise<void>;
   readOpened?: (orderId: string) => Promise<boolean>;
-  loadRecord?: (orderId: string) => Promise<{ buyer: string; amount: string; basketHash: string; openSig?: string } | null>;
+  loadRecord?: (orderId: string) => Promise<ChannelsRecordRow | null>;
+  saveAttempt?: (orderId: string, hash: string) => Promise<void>;
+  recoverAttempt?: (rec: ChannelsRecord) => Promise<ChannelsRecord>;
   note?: (line: string) => void;
 }
 
@@ -116,7 +147,7 @@ function assertOpenShape(input: OpenFields): void {
   if (!/^C[A-Z2-7]{55}$/.test(input.contractId)) {
     throw new ChannelsFailure(400, 'channels_contract', 'El contrato no es válido.');
   }
-  if (!Number.isInteger(input.timeoutSecs)) {
+  if (!Number.isInteger(input.timeoutSecs) || input.timeoutSecs < MIN_TIMEOUT_SECS || input.timeoutSecs > MAX_TIMEOUT_SECS) {
     throw new ChannelsFailure(400, 'channels_timeout', 'El plazo no es válido.');
   }
 }
@@ -237,6 +268,54 @@ export function assertBuyerEntries(entries: string[], buyer: string, funcXdr: st
   }
 }
 
+function assertRecordMatch(rec: ChannelsRecord, input: OpenFields, buyer: string): void {
+  if (rec.buyer !== buyer || rec.amount !== input.amount || rec.basketHash !== input.basketHash) {
+    throw new ChannelsFailure(409, 'channels_record', 'El pedido no coincide con la cotización.');
+  }
+  if (input.timeoutSecs !== DEFAULT_TIMEOUT_SECS) {
+    throw new ChannelsFailure(409, 'channels_record', 'El pedido no coincide con la cotización.');
+  }
+}
+
+async function loadQuoted(
+  orderId: string,
+  deps: ChannelsDeps,
+): Promise<ChannelsRecord | null> {
+  const raw = await (deps.loadRecord ?? loadCheckout)(orderId);
+  if (!raw) return null;
+  const rec: ChannelsRecord = {
+    orderId: raw.orderId || orderId,
+    buyer: raw.buyer,
+    amount: raw.amount,
+    basketHash: raw.basketHash,
+    openSig: raw.openSig,
+    openAttemptSig: raw.openAttemptSig,
+  };
+  return deps.recoverAttempt ? deps.recoverAttempt(rec) : recoverCheckout(rec);
+}
+
+async function recoverCheckout(rec: ChannelsRecord): Promise<ChannelsRecord> {
+  if (rec.openSig || !rec.openAttemptSig) return rec;
+  const full = await checkoutStore().get(rec.orderId);
+  if (full) {
+    const next = await recoverOpenAttempt(full);
+    return {
+      orderId: next.orderId,
+      buyer: next.buyer,
+      amount: next.amount,
+      basketHash: next.basketHash,
+      openSig: next.openSig,
+      openAttemptSig: next.openAttemptSig,
+    };
+  }
+  const order = await readOrder(rec.orderId);
+  if (!order || order.orderId !== rec.orderId || order.buyer !== rec.buyer
+      || order.amount !== BigInt(rec.amount) || order.basketHash !== rec.basketHash) {
+    return rec;
+  }
+  return { ...rec, openSig: rec.openAttemptSig };
+}
+
 export async function prepareOpen(
   input: OpenFields,
   buyer: string,
@@ -246,16 +325,14 @@ export async function prepareOpen(
     throw new ChannelsFailure(503, 'channels_unconfigured', 'Los pagos no están habilitados.');
   }
   const func = buildOpenFuncForBuyer(input, buyer);
-  const rec = await (deps.loadRecord ?? loadCheckout)(input.orderId);
+  const rec = await loadQuoted(input.orderId, deps);
   if (rec) {
-    if (rec.buyer !== buyer || rec.amount !== input.amount || rec.basketHash !== input.basketHash) {
-      throw new ChannelsFailure(409, 'channels_record', 'El pedido no coincide con la cotización.');
-    }
-    if (input.timeoutSecs !== DEFAULT_TIMEOUT_SECS) {
-      throw new ChannelsFailure(409, 'channels_record', 'El pedido no coincide con la cotización.');
-    }
-    if (rec.openSig && /^[0-9a-f]{64}$/.test(rec.openSig)) {
+    assertRecordMatch(rec, input, buyer);
+    if (rec.openSig && HASH_RE.test(rec.openSig)) {
       return { kind: 'opened', hash: rec.openSig };
+    }
+    if (rec.openAttemptSig && HASH_RE.test(rec.openAttemptSig)) {
+      throw new ChannelsFailure(409, 'channels_confirming', 'El pago puede haber entrado. No vuelvas a firmar.', rec.openAttemptSig);
     }
   }
   const source = deployment('testnet').resolver;
@@ -282,6 +359,16 @@ export async function submitOpen(
     throw new ChannelsFailure(503, 'channels_unconfigured', 'Los pagos no están habilitados.');
   }
   const func = buildOpenFuncForBuyer(input, buyer);
+  const rec = await loadQuoted(input.orderId, deps);
+  if (rec) {
+    assertRecordMatch(rec, input, buyer);
+    if (rec.openSig && HASH_RE.test(rec.openSig)) {
+      return { hash: rec.openSig };
+    }
+    if (rec.openAttemptSig && HASH_RE.test(rec.openAttemptSig)) {
+      throw new ChannelsFailure(409, 'channels_confirming', 'El pago puede haber entrado. No vuelvas a firmar.', rec.openAttemptSig);
+    }
+  }
   assertBuyerEntries(signed, buyer, func);
   const sleep = deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   let last: ChannelsFailure | null = null;
@@ -289,7 +376,7 @@ export async function submitOpen(
     try {
       const sent = await deps.client.submitSorobanTransaction({ func, auth: signed });
       const hash = sent.hash?.trim().toLowerCase();
-      if (!hash || !/^[0-9a-f]{64}$/.test(hash)) {
+      if (!hash || !HASH_RE.test(hash)) {
         throw new ChannelsFailure(502, 'channels_submit', 'No se pudo enviar el pago.');
       }
       deps.note?.(`[channels] submitted ${hash}`);
@@ -301,11 +388,8 @@ export async function submitOpen(
         await sleep(200 * (attempt + 1));
         continue;
       }
-      if (mapped.code === 'channels_wait' || mapped.code === 'channels_exists') {
-        const opened = await (deps.readOpened ?? readOrderOpened)(input.orderId);
-        if (opened) {
-          throw new ChannelsFailure(409, 'channels_confirming', 'El pago puede haber entrado. No vuelvas a firmar.');
-        }
+      if (mapped.code === 'channels_wait' || mapped.code === 'channels_exists' || mapped.code === 'channels_onchain') {
+        return recoverLanded(input.orderId, mapped, deps);
       }
       throw mapped;
     }
@@ -313,51 +397,155 @@ export async function submitOpen(
   throw last ?? new ChannelsFailure(503, 'channels_pool', 'No se pudo enviar el pago. Probá de nuevo en un momento.');
 }
 
-async function loadCheckout(orderId: string) {
-  return checkoutStore().get(orderId);
+async function recoverLanded(
+  orderId: string,
+  mapped: ChannelsFailure,
+  deps: ChannelsDeps,
+): Promise<{ hash: string }> {
+  if (mapped.hash) {
+    await (deps.saveAttempt ?? saveOpenAttempt)(orderId, mapped.hash);
+  }
+  const rec = await loadQuoted(orderId, deps);
+  if (rec?.openSig && HASH_RE.test(rec.openSig)) {
+    return { hash: rec.openSig };
+  }
+  const hash = mapped.hash ?? (rec?.openAttemptSig && HASH_RE.test(rec.openAttemptSig) ? rec.openAttemptSig : undefined);
+  throw new ChannelsFailure(409, 'channels_confirming', 'El pago puede haber entrado. No vuelvas a firmar.', hash);
 }
 
-async function readOrderOpened(orderId: string): Promise<boolean> {
-  const found = await readOrder(orderId);
-  return Boolean(found);
+async function loadCheckout(orderId: string): Promise<ChannelsRecord | null> {
+  const rec = await checkoutStore().get(orderId);
+  if (!rec) return null;
+  return {
+    orderId: rec.orderId,
+    buyer: rec.buyer,
+    amount: rec.amount,
+    basketHash: rec.basketHash,
+    openSig: rec.openSig,
+    openAttemptSig: rec.openAttemptSig,
+  };
+}
+
+async function saveOpenAttempt(orderId: string, hash: string): Promise<void> {
+  const rec = await checkoutStore().get(orderId);
+  if (!rec) return;
+  rec.openAttemptSig = hash;
+  await checkoutStore().set(rec);
+}
+
+interface ChannelsErrorBody {
+  message?: string;
+  category?: string;
+  statusCode?: number;
+  errorDetails?: {
+    code?: string;
+    status?: number;
+    details?: unknown;
+  } | unknown;
+}
+
+function asBody(err: unknown): ChannelsErrorBody {
+  if (!err || typeof err !== 'object') return { message: String(err ?? '') };
+  return err as ChannelsErrorBody;
+}
+
+function executionCode(body: ChannelsErrorBody): string | undefined {
+  const details = body.errorDetails;
+  if (details && typeof details === 'object' && typeof (details as { code?: unknown }).code === 'string') {
+    return (details as { code: string }).code;
+  }
+  const message = body.message ?? '';
+  if (EXECUTION_CODES.has(message)) return message;
+  return undefined;
+}
+
+function executionDetails(body: ChannelsErrorBody): unknown {
+  const details = body.errorDetails;
+  if (!details || typeof details !== 'object') return undefined;
+  return (details as { details?: unknown }).details;
+}
+
+function detailHash(details: unknown): string | undefined {
+  if (!details || typeof details !== 'object') return undefined;
+  const hash = (details as { hash?: unknown }).hash;
+  if (typeof hash !== 'string') return undefined;
+  const normalized = hash.trim().toLowerCase();
+  return HASH_RE.test(normalized) ? normalized : undefined;
+}
+
+function detailBlob(details: unknown, message: string): string {
+  if (details == null) return message;
+  if (typeof details === 'string') return `${details} ${message}`;
+  try {
+    return `${JSON.stringify(details)} ${message}`;
+  } catch {
+    return message;
+  }
+}
+
+function detailMessage(details: unknown): string {
+  if (typeof details === 'string') return details;
+  if (details && typeof details === 'object' && typeof (details as { message?: unknown }).message === 'string') {
+    return (details as { message: string }).message;
+  }
+  return '';
+}
+
+function mapSimFailed(details: unknown): ChannelsFailure {
+  const text = detailMessage(details).toLowerCase();
+  if (text.includes('orderexists')) {
+    return new ChannelsFailure(409, 'channels_exists', 'Ese pedido ya está abierto.', detailHash(details));
+  }
+  if (text.includes('balance') || text.includes('insufficient')) {
+    return new ChannelsFailure(409, 'channels_balance', 'No alcanza el USDC para este pedido.');
+  }
+  if (text.includes('account') || text.includes('not found')) {
+    return new ChannelsFailure(409, 'channels_account', 'La cuenta todavía no existe en testnet.');
+  }
+  return new ChannelsFailure(409, 'channels_sim', 'La red no pudo simular el pago.');
+}
+
+function mapOnchainFailed(details: unknown): ChannelsFailure {
+  const hash = detailHash(details);
+  const text = detailBlob(details, '').toLowerCase();
+  if (!details || text.includes('orderexists')) {
+    return new ChannelsFailure(409, 'channels_exists', 'Ese pedido ya está abierto.', hash);
+  }
+  return new ChannelsFailure(409, 'channels_onchain', 'No se pudo abrir el pedido en la red.', hash);
 }
 
 export function mapChannelsError(err: unknown): ChannelsFailure {
-  const text = detailText(err);
-  if (text.includes('FEE_LIMIT_EXCEEDED')) {
-    return new ChannelsFailure(503, 'channels_fee_cap', 'El cupo de comisiones de hoy se agotó. Probá más tarde.');
-  }
-  if (text.includes('WAIT_TIMEOUT')) {
-    return new ChannelsFailure(409, 'channels_wait', 'El pago puede haber entrado. No vuelvas a firmar.');
-  }
-  if (text.includes('POOL_CAPACITY') || text.includes('ECONN') || text.includes('ETIMEDOUT') || text.includes('502')) {
+  const body = asBody(err);
+  if (body.category === 'transport') {
     return new ChannelsFailure(503, 'channels_pool', 'No se pudo enviar el pago. Probá de nuevo en un momento.');
   }
-  if (text.includes('AUTH_EXPIRY_TOO_SHORT')) {
-    return new ChannelsFailure(409, 'channels_auth_expiry', 'La autorización venció. Volvé a firmar.');
+  const code = executionCode(body);
+  const details = executionDetails(body);
+  switch (code) {
+    case 'FEE_LIMIT_EXCEEDED':
+      return new ChannelsFailure(503, 'channels_fee_cap', 'El cupo de comisiones de hoy se agotó. Probá más tarde.');
+    case 'WAIT_TIMEOUT':
+      return new ChannelsFailure(
+        409,
+        'channels_wait',
+        'El pago puede haber entrado. No vuelvas a firmar.',
+        detailHash(details),
+      );
+    case 'POOL_CAPACITY':
+    case 'SIMULATION_NETWORK_ERROR':
+    case 'SIMULATION_RPC_FAILURE':
+      return new ChannelsFailure(503, 'channels_pool', 'No se pudo enviar el pago. Probá de nuevo en un momento.');
+    case 'AUTH_EXPIRY_TOO_SHORT':
+      return new ChannelsFailure(409, 'channels_auth_expiry', 'La autorización venció. Volvé a firmar.');
+    case 'SIMULATION_SIGNED_AUTH_VALIDATION_FAILED':
+      return new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este pago.');
+    case 'SIMULATION_FAILED':
+      return mapSimFailed(details);
+    case 'ONCHAIN_FAILED':
+      return mapOnchainFailed(details);
+    default:
+      return new ChannelsFailure(502, 'channels_submit', 'No se pudo enviar el pago.');
   }
-  if (text.includes('SIMULATION_SIGNED_AUTH_VALIDATION_FAILED')) {
-    return new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este pago.');
-  }
-  if (text.includes('account') && text.includes('SIMULATION_FAILED')) {
-    return new ChannelsFailure(409, 'channels_account', 'La cuenta todavía no existe en testnet.');
-  }
-  if (text.includes('SIMULATION_FAILED')) {
-    return new ChannelsFailure(409, 'channels_balance', 'No alcanza el USDC para este pedido.');
-  }
-  if (text.includes('OrderExists') || text.includes('ONCHAIN_FAILED')) {
-    return new ChannelsFailure(409, 'channels_exists', 'Ese pedido ya está abierto.');
-  }
-  return new ChannelsFailure(502, 'channels_submit', 'No se pudo enviar el pago.');
-}
-
-function detailText(err: unknown): string {
-  if (!err || typeof err !== 'object') return String(err ?? '');
-  const body = err as { message?: string; errorDetails?: unknown; statusCode?: number };
-  const details = body.errorDetails == null
-    ? ''
-    : typeof body.errorDetails === 'string' ? body.errorDetails : JSON.stringify(body.errorDetails);
-  return `${body.message ?? ''} ${details}`;
 }
 
 /** Loads the Channels client. Returns null when the secret is unset. */

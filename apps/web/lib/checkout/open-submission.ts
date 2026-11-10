@@ -5,7 +5,15 @@ export interface OpenSubmission { orderId: string; tx: string }
 export interface OpenResult { openSig: string; status?: StatusResponse }
 
 /** A lost reply says nothing about whether the already-signed lock landed. */
-export class OpenConfirmationPending extends Error {}
+export class OpenConfirmationPending extends Error {
+  readonly tx?: string;
+
+  constructor(message?: string, tx?: string) {
+    super(message);
+    this.name = 'OpenConfirmationPending';
+    this.tx = tx;
+  }
+}
 
 export async function recoverOpen(request: Request, orderId: string): Promise<OpenResult | null> {
   try {

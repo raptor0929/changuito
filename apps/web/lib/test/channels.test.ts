@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import { Address, xdr } from '@stellar/stellar-sdk';
+import {
+  PluginExecutionError,
+  PluginTransportError,
+} from '@openzeppelin/relayer-plugin-channels/dist/client/index.js';
 
 import { contractIds } from '../contract-ids.ts';
 import { DEPLOYMENTS } from '../deployments.ts';
@@ -177,24 +181,24 @@ describe('channels open', () => {
     process.env.STELLAR_ESCROW_ID = ESCROW;
     const func = buildOpenFuncForBuyer(input(), BUYER);
     const signed = [entry(BUYER, func)];
-    const cases: Array<[string, string, number, number]> = [
-      ['FEE_LIMIT_EXCEEDED', 'channels_fee_cap', 503, 1],
-      ['POOL_CAPACITY', 'channels_pool', 503, 3],
-      ['AUTH_EXPIRY_TOO_SHORT', 'channels_auth_expiry', 409, 1],
-      ['SIMULATION_FAILED account missing', 'channels_account', 409, 1],
-      ['SIMULATION_FAILED balance', 'channels_balance', 409, 1],
-      ['SIMULATION_SIGNED_AUTH_VALIDATION_FAILED', 'channels_auth', 400, 1],
-      ['ONCHAIN_FAILED', 'channels_exists', 409, 1],
+    const cases: Array<[unknown, string, number, number, string]> = [
+      [new PluginExecutionError('fee', { code: 'FEE_LIMIT_EXCEEDED', status: 429, details: {} }), 'channels_fee_cap', 503, 1, 'fee'],
+      [new PluginExecutionError('pool', { code: 'POOL_CAPACITY', status: 503, details: {} }), 'channels_pool', 503, 3, 'pool'],
+      [new PluginExecutionError('expiry', { code: 'AUTH_EXPIRY_TOO_SHORT', status: 400, details: {} }), 'channels_auth_expiry', 409, 1, 'expiry'],
+      [new PluginExecutionError('sim', { code: 'SIMULATION_FAILED', status: 400, details: { message: 'account not found' } }), 'channels_account', 409, 1, 'account'],
+      [new PluginExecutionError('sim', { code: 'SIMULATION_FAILED', status: 400, details: { message: 'insufficient balance' } }), 'channels_balance', 409, 1, 'balance'],
+      [new PluginExecutionError('auth', { code: 'SIMULATION_SIGNED_AUTH_VALIDATION_FAILED', status: 400, details: {} }), 'channels_auth', 400, 1, 'auth'],
+      [new PluginExecutionError('chain', { code: 'ONCHAIN_FAILED', status: 400, details: { message: 'OrderExists' } }), 'channels_confirming', 409, 1, 'exists'],
     ];
-    for (const [text, code, status, calls] of cases) {
+    for (const [thrown, code, status, calls, label] of cases) {
       let n = 0;
       await assert.rejects(
         () => submitOpen(input(), BUYER, signed, deps({
-          client: { async submitSorobanTransaction() { n += 1; throw { message: text }; } },
+          client: { async submitSorobanTransaction() { n += 1; throw thrown; } },
         })),
         (err: unknown) => err instanceof ChannelsFailure && err.code === code && err.status === status,
       );
-      assert.equal(n, calls, text);
+      assert.equal(n, calls, label);
     }
     const waiting = mapChannelsError({ message: 'WAIT_TIMEOUT' });
     assert.equal(waiting.code, 'channels_wait');
@@ -214,5 +218,194 @@ describe('channels route', () => {
   it('does not accept a host function from the browser', () => {
     assert.doesNotMatch(route, /body\.func/);
     assert.doesNotMatch(route, /func:/);
+  });
+});
+
+describe('channels structured errors', () => {
+  const LANDED = 'ef'.repeat(32);
+
+  function pluginExec(code: string, details: unknown = {}, message = code) {
+    return new PluginExecutionError(message, { code, status: 400, details });
+  }
+
+  it('does not call a SIMULATION_FAILED without balance "No alcanza el USDC"', () => {
+    const mapped = mapChannelsError(pluginExec('SIMULATION_FAILED', { message: 'Simulation failed' }, 'Simulation failed'));
+    assert.equal(mapped.code, 'channels_sim');
+    assert.doesNotMatch(mapped.message, /USDC/);
+  });
+
+  it('does not retry when details only contain 502 inside a number', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    let n = 0;
+    await assert.rejects(
+      () => submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
+        client: {
+          async submitSorobanTransaction() {
+            n += 1;
+            throw pluginExec('ONCHAIN_FAILED', { ledger: 1502, reason: 'boom' });
+          },
+        },
+      })),
+      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_confirming',
+    );
+    assert.equal(n, 1);
+  });
+
+  it('stores WAIT_TIMEOUT hash as openAttemptSig and returns it when the order landed', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    const store: {
+      buyer: string;
+      amount: string;
+      basketHash: string;
+      orderId: string;
+      openSig?: string;
+      openAttemptSig?: string;
+    } = { buyer: BUYER, amount: '1000000', basketHash: BASKET, orderId: ORDER };
+    let opened = false;
+    const sent = await submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
+      loadRecord: async () => ({ ...store }),
+      saveAttempt: async (_orderId, hash) => { store.openAttemptSig = hash; },
+      recoverAttempt: async (rec) => {
+        if (!rec.openSig && rec.openAttemptSig && opened) {
+          store.openSig = rec.openAttemptSig;
+          return { ...rec, openSig: rec.openAttemptSig };
+        }
+        return rec;
+      },
+      readOpened: async () => opened,
+      client: {
+        async submitSorobanTransaction() {
+          opened = true;
+          throw pluginExec('WAIT_TIMEOUT', { hash: LANDED }, 'WAIT_TIMEOUT');
+        },
+      },
+    }));
+    assert.equal(store.openAttemptSig, LANDED);
+    assert.equal(sent.hash, LANDED);
+  });
+
+  it('submit returns an existing openSig without calling Channels', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    let n = 0;
+    const sent = await submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
+      loadRecord: async () => ({
+        orderId: ORDER,
+        buyer: BUYER,
+        amount: '1000000',
+        basketHash: BASKET,
+        openSig: LANDED,
+      }),
+      client: {
+        async submitSorobanTransaction() {
+          n += 1;
+          return { hash: 'ab'.repeat(32) };
+        },
+      },
+    }));
+    assert.equal(sent.hash, LANDED);
+    assert.equal(n, 0);
+  });
+
+  it('submit rejects a record that does not match the quote', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    await assert.rejects(
+      () => submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
+        loadRecord: async () => ({
+          orderId: ORDER,
+          buyer: OTHER,
+          amount: '1000000',
+          basketHash: BASKET,
+        }),
+      })),
+      (err: unknown) => err instanceof ChannelsFailure && err.status === 409 && err.code === 'channels_record',
+    );
+  });
+
+  it('retries PluginTransportError twice then answers 503', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    let n = 0;
+    await assert.rejects(
+      () => submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
+        client: {
+          async submitSorobanTransaction() {
+            n += 1;
+            throw new PluginTransportError('bad gateway', 502);
+          },
+        },
+      })),
+      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_pool' && err.status === 503,
+    );
+    assert.equal(n, 3);
+  });
+
+  it('maps FEE_LIMIT_EXCEEDED from errorDetails.code without retrying', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    let n = 0;
+    await assert.rejects(
+      () => submitOpen(input(), BUYER, [entry(BUYER, func)], deps({
+        client: {
+          async submitSorobanTransaction() {
+            n += 1;
+            throw pluginExec('FEE_LIMIT_EXCEEDED', {}, 'fee cap');
+          },
+        },
+      })),
+      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_fee_cap' && err.status === 503,
+    );
+    assert.equal(n, 1);
+  });
+
+  it('prepare recovers a landed openAttemptSig before simulating', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    let simulated = 0;
+    const prepared = await prepareOpen(input(), BUYER, deps({
+      loadRecord: async () => ({
+        orderId: ORDER,
+        buyer: BUYER,
+        amount: '1000000',
+        basketHash: BASKET,
+        openAttemptSig: LANDED,
+      }),
+      recoverAttempt: async (rec) => ({ ...rec, openSig: rec.openAttemptSig }),
+      simulator: {
+        async simulate() {
+          simulated += 1;
+          return { auth: [], latestLedger: 1000 };
+        },
+      },
+    }));
+    assert.deepEqual(prepared, { kind: 'opened', hash: LANDED });
+    assert.equal(simulated, 0);
+  });
+
+  it('prepare does not simulate again while confirmation is still pending', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    let simulated = 0;
+    await assert.rejects(
+      () => prepareOpen(input(), BUYER, deps({
+        loadRecord: async () => ({
+          orderId: ORDER,
+          buyer: BUYER,
+          amount: '1000000',
+          basketHash: BASKET,
+          openAttemptSig: LANDED,
+        }),
+        recoverAttempt: async (rec) => rec,
+        simulator: {
+          async simulate() {
+            simulated += 1;
+            return { auth: [], latestLedger: 1000 };
+          },
+        },
+      })),
+      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_confirming' && err.hash === LANDED,
+    );
+    assert.equal(simulated, 0);
   });
 });

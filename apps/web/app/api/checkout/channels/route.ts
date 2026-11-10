@@ -42,7 +42,8 @@ export async function POST(req: Request): Promise<Response> {
     const status = err instanceof Error && 'status' in err && typeof err.status === 'number' ? err.status : 500;
     const code = err instanceof Error && 'code' in err && typeof err.code === 'string' ? err.code : 'channels_submit';
     const message = err instanceof Error ? err.message : 'No se pudo enviar el pago.';
-    return Response.json({ error: message, code }, { status });
+    const hash = err instanceof Error && 'hash' in err && typeof err.hash === 'string' ? err.hash : undefined;
+    return Response.json({ error: message, code, hash }, { status });
   }
 }
 

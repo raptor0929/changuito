@@ -7,6 +7,7 @@
  */
 
 import { track } from './analytics';
+import { OpenConfirmationPending } from './checkout/open-submission.ts';
 
 export interface ChannelSigner {
   signAuthEntry(
@@ -42,6 +43,7 @@ export async function openThroughChannels(input: ChannelOpen): Promise<string> {
     const hash = await signAndSubmit(body, first, input.signAuthEntry);
     return hash;
   } catch (err) {
+    if (err instanceof OpenConfirmationPending) throw err;
     const code = err instanceof ChannelRequestError ? err.code : 'channels_submit';
     track('payment_fail', { flow: 'checkout', code });
     throw err;
@@ -109,6 +111,12 @@ async function post(body: Record<string, unknown>): Promise<ChannelResponse> {
   });
   const json = await res.json().catch(() => ({})) as ChannelResponse;
   if (!res.ok) {
+    if (json.code === 'channels_confirming') {
+      throw new OpenConfirmationPending(
+        json.error ?? 'El pago puede haber entrado. No vuelvas a firmar.',
+        json.hash,
+      );
+    }
     throw new ChannelRequestError(res.status, json.code ?? 'channels_submit', json.error ?? 'No se pudo enviar el pago.');
   }
   return json;

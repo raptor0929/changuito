@@ -261,7 +261,8 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
         ? (lang === 'en' ? 'Your wallet approval was received, but confirmation is still pending. We are checking this order. You do not need to sign or pay again.'
           : 'Recibimos la aprobación de tu billetera, pero falta confirmar el pedido. Lo estamos consultando. No hace falta volver a firmar ni pagar.')
         : e instanceof Error && e.message ? e.message : copy.failed);
-      if (!(e instanceof OpenConfirmationPending)) setPendingOpen(null);
+      if (e instanceof OpenConfirmationPending && e.tx) setPendingOpen({ orderId: quote.orderId, tx: e.tx });
+      else if (!(e instanceof OpenConfirmationPending)) setPendingOpen(null);
       if (manual && fundedSig) {
         setStatus({ orderId: quote.orderId, checkoutKind: 'manual_fee_v1', stage: 'shopping', phase: 'queued', payment: null,
           storeOrderId: null, openSig: fundedSig, closeSig: null, handoffUrl: null, amountDisplay: '0.10', error: null,
