@@ -5,9 +5,14 @@
  * write checks the chain first, so a poll that arrives twice cannot settle
  * twice — the contract refuses a second close anyway.
  *
- * The browser opens the order (the buyer has to sign). This module never
- * builds that transaction. Purchases that are not on chain yet are read back
- * from the checkout store, which is what the shopper just paid into.
+ * The browser opens the order (the buyer has to sign). Settle and refund are
+ * authorized by the resolver on the server and submitted through Channels:
+ * Channels is the transaction source and the fee payer. This module never
+ * builds a buyer-paid close, and a failed Channels submit is not retried as
+ * a direct RPC send.
+ *
+ * Purchases that are not on chain yet are read back from the checkout store,
+ * which is what the shopper just paid into.
  */
 import { Buffer } from 'node:buffer';
 
@@ -96,33 +101,52 @@ export async function readOrder(orderIdHex: string): Promise<OrderAccount | null
   return rec?.openSig ? fromRecord(rec) : null;
 }
 
-async function sentHash(tx: { signAndSend: () => Promise<unknown> }): Promise<string> {
-  const sent = await tx.signAndSend();
-  if (sent && typeof sent === 'object') {
-    const body = sent as { hash?: string; sendTransactionResponse?: { hash?: string } };
-    const hash = body.hash ?? body.sendTransactionResponse?.hash;
-    if (typeof hash === 'string' && hash.length > 0) return hash;
+/** Shared by settleOrder/refundOrder and POST /api/settle — one place for close deps. */
+export async function channelsCloseDeps() {
+  const {
+    ChannelsFailure,
+    channelsClient,
+    channelsKey,
+    stellarSimulator,
+  } = await import('../server/channels.ts');
+  const { resolverKeypair } = await import('../server/resolver.ts');
+  const { deployment } = await import('../deployments.ts');
+  const apiKey = channelsKey();
+  const client = await channelsClient();
+  if (!apiKey || !client) {
+    throw new ChannelsFailure(503, 'channels_unconfigured', 'Los pagos no están habilitados.');
   }
-  throw new Error('escrow send failed');
+  const net = 'testnet' as const;
+  return {
+    apiKey,
+    client,
+    simulator: stellarSimulator(net),
+    resolver: resolverKeypair(net),
+    networkPassphrase: deployment(net).networkPassphrase,
+  };
 }
 
 export async function settleOrder(order: OrderAccount, receiptHash: Uint8Array): Promise<string> {
-  const { escrowAsResolver } = await import('../server/resolver.ts');
-  const tx = await escrowAsResolver().settle({
-    order_id: Buffer.from(fromHex(order.orderId)),
-    basket_hash: Buffer.from(fromHex(order.basketHash)),
-    receipt_hash: Buffer.from(receiptHash),
-  });
-  return sentHash(tx);
+  const { submitSettle, noteLanded } = await import('../server/channels.ts');
+  const deps = await channelsCloseDeps();
+  const sent = await submitSettle(
+    { orderId: order.orderId, basketHash: order.basketHash, buyer: order.buyer },
+    receiptHash,
+    deps,
+  );
+  await noteLanded(sent.hash);
+  return sent.hash;
 }
 
 export async function refundOrder(order: OrderAccount): Promise<string> {
-  const { escrowAsResolver, resolverKeypair } = await import('../server/resolver.ts');
-  const tx = await escrowAsResolver().refund({
-    caller: resolverKeypair().publicKey(),
-    order_id: Buffer.from(fromHex(order.orderId)),
-  });
-  return sentHash(tx);
+  const { submitRefund, noteLanded } = await import('../server/channels.ts');
+  const deps = await channelsCloseDeps();
+  const sent = await submitRefund(
+    { orderId: order.orderId, buyer: order.buyer },
+    deps,
+  );
+  await noteLanded(sent.hash);
+  return sent.hash;
 }
 
 /** Orders this wallet has opened, newest first. The checkout store is the index; the chain is the balance. */

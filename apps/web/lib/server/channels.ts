@@ -1,10 +1,11 @@
 /**
- * OpenZeppelin Stellar Channels for `escrow.open` (issue #2).
+ * OpenZeppelin Stellar Channels for every escrow write (open, settle, refund).
  *
- * The buyer signs one authorization entry. A Channels account is the
- * transaction source and pays the fee. The browser never sends the host
- * function: this module rebuilds it from the quoted order and checks that
- * the signed entry is that call, for that buyer.
+ * Open: the buyer signs one authorization entry in the browser. Settle and
+ * refund: the resolver signs its authorization entry on the server. In every
+ * case a Channels account is the transaction source and pays the fee. There
+ * is no path where the buyer pays the fee, and a failed Channels submit does
+ * not fall back to a buyer-paid or resolver-paid send.
  *
  * The client is imported from the package's client file, not its root. The
  * root also loads a Node-only Actions plugin, which a Worker cannot run.
@@ -15,10 +16,12 @@ import {
   Address,
   Operation,
   TransactionBuilder,
+  authorizeEntry,
   nativeToScVal,
   rpc,
   scValToNative,
   xdr,
+  type Keypair,
 } from '@stellar/stellar-sdk';
 
 import { recoverOpenAttempt } from '../checkout/open-recovery.ts';
@@ -758,4 +761,187 @@ export async function noteLanded(hash: string, net: NetworkId = 'testnet'): Prom
   } catch {
     console.info('[channels] submitted', hash);
   }
+}
+
+/** What a settle / refund submit needs beyond the shared Channels client. */
+export interface CloseDeps {
+  simulator: Simulator;
+  client: ChannelsSubmitter | null;
+  apiKey: string | undefined;
+  /** Signs one simulated auth entry as the resolver. */
+  resolver: Keypair;
+  networkPassphrase: string;
+  sleep?: (ms: number) => Promise<void>;
+  note?: (line: string) => void;
+}
+
+function hostSettle(
+  escrowId: string,
+  orderId: string,
+  basketHash: string,
+  receiptHash: Uint8Array,
+): string {
+  const func = xdr.HostFunction.hostFunctionTypeInvokeContract(
+    new xdr.InvokeContractArgs({
+      contractAddress: new Address(escrowId).toScAddress(),
+      functionName: 'settle',
+      args: [
+        nativeToScVal(Buffer.from(fromHex(orderId)), { type: 'bytes' }),
+        nativeToScVal(Buffer.from(fromHex(basketHash)), { type: 'bytes' }),
+        nativeToScVal(Buffer.from(receiptHash), { type: 'bytes' }),
+      ],
+    }),
+  );
+  return func.toXDR('base64');
+}
+
+function hostRefund(escrowId: string, caller: string, orderId: string): string {
+  const func = xdr.HostFunction.hostFunctionTypeInvokeContract(
+    new xdr.InvokeContractArgs({
+      contractAddress: new Address(escrowId).toScAddress(),
+      functionName: 'refund',
+      args: [
+        new Address(caller).toScVal(),
+        nativeToScVal(Buffer.from(fromHex(orderId)), { type: 'bytes' }),
+      ],
+    }),
+  );
+  return func.toXDR('base64');
+}
+
+export function buildSettleFunc(orderId: string, basketHash: string, receiptHash: Uint8Array): string {
+  if (!HASH_RE.test(orderId) || !HASH_RE.test(basketHash)) {
+    throw new ChannelsFailure(400, 'channels_ids', 'El pedido no es válido.');
+  }
+  if (receiptHash.length !== 32) {
+    throw new ChannelsFailure(400, 'channels_ids', 'El pedido no es válido.');
+  }
+  return hostSettle(contractIds('testnet').escrowId, orderId, basketHash, receiptHash);
+}
+
+export function buildRefundFunc(caller: string, orderId: string): string {
+  if (!HASH_RE.test(orderId)) {
+    throw new ChannelsFailure(400, 'channels_ids', 'El pedido no es válido.');
+  }
+  if (!/^G[A-Z2-7]{55}$/.test(caller)) {
+    throw new ChannelsFailure(400, 'channels_buyer', 'La cuenta no es válida.');
+  }
+  return hostRefund(contractIds('testnet').escrowId, caller, orderId);
+}
+
+/**
+ * Address credentials for the resolver. Source-account credentials are
+ * refused: those only work when the transaction source is the resolver, and
+ * Channels is the source.
+ */
+export function assertResolverEntries(entries: string[], resolver: string, funcXdr: string): void {
+  if (entries.length < 1) {
+    throw new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este cierre.');
+  }
+  const want = xdr.HostFunction.fromXDR(funcXdr, 'base64');
+  if (want.type !== 'hostFunctionTypeInvokeContract') {
+    throw new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este cierre.');
+  }
+  for (const entryXdr of entries) {
+    const entry = xdr.SorobanAuthorizationEntry.fromXDR(entryXdr, 'base64');
+    if (entry.credentials.type === 'sorobanCredentialsSourceAccount') {
+      throw new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este cierre.');
+    }
+    let addressCreds: xdr.SorobanAddressCredentials;
+    try {
+      addressCreds = buyerCredentials(entry);
+    } catch {
+      throw new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este cierre.');
+    }
+    const address = Address.fromScAddress(addressCreds.address).toString();
+    if (address !== resolver) {
+      throw new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este cierre.');
+    }
+    const fn = entry.rootInvocation.function;
+    if (fn.type !== 'sorobanAuthorizedFunctionTypeContractFn') {
+      throw new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este cierre.');
+    }
+    if (fn.contractFn.toXDR('base64') !== want.invokeContract.toXDR('base64')) {
+      throw new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este cierre.');
+    }
+  }
+}
+
+/**
+ * Simulate with a source that is not the resolver so the host records
+ * address credentials for the resolver. Sign those, then hand func+auth to
+ * Channels. Channels is the fee payer; this never builds a buyer-paid tx.
+ */
+async function submitResolverCall(
+  func: string,
+  simSource: string,
+  deps: CloseDeps,
+): Promise<{ hash: string; feePayer: 'channels' }> {
+  if (!deps.apiKey || !deps.client) {
+    throw new ChannelsFailure(503, 'channels_unconfigured', 'Los pagos no están habilitados.');
+  }
+  const resolver = deps.resolver.publicKey();
+  if (simSource === resolver) {
+    // Same source as the authorizer would yield source-account credentials,
+    // which cannot travel with a Channels-built transaction.
+    throw new ChannelsFailure(500, 'channels_auth', 'La autorización no corresponde a este cierre.');
+  }
+  let sim: { auth: string[]; latestLedger: number };
+  try {
+    sim = await deps.simulator.simulate(func, simSource);
+  } catch (err) {
+    if (err instanceof ChannelsFailure) throw err;
+    const name = err instanceof Error ? err.name : 'Error';
+    const message = err instanceof Error ? firstLine(err.message) : '';
+    console.warn('[channels] close simulate threw', name, message);
+    throw new ChannelsFailure(502, 'channels_rpc', 'La red no pudo simular el pago.');
+  }
+  assertResolverEntries(sim.auth, resolver, func);
+  const ledger = sim.latestLedger + EXPIRY_LEDGERS;
+  const signed: string[] = [];
+  for (const entryXdr of sim.auth) {
+    const entry = xdr.SorobanAuthorizationEntry.fromXDR(entryXdr, 'base64');
+    const authorized = await authorizeEntry(entry, deps.resolver, ledger, deps.networkPassphrase);
+    signed.push(authorized.toXDR('base64'));
+  }
+  const sleep = deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+  let last: ChannelsFailure | null = null;
+  for (let attempt = 0; attempt < SUBMIT_TRIES; attempt++) {
+    try {
+      const sent = await deps.client.submitSorobanTransaction({ func, auth: signed });
+      const hash = sent.hash?.trim().toLowerCase();
+      if (!hash || !HASH_RE.test(hash)) {
+        throw new ChannelsFailure(502, 'channels_submit', 'No se pudo enviar el pago.');
+      }
+      deps.note?.(`[channels] close submitted ${hash}`);
+      return { hash, feePayer: 'channels' };
+    } catch (err) {
+      const mapped = err instanceof ChannelsFailure ? err : mapChannelsError(err);
+      last = mapped;
+      if (mapped.code === 'channels_pool' && attempt < SUBMIT_TRIES - 1) {
+        await sleep(200 * (attempt + 1));
+        continue;
+      }
+      throw mapped;
+    }
+  }
+  throw last ?? new ChannelsFailure(503, 'channels_pool', 'No se pudo enviar el pago. Probá de nuevo en un momento.');
+}
+
+export async function submitSettle(
+  order: { orderId: string; basketHash: string; buyer: string },
+  receiptHash: Uint8Array,
+  deps: CloseDeps,
+): Promise<{ hash: string; feePayer: 'channels' }> {
+  const func = buildSettleFunc(order.orderId, order.basketHash, receiptHash);
+  return submitResolverCall(func, order.buyer, deps);
+}
+
+export async function submitRefund(
+  order: { orderId: string; buyer: string },
+  deps: CloseDeps,
+): Promise<{ hash: string; feePayer: 'channels' }> {
+  const caller = deps.resolver.publicKey();
+  const func = buildRefundFunc(caller, order.orderId);
+  return submitResolverCall(func, order.buyer, deps);
 }
