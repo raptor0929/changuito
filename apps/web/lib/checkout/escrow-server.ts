@@ -101,7 +101,8 @@ export async function readOrder(orderIdHex: string): Promise<OrderAccount | null
   return rec?.openSig ? fromRecord(rec) : null;
 }
 
-async function channelsCloseDeps() {
+/** Shared by settleOrder/refundOrder and POST /api/settle — one place for close deps. */
+export async function channelsCloseDeps() {
   const {
     ChannelsFailure,
     channelsClient,

@@ -105,16 +105,86 @@ export function mockBindings(): void {
  * Also replace lib/server/resolver.ts, for route tests that need the resolver
  * to sign: the real one only accepts the deployed key, which no test has.
  * lib/test/resolver.test.ts covers the real module's refusals.
+ *
+ * Settle/refund go through Channels now, so the resolver mock also installs
+ * the Channels close fake — same boundary the live route crosses.
  */
 export function mockResolver(): void {
   const signer = { publicKey: RESOLVER_PUBLIC, signTransaction: async () => ({}) };
+  const keypair = { publicKey: () => RESOLVER_PUBLIC };
   mock.module(new URL('../../server/resolver.ts', import.meta.url).href, {
     namedExports: {
       escrowAsResolver: () => new EscrowClient(signer),
       usdcAsAdmin: () => new UsdcClient(signer),
-      resolverKeypair: () => {
-        throw new Error('not in tests');
-      },
+      resolverKeypair: () => keypair,
+    },
+  });
+  mockChannelsClose();
+}
+
+/**
+ * Stand-in for lib/server/channels.ts close path. Records settle/refund on
+ * `chain.calls` with the resolver as signer, so settle-route assertions keep
+ * checking authorization without a live Channels submit. `chain.fail` still
+ * makes the close throw.
+ */
+export function mockChannelsClose(): void {
+  class ChannelsFailure extends Error {
+    readonly status: number;
+    readonly code: string;
+    readonly hash?: string;
+
+    constructor(status: number, code: string, message: string, hash?: string) {
+      super(message);
+      this.name = 'ChannelsFailure';
+      this.status = status;
+      this.code = code;
+      this.hash = hash;
+    }
+  }
+
+  async function submitSettle(
+    order: { orderId: string; basketHash: string; buyer: string },
+    receiptHash: Uint8Array,
+    deps: { resolver: { publicKey(): string } },
+  ) {
+    if (chain.fail) throw chain.fail;
+    const signedBy = deps.resolver.publicKey();
+    chain.calls.push({
+      method: 'settle',
+      args: { order: order.orderId, receipt: Buffer.from(receiptHash).toString('hex') },
+      signedBy,
+    });
+    return { hash: `tx-settle-${chain.calls.length}`, feePayer: 'channels' as const };
+  }
+
+  async function submitRefund(
+    order: { orderId: string; buyer: string },
+    deps: { resolver: { publicKey(): string } },
+  ) {
+    if (chain.fail) throw chain.fail;
+    const signedBy = deps.resolver.publicKey();
+    chain.calls.push({
+      method: 'refund',
+      args: { order: order.orderId, caller: signedBy },
+      signedBy,
+    });
+    return { hash: `tx-refund-${chain.calls.length}`, feePayer: 'channels' as const };
+  }
+
+  mock.module(new URL('../../server/channels.ts', import.meta.url).href, {
+    namedExports: {
+      ChannelsFailure,
+      channelsKey: () => 'test-key',
+      channelsClient: async () => ({
+        submitSorobanTransaction: async () => ({ hash: 'ab'.repeat(32) }),
+      }),
+      stellarSimulator: () => ({
+        simulate: async () => ({ auth: [] as string[], latestLedger: 1 }),
+      }),
+      noteLanded: async () => {},
+      submitSettle,
+      submitRefund,
     },
   });
 }

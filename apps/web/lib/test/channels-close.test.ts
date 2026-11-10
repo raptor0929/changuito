@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { Address, Keypair, xdr } from '@stellar/stellar-sdk';
 import {
   PluginExecutionError,
@@ -184,12 +185,55 @@ describe('channels close', () => {
     );
   });
 
-  it('RULE: escrow-server close never signAndSend and never falls back to the buyer', () => {
-    const src = readFileSync(join(import.meta.dirname, '../checkout/escrow-server.ts'), 'utf8');
-    assert.doesNotMatch(src, /signAndSend/);
-    assert.doesNotMatch(src, /sendTransaction/);
-    assert.match(src, /submitSettle/);
-    assert.match(src, /submitRefund/);
-    assert.doesNotMatch(src, /buyer.*pay|pay.*buyer|fallback/i);
+  it('RULE: escrow writes only leave through channels.ts', () => {
+    // Every settle/refund/open that reaches the network must go through
+    // lib/server/channels.ts. A signAndSend on an escrow client, an escrow
+    // .settle/.refund/.open that is sent, or an RPC sendTransaction anywhere
+    // else is a regression back to the buyer or the resolver paying the fee.
+    const webRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
+    const allowed = 'lib/server/channels.ts';
+    // Exact paths only. The faucet mints mock USDC; that is not an escrow call.
+    const allowlist = new Map<string, string>([
+      ['app/api/faucet/route.ts', 'USDC mint via usdcAsAdmin, not an escrow write'],
+    ]);
+
+    const WRITE = /\.(signAndSend|sendTransaction)\s*\(|\.(settle|refund|open)\s*\(/;
+
+    function isEscrowWrite(src: string): boolean {
+      return WRITE.test(src);
+    }
+
+    // The pre-Channels settle route would have failed this scan.
+    const oldSettleRoute = [
+      'const tx = await escrow.settle({ order_id: idBuf, basket_hash: buf, receipt_hash: buf });',
+      'const sent = await tx.signAndSend();',
+      'const hash = sent.sendTransactionResponse?.hash ?? "";',
+    ].join('\n');
+    assert.ok(isEscrowWrite(oldSettleRoute), 'scan must flag the old settle route');
+
+    const hits: string[] = [];
+    function walk(dir: string): void {
+      for (const name of readdirSync(dir)) {
+        if (name === 'node_modules') continue;
+        const full = join(dir, name);
+        const rel = relative(webRoot, full).replaceAll('\\', '/');
+        if (rel === 'lib/test' || rel.startsWith('lib/test/')) continue;
+        const st = statSync(full);
+        if (st.isDirectory()) {
+          walk(full);
+          continue;
+        }
+        if (!/\.(ts|tsx)$/.test(name) || name.endsWith('.test.ts') || name.endsWith('.test.tsx')) continue;
+        if (rel === allowed) continue;
+        if (allowlist.has(rel)) continue;
+        const src = readFileSync(full, 'utf8');
+        if (isEscrowWrite(src)) hits.push(rel);
+      }
+    }
+
+    walk(join(webRoot, 'app'));
+    walk(join(webRoot, 'lib'));
+    assert.deepEqual(hits, [], `escrow write outside channels.ts: ${hits.join(', ')}`);
   });
 });
+

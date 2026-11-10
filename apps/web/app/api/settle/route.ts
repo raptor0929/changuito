@@ -2,8 +2,11 @@
  * POST /api/settle  ->  release the escrow to the treasury, or return it.
  *
  * The resolver's half of the contract. `open` is signed by the buyer in their
- * wallet; `settle` and `refund` are signed here, by the one server key, because
- * the buyer must not be able to move money out of an escrow they funded.
+ * wallet; `settle` and `refund` are authorized here by the one server key,
+ * because the buyer must not be able to move money out of an escrow they
+ * funded. The transaction itself is submitted through Channels: Channels is
+ * the source and the fee payer. A Channels failure is not retried as a
+ * resolver-paid or buyer-paid send.
  *
  * Who decides: only the order's buyer, proven by a SEP-53 signature over the
  * action and the order id, and checked against the buyer the contract
@@ -12,7 +15,9 @@
  */
 import { Status } from '@changuito/escrow-bindings';
 
+import { channelsCloseDeps } from '../../../lib/checkout/escrow-server.ts';
 import { canonicalReceipt, fromHex, receiptHash, toHex, type SettleAction } from '../../../lib/order.ts';
+import { noteLanded, submitRefund, submitSettle } from '../../../lib/server/channels.ts';
 import { escrowAsResolver } from '../../../lib/server/resolver.ts';
 import { buyerMayClose, gateSettle, notYourOrderResponse } from '../../../lib/settle-gate.ts';
 import { explorer, formatUsdc } from '../../../lib/stellar.ts';
@@ -64,39 +69,49 @@ export async function POST(req: Request): Promise<Response> {
       return Response.json({ error: 'el carrito no coincide con el que firmó el comprador' }, { status: 409 });
     }
 
+    // Channels serves testnet only. A network it does not cover is refused
+    // here — never sent with the resolver as source.
+    if (network !== 'testnet') {
+      return Response.json({ error: 'Channels está disponible solo en testnet.' }, { status: 403 });
+    }
+
     const amount = found.amount;
     const common = { action, orderId, amount: amount.toString(), amountDisplay: formatUsdc(amount) };
+    const deps = await channelsCloseDeps();
+    const buyer = String(found.buyer);
 
     if (action === 'refund') {
-      const tx = await escrow.refund({ caller: (await escrow.config()).result.resolver, order_id: idBuf });
-      const sent = await tx.signAndSend();
-      const hash = sent.sendTransactionResponse?.hash ?? '';
-      return Response.json({ ...common, hash, txUrl: explorer.tx(hash, network) } satisfies SettleResponse);
+      const sent = await submitRefund({ orderId, buyer }, deps);
+      await noteLanded(sent.hash, network);
+      return Response.json({
+        ...common,
+        hash: sent.hash,
+        txUrl: explorer.tx(sent.hash, network),
+      } satisfies SettleResponse);
     }
 
     // Only what the contract returned and the server chose. Nothing the
     // browser sent is hashed as if it were evidence.
     const input = {
       orderId,
-      buyer: String(found.buyer),
+      buyer,
       basketHash,
       amountUnits: amount.toString(),
       settledAt: new Date().toISOString(),
     };
     const receipt = await receiptHash(input);
 
-    const tx = await escrow.settle({
-      order_id: idBuf,
-      basket_hash: Buffer.from(fromHex(basketHash)),
-      receipt_hash: Buffer.from(receipt),
-    });
-    const sent = await tx.signAndSend();
-    const hash = sent.sendTransactionResponse?.hash ?? '';
+    const sent = await submitSettle(
+      { orderId, basketHash, buyer },
+      receipt,
+      deps,
+    );
+    await noteLanded(sent.hash, network);
 
     return Response.json({
       ...common,
-      hash,
-      txUrl: explorer.tx(hash, network),
+      hash: sent.hash,
+      txUrl: explorer.tx(sent.hash, network),
       // Returned so the on-chain hash can be re-derived by anyone, which is
       // the only thing that makes it a receipt rather than 32 opaque bytes.
       receipt: canonicalReceipt(input),
