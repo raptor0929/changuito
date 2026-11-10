@@ -32,8 +32,8 @@ import { flowLabels, flowRailIndex, flowScreen } from '../lib/checkout/flow.ts';
  *   2. lock    — the server quotes goods + envío at belo's USDC rate (order
  *                id, basket hash, USDC amount) and the shopper confirms that
  *                breakdown and types their Día login. The server builds
- *                `open` with the resolver as fee payer; the wallet signs it
- *                as the buyer, the server co-signs and sends. The USDC is
+ *                `open`; the wallet signs the authorization and Channels
+ *                pays the fee and sends. The USDC is
  *                now in a vault the program owns, not in an account of ours.
  *   3. shop    — the server starts a sandbox job (services/sandbox) that logs
  *                into the shopper's Día account, fills the cart, picks the
@@ -211,8 +211,7 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
     setError(null);
     let fundedSig: string | null = openSig;
     try {
-      // The server builds `open` with the resolver paying the fee; the wallet
-      // signs as the buyer and the server co-signs and sends.
+      // Channels pays the fee. The wallet signs the open authorization.
       if (!fundedSig) {
         let submission = pending;
         if (!submission) {
