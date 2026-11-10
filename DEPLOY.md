@@ -229,18 +229,18 @@ inlined. On a local machine the same public names can come from the shell.
 [2.4](#24-environment-variables): `ANTHROPIC_API_KEY`, `TURNSTILE_SECRET_KEY`,
 `CHG_SESSION_SECRET`, and for payments `STELLAR_RESOLVER_SECRET`,
 `DEPOSIT_ADDRESS_TESTNET`, `DEMO_WALLET_SECRET`, plus optionally
-`FAUCET_ALLOWLIST_ADDRESSES`, `VYRION_API_KEY`, `FX_ARS_PER_USD`. Without the
+`VYRION_API_KEY`, `FX_ARS_PER_USD`. Without the
 three payment ones the app runs and checkout answers 503 "los pagos no están
 habilitados" (`lib/test/go-live-without-payments.test.ts`).
 
-The faucet has a second gate in the database, read after the env one. Apply
+The faucet list is the database, not a Worker secret. Apply
 `supabase/migrations/0011_wallet.sql` first. `config.faucet_open_to_all`
 (default false) lets any wallet that is not banned mint; otherwise only a
-`wallet` row with `faucet_allowed` does, on top of the env list.
+`wallet` row with `faucet_allowed` does.
 `node scripts/config.mjs set faucet_open_to_all true` flips the flag, and
 `npm run wallet -- allow G...` grants one address. A `banned` row refuses
-the login cookie and the faucet. A missing database leaves the env list in
-charge. The SEP-53 proof is still required in production.
+the login cookie and the faucet. With no database the faucet is closed.
+The SEP-53 proof is still required.
 
 No Redis. The chat and faucet quotas count in Postgres (`quota` table,
 `lib/kv.ts`). Production without `DATABASE_URL` refuses them. `KV_REST_API_URL`
@@ -380,16 +380,12 @@ store. See [2.6](#26-conversation-history-and-quotas).
 | `REAL_MODE_ALLOWLIST_ADDRESSES` | who may pay — see [2.8](#28-who-may-pay) | server only |
 | `REAL_MODE_OPEN_TO_ALL` | optional, `1` to drop that list — read [2.8](#28-who-may-pay) first | server only |
 
-**Still configured for the escrow and the testnet faucet:**
-`STELLAR_RESOLVER_SECRET`, `STELLAR_RESOLVER_SECRET_MAINNET`, and optionally
-`FAUCET_ALLOWLIST_ADDRESSES` or `FAUCET_OPEN_TO_ALL`. Settle and refund need
-the resolver secret. The env pair is one faucet gate: an empty list in
-production disables that gate, and `FAUCET_OPEN_TO_ALL` (`1`, `true`, `yes`
-or `on`) skips the list without skipping the SEP-53 proof. The other gate
-is in the database, after `0011_wallet.sql`: `config.faucet_open_to_all` or
-a `wallet.faucet_allowed` row. Either one opens a faucet the env gate
-refused; a ban wins over both. Set them with `node scripts/config.mjs` and
-`npm run wallet`, not with a Worker secret. See
+**Still configured for the escrow:**
+`STELLAR_RESOLVER_SECRET` and `STELLAR_RESOLVER_SECRET_MAINNET`. Settle and
+refund need the resolver secret. The faucet is not an environment variable:
+after `0011_wallet.sql`, `config.faucet_open_to_all` or a
+`wallet.faucet_allowed` row decides who may mint, and a ban wins over both.
+Set them with `node scripts/config.mjs` and `npm run wallet`. See
 [docs/flows.md](docs/flows.md#2-funding-a-wallet-testnet).
 
 `DEPOSIT_ADDRESS_*` is **public by nature** — it is printed on screen for the

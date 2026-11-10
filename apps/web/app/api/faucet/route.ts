@@ -12,8 +12,8 @@
  * Doing it the other way round hands someone money they cannot spend.
  *
  * Both steps sign with our keys, so neither runs until `authorizeFaucet` says
- * so: in production only allowlisted testers, proving the wallet with a fresh
- * SEP-53 signature. See lib/faucet-auth.ts.
+ * so: the database says this wallet may mint, and the wallet proves it with a
+ * fresh SEP-53 signature. See lib/faucet-auth.ts.
  *
  * GET /api/faucet?address=…&network=…  ->  { mode, allowed }, so the widget can
  * leave the button out instead of showing one that can only fail. On a network
@@ -40,14 +40,12 @@
  * very much alive: it is the house pattern for "we are about to spend
  * something on your behalf", and POST /api/deposit/demo follows it.
  */
-import { faucetAccess } from '../../../lib/faucet-auth.ts';
-import { gateFaucet } from '../../../lib/faucet-gate.ts';
+import { faucetButton, gateFaucet } from '../../../lib/faucet-gate.ts';
 import { faucetVerdict } from '../../../lib/faucet-policy.ts';
-import type { FaucetAccess } from '../../../lib/faucet-proof.ts';
 import { requireHuman } from '../../../lib/human-gate.ts';
 import { networkNotServed, requestNetwork } from '../../../lib/server-network.ts';
 import { usdcAsAdmin } from '../../../lib/server/resolver.ts';
-import { addressKind, ensureFunded, formatUsdc } from '../../../lib/stellar.ts';
+import { ensureFunded, formatUsdc } from '../../../lib/stellar.ts';
 import { usdcBalance } from '../../../lib/token.ts';
 
 export const runtime = 'nodejs';
@@ -74,9 +72,7 @@ export async function GET(req: Request): Promise<Response> {
   const asked = requestNetwork(params.get('network'));
   if (!asked.ok) return networkNotServed();
   const network = asked.network;
-  const access: FaucetAccess = addressKind(address)
-    ? faucetAccess(address, process.env, network)
-    : { mode: faucetAccess('', process.env, network).mode, allowed: false };
+  const access = await faucetButton(address, process.env, network);
   return Response.json(access, { headers: { 'cache-control': 'no-store' } });
 }
 

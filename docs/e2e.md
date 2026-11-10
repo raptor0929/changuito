@@ -94,7 +94,7 @@ So:
 |---|---|
 | Either missing or blank | Skips |
 | Email + any password, no 6-digit code | Submits the email, expects the code screen, does not claim the wallet chrome |
-| Email + `CHANGUTO_E2E_OTP` (or a password that is exactly 6 digits) | Types the code and expects **Salir** and **Tu pago**. **Cargar USDC** is expected only if `GET /api/faucet` says this wallet is on `FAUCET_ALLOWLIST_ADDRESSES`; otherwise the spec checks the button is absent |
+| Email + `CHANGUTO_E2E_OTP` (or a password that is exactly 6 digits) | Types the code and expects **Salir** and **Tu pago**. **Cargar USDC** is expected only if `GET /api/faucet` says this wallet is granted in the database; otherwise the spec checks the button is absent |
 
 A normal password cannot finish login. A code is one-time, so a standing
 GitHub secret will not keep the signed-in assertion green unless Pollar

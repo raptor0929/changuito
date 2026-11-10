@@ -1,12 +1,11 @@
 import type { NetworkId } from './deployments.ts';
-import { authorizeFaucet } from './faucet-auth.ts';
-import type { FaucetProof } from './faucet-proof.ts';
+import { authorizeFaucet, faucetView } from './faucet-auth.ts';
+import type { FaucetAccess, FaucetProof } from './faucet-proof.ts';
 import { requireHuman } from './human-gate.ts';
 import { guestTurnCounter, limiterUnavailableResponse, takeQuota, type TurnCounter } from './login-gate.ts';
 import { requestNetwork } from './server-network.ts';
 import { addressKind } from './stellar.ts';
-import { verifyWalletProof } from './wallet-proof-verify.ts';
-import { faucetOpenToAll, walletOpensFaucet, walletStanding, type WalletDirectory } from './wallet-record.ts';
+import { faucetAdmitted, faucetOpenToAll, walletStanding, type WalletDirectory } from './wallet-record.ts';
 
 /**
  * Everything POST /api/faucet decides before it touches the chain.
@@ -28,6 +27,21 @@ export const FAUCET_COOLDOWN_SECONDS = 60;
 
 /** Every tester together, per hour. The hot key signs each one. */
 export const FAUCET_GRANTS_PER_HOUR = 20;
+
+/** What the widget reads. A banned wallet and a wallet the database has not granted both hide the button. */
+export async function faucetButton(
+  address: string,
+  env: NodeJS.ProcessEnv,
+  network: NetworkId,
+  wallets?: WalletDirectory,
+): Promise<FaucetAccess> {
+  const openToAll = await faucetOpenToAll(env, wallets);
+  if (!addressKind(address)) return faucetView(network, { admitted: false, openToAll });
+  const standing = await walletStanding(address, env, network, wallets);
+  if (standing.banned) return { mode: 'disabled', allowed: false };
+  return faucetView(network, { admitted: faucetAdmitted(standing, openToAll), openToAll });
+}
+
 export async function gateFaucet(
   req: Request,
   env: NodeJS.ProcessEnv = process.env,
@@ -65,22 +79,15 @@ export async function gateFaucet(
     return Response.json({ error: 'wallet_banned', message: 'Esta cuenta no puede usar Changuito.' }, { status: 403 });
   }
 
-  const auth = authorizeFaucet({ address, proof, now, env, net: network });
-  if (!auth.ok) {
-    const open = walletOpensFaucet(standing, await faucetOpenToAll(env, wallets), auth.error);
-    if (!open) return Response.json({ error: auth.error, message: auth.message }, { status: auth.status });
-    const signed = verifyWalletProof({ intent: 'faucet', address, proof, now });
-    if (!signed.ok) {
-      const error = signed.error === 'proof_missing' ? 'faucet_session_required' : signed.error === 'proof_expired' ? 'faucet_proof_expired' : 'faucet_proof_invalid';
-      const message =
-        signed.error === 'proof_missing'
-          ? 'Iniciá sesión con la cuenta de prueba para cargar USDC.'
-          : signed.error === 'proof_expired'
-            ? 'La confirmación venció. Probá de nuevo.'
-            : 'No pudimos confirmar tu sesión. Probá de nuevo.';
-      return Response.json({ error, message }, { status: 401 });
-    }
-  }
+  const openToAll = await faucetOpenToAll(env, wallets);
+  const auth = authorizeFaucet({
+    address,
+    proof,
+    now,
+    net: network,
+    admitted: faucetAdmitted(standing, openToAll),
+  });
+  if (!auth.ok) return Response.json({ error: auth.error, message: auth.message }, { status: auth.status });
 
   const wait = 'Esperá un momento antes de volver a pedir fondos.';
   const mine = await takeQuota(`changuito:faucet:${address}`, 1, FAUCET_COOLDOWN_SECONDS, store);

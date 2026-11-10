@@ -58,7 +58,8 @@ export async function registerWallet(
   network: NetworkId = walletNetwork(env),
   directory?: WalletDirectory,
 ): Promise<WalletStanding> {
-  if (directory) return directory.register(network, address);
+  const standIn = directoryOf(directory);
+  if (standIn) return standIn.register(network, address);
   if (!hasDatabase(env)) return { network, ...OPEN };
   try {
     const inserted = await db(env)`
@@ -89,7 +90,8 @@ export async function walletStanding(
   network: NetworkId = walletNetwork(env),
   directory?: WalletDirectory,
 ): Promise<WalletStanding> {
-  if (directory) return directory.standing(network, address);
+  const standIn = directoryOf(directory);
+  if (standIn) return standIn.standing(network, address);
   if (!hasDatabase(env)) return { network, ...OPEN };
   try {
     const rows = await db(env)`
@@ -106,7 +108,8 @@ export async function walletStanding(
 
 /** `config.faucet_open_to_all`. Missing row, missing table and no database are false. */
 export async function faucetOpenToAll(env: NodeJS.ProcessEnv = process.env, directory?: WalletDirectory): Promise<boolean> {
-  if (directory) return directory.openToAll();
+  const standIn = directoryOf(directory);
+  if (standIn) return standIn.openToAll();
   if (!hasDatabase(env)) return false;
   try {
     const rows = await db(env)`select value from config where key = 'faucet_open_to_all'`;
@@ -117,17 +120,19 @@ export async function faucetOpenToAll(env: NodeJS.ProcessEnv = process.env, dire
   }
 }
 
-/**
- * The database can open the faucet for a wallet the env allowlist does not
- * know. It never opens it for a banned wallet, and it never replaces a
- * refusal that is about the network or the signature.
- */
-export function walletOpensFaucet(
-  standing: Pick<WalletStanding, 'banned' | 'faucetAllowed'>,
-  openToAll: boolean,
-  envError: string,
-): boolean {
+/** The database is the only faucet list. A ban wins over both flags. */
+export function faucetAdmitted(standing: Pick<WalletStanding, 'banned' | 'faucetAllowed'>, openToAll: boolean): boolean {
   if (standing.banned) return false;
-  if (envError !== 'faucet_disabled' && envError !== 'faucet_not_allowed') return false;
   return openToAll || standing.faucetAllowed;
+}
+
+let testDirectory: WalletDirectory | undefined;
+
+/** Route tests install a stand-in. Production never calls this. */
+export function __setWalletDirectoryForTests(next?: WalletDirectory): void {
+  testDirectory = next;
+}
+
+function directoryOf(passed?: WalletDirectory): WalletDirectory | undefined {
+  return passed ?? testDirectory;
 }

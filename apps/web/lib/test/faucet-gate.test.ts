@@ -26,7 +26,6 @@ const stranger = Keypair.random();
 const env = {
   NODE_ENV: 'production',
   TURNSTILE_SECRET_KEY: SECRET,
-  FAUCET_ALLOWLIST_ADDRESSES: tester.publicKey(),
 } as NodeJS.ProcessEnv;
 
 function signed(kp: Keypair, address = kp.publicKey()) {
@@ -47,9 +46,11 @@ async function refusal(res: unknown): Promise<{ status: number; error: string }>
 }
 
 describe('POST /api/faucet gate', () => {
-  it('lets the allowlisted tester through with a signed session proof', async () => {
-    const res = await gateFaucet(await post({ address: tester.publicKey(), proof: signed(tester) }), env, now, memoryCounter());
+  it('lets a granted wallet through with a signed session proof', async () => {
+    const book = memoryWallets([{ address: tester.publicKey(), faucetAllowed: true }]);
+    const res = await gateFaucet(await post({ address: tester.publicKey(), proof: signed(tester) }), env, now, memoryCounter(), book.directory);
     assert.deepEqual(res, { address: tester.publicKey(), kind: 'account', network: DEFAULT_NETWORK });
+    assert.equal(book.inserts(), 0);
   });
 
   it('refuses to fund in modo real, and refuses a network it does not know', async () => {
@@ -75,22 +76,22 @@ describe('POST /api/faucet gate', () => {
     assert.deepEqual(await refusal(res), { status: 403, error: 'faucet_not_allowed' });
   });
 
-  it('refuses the tester’s address with no session proof with 401', async () => {
-    // The QA repro: POST { address } straight at the API.
-    const res = await gateFaucet(await post({ address: tester.publicKey() }), env, now, memoryCounter());
+  it('refuses the granted address with no session proof with 401', async () => {
+    const book = memoryWallets([{ address: tester.publicKey(), faucetAllowed: true }]);
+    const res = await gateFaucet(await post({ address: tester.publicKey() }), env, now, memoryCounter(), book.directory);
     assert.deepEqual(await refusal(res), { status: 401, error: 'faucet_session_required' });
   });
 
-  it('refuses a forged proof for the tester’s address', async () => {
+  it('refuses a forged proof for the granted address', async () => {
+    const book = memoryWallets([{ address: tester.publicKey(), faucetAllowed: true }]);
     const forged = { ...signed(stranger, tester.publicKey()) };
-    const res = await gateFaucet(await post({ address: tester.publicKey(), proof: forged }), env, now, memoryCounter());
+    const res = await gateFaucet(await post({ address: tester.publicKey(), proof: forged }), env, now, memoryCounter(), book.directory);
     assert.deepEqual(await refusal(res), { status: 401, error: 'faucet_proof_invalid' });
   });
 
-  it('refuses everyone when production has no allowlist', async () => {
-    const closed = { ...env, FAUCET_ALLOWLIST_ADDRESSES: '' } as NodeJS.ProcessEnv;
-    const res = await gateFaucet(await post({ address: tester.publicKey(), proof: signed(tester) }), closed, now, memoryCounter());
-    assert.deepEqual(await refusal(res), { status: 403, error: 'faucet_disabled' });
+  it('refuses a wallet the database has not granted', async () => {
+    const res = await gateFaucet(await post({ address: tester.publicKey(), proof: signed(tester) }), env, now, memoryCounter());
+    assert.deepEqual(await refusal(res), { status: 403, error: 'faucet_not_allowed' });
   });
 
   it('still requires the human cookie first', async () => {
@@ -99,20 +100,21 @@ describe('POST /api/faucet gate', () => {
   });
 
   it('holds a second grant inside the cooldown, across instances', async () => {
+    const book = memoryWallets([{ address: tester.publicKey(), faucetAllowed: true }]);
     const store = memoryCounter();
-    const first = await gateFaucet(await post({ address: tester.publicKey(), proof: signed(tester) }), env, now, store);
+    const first = await gateFaucet(await post({ address: tester.publicKey(), proof: signed(tester) }), env, now, store, book.directory);
     assert.ok(!(first instanceof Response));
-    const second = await gateFaucet(await post({ address: tester.publicKey(), proof: signed(tester) }), env, now, store);
+    const second = await gateFaucet(await post({ address: tester.publicKey(), proof: signed(tester) }), env, now, store, book.directory);
     assert.deepEqual(await refusal(second), { status: 429, error: 'rate_limited' });
   });
 
   it('stops every tester together at the hourly ceiling', async () => {
     const store = memoryCounter();
+    const book = memoryWallets([], true);
     const testers = Array.from({ length: FAUCET_GRANTS_PER_HOUR + 1 }, () => Keypair.random());
-    const many = { ...env, FAUCET_ALLOWLIST_ADDRESSES: testers.map((k) => k.publicKey()).join(',') } as NodeJS.ProcessEnv;
     const results: unknown[] = [];
     for (const kp of testers) {
-      results.push(await gateFaucet(await post({ address: kp.publicKey(), proof: signed(kp) }), many, now, store));
+      results.push(await gateFaucet(await post({ address: kp.publicKey(), proof: signed(kp) }), env, now, store, book.directory));
     }
     assert.equal(results.filter((r) => !(r instanceof Response)).length, FAUCET_GRANTS_PER_HOUR);
     assert.deepEqual(await refusal(results.at(-1)), { status: 429, error: 'rate_limited' });
@@ -128,7 +130,8 @@ describe('POST /api/faucet gate', () => {
         throw new CounterUnavailable('down');
       },
     };
-    const res = await gateFaucet(await post({ address: tester.publicKey(), proof: signed(tester) }), env, now, down);
+    const book = memoryWallets([{ address: tester.publicKey(), faucetAllowed: true }]);
+    const res = await gateFaucet(await post({ address: tester.publicKey(), proof: signed(tester) }), env, now, down, book.directory);
     assert.deepEqual(await refusal(res), { status: 503, error: 'limiter_unavailable' });
   });
 
@@ -145,22 +148,22 @@ describe('POST /api/faucet gate', () => {
   });
 
   it('does not insert a wallet for an unproven faucet request', async () => {
-    const book = memoryWallets();
+    const book = memoryWallets([{ address: tester.publicKey(), faucetAllowed: true }]);
     const res = await gateFaucet(await post({ address: tester.publicKey() }), env, now, memoryCounter(), book.directory);
     assert.deepEqual(await refusal(res), { status: 401, error: 'faucet_session_required' });
     assert.equal(book.inserts(), 0);
-    const open = { NODE_ENV: 'development', TURNSTILE_SECRET_KEY: SECRET } as NodeJS.ProcessEnv;
-    const dev = await gateFaucet(await post({ address: stranger.publicKey() }), open, now, memoryCounter(), book.directory);
-    assert.ok(!(dev instanceof Response));
-    assert.equal(book.inserts(), 0);
+    const dev = { NODE_ENV: 'development', TURNSTILE_SECRET_KEY: SECRET } as NodeJS.ProcessEnv;
+    const openBook = memoryWallets();
+    const ungranted = await gateFaucet(await post({ address: stranger.publicKey() }), dev, now, memoryCounter(), openBook.directory);
+    assert.deepEqual(await refusal(ungranted), { status: 403, error: 'faucet_not_allowed' });
+    assert.equal(openBook.inserts(), 0);
   });
 
-  it('lets a granted wallet through when the env list is closed, without inserting', async () => {
+  it('lets a granted wallet through without an env list, and does not insert', async () => {
     const book = memoryWallets([{ address: stranger.publicKey(), faucetAllowed: true }]);
-    const closed = { ...env, FAUCET_ALLOWLIST_ADDRESSES: '' } as NodeJS.ProcessEnv;
     const res = await gateFaucet(
       await post({ address: stranger.publicKey(), proof: signed(stranger) }),
-      closed,
+      env,
       now,
       memoryCounter(),
       book.directory,
@@ -170,7 +173,7 @@ describe('POST /api/faucet gate', () => {
   });
 });
 
-function memoryWallets(seed: { address: string; banned?: boolean; faucetAllowed?: boolean }[] = []): {
+function memoryWallets(seed: { address: string; banned?: boolean; faucetAllowed?: boolean }[] = [], open = false): {
   directory: WalletDirectory;
   inserts: () => number;
 } {
@@ -197,7 +200,7 @@ function memoryWallets(seed: { address: string; banned?: boolean; faucetAllowed?
         return read(network, address);
       },
       async openToAll() {
-        return false;
+        return open;
       },
     },
   };

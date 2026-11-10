@@ -185,7 +185,7 @@ in `apps/web/.env.example`; setup in [`../DEPLOY.md`](../DEPLOY.md).
 |---|---|---|
 | `ANTHROPIC_API_KEY` | yes | the agent |
 | `NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` | no | the wallet. Without it preview still works end to end; what is missing is the way *out* of preview |
-| `DATABASE_URL`, `DIRECT_URL` | for orders | orders, cards and the chat archive. Unset, the checkout has nowhere to record |
+| `DATABASE_URL`, `DIRECT_URL` | for orders and the faucet | orders, cards, the chat archive, quotas, and who may use the faucet. Unset, the faucet is closed |
 | `DEPOSIT_ADDRESS_TESTNET` / `_MAINNET` | for checkout | where a deposit is paid. A `C…` contract address is refused — it cannot take a memo. Unset, the deposit screen answers 503 |
 | `DEMO_WALLET_SECRET` | for preview pay | lets preview settle a real testnet payment for a visitor with no wallet. Unset, the button answers 503 and says so |
 | `VYRION_API_KEY` | for the card | unset, the card button is never rendered rather than rendered and broken |
@@ -194,7 +194,6 @@ in `apps/web/.env.example`; setup in [`../DEPLOY.md`](../DEPLOY.md).
 | `STELLAR_RESOLVER_SECRET_MAINNET` | no | must be a *different* key; checked against `deployments.json` and refused on mismatch |
 | `REAL_MODE_ALLOWLIST_ADDRESSES` | for modo real | deny-by-default: empty in production means nobody, Vercel previews included |
 | `REAL_MODE_OPEN_TO_ALL` | no | drops the allowlist, **not** the SEP-53 signature |
-| `FAUCET_ALLOWLIST_ADDRESSES`, `FAUCET_OPEN_TO_ALL` | no | the env faucet gate. After migration 0011 the database can open it too (`config.faucet_open_to_all`, `wallet.faucet_allowed`); a ban wins |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | in production | the human gate. The secret alone decides it, and unset in production it fails shut |
 | `CHG_SESSION_SECRET` | in production | signs the httpOnly login cookie. Unset, nobody can sign in |
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | no | conversation history across restarts; falls back to an in-process Map |

@@ -90,11 +90,10 @@ Two steps, and the order is the point.
 ```
 [Fondear]  ──►  POST /api/faucet { address, proof }
                    │
-                   │ 0. A banned wallet is refused. Then the env gate
-                   │      (allowlist, or FAUCET_OPEN_TO_ALL) — deny-by-default
-                   │      in production. config.faucet_open_to_all or a
-                   │      wallet.faucet_allowed row can open that refusal.
-                   │      The SEP-53 proof is still required in production.
+                   │ 0. A banned wallet is refused. Then the database:
+                   │      config.faucet_open_to_all, or a wallet.faucet_allowed
+                   │      row. With no database the faucet is closed.
+                   │      The SEP-53 proof is still required.
                    │
                    │ 1. friendbot, if XLM < 5
                    │      an address nobody funded is just a public key: every

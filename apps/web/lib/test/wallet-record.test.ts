@@ -1,20 +1,16 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { registerWallet, walletOpensFaucet } from '../wallet-record.ts';
+import { registerWallet, faucetAdmitted } from '../wallet-record.ts';
 
-describe('walletOpensFaucet', () => {
+describe('faucetAdmitted', () => {
   const closed = { banned: false, faucetAllowed: false };
 
-  it('opens the faucet from the config flag when the env list does not', () => {
-    assert.equal(walletOpensFaucet(closed, true, 'faucet_disabled'), true);
-    assert.equal(walletOpensFaucet({ ...closed, faucetAllowed: true }, false, 'faucet_not_allowed'), true);
-  });
-
-  it('stays closed for a banned wallet and for a refusal that is not the allowlist', () => {
-    assert.equal(walletOpensFaucet({ banned: true, faucetAllowed: true }, true, 'faucet_disabled'), false);
-    assert.equal(walletOpensFaucet(closed, true, 'faucet_not_on_network'), false);
-    assert.equal(walletOpensFaucet(closed, false, 'faucet_disabled'), false);
+  it('follows the database flag or the row, and a ban wins', () => {
+    assert.equal(faucetAdmitted(closed, true), true);
+    assert.equal(faucetAdmitted({ ...closed, faucetAllowed: true }, false), true);
+    assert.equal(faucetAdmitted({ banned: true, faucetAllowed: true }, true), false);
+    assert.equal(faucetAdmitted(closed, false), false);
   });
 });
 

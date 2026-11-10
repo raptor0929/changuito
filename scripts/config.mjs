@@ -36,7 +36,7 @@ const KNOWN = {
   faucet_open_to_all: (on) =>
     on
       ? 'any wallet that is not banned can use the faucet'
-      : 'the faucet answers only for a wallet row with faucet_allowed, or the env allowlist',
+      : 'the faucet answers only for a wallet row with faucet_allowed',
 };
 
 /** String keys. Anything other than the listed values reads as the default. */

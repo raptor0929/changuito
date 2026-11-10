@@ -10,12 +10,11 @@ export type { WalletProof as FaucetProof } from './wallet-proof.ts';
 /**
  * GET /api/faucet?address=… — whether to show the button at all.
  *
- * `open` exists only outside production with no allowlist, so a fresh clone
- * can still fund a wallet. `allowlist` needs a signed proof on POST, and so
- * does `public`: that one is the allowlist waived by FAUCET_OPEN_TO_ALL, not
- * the ceremony waived, so the widget has to read it the same way.
+ * `public` is `config.faucet_open_to_all`: every wallet that is not banned.
+ * `allowlist` is one `wallet.faucet_allowed` row. Both still require a signed
+ * proof on POST. There is no mode that skips the signature.
  */
 export interface FaucetAccess {
-  mode: 'open' | 'public' | 'allowlist' | 'disabled';
+  mode: 'public' | 'allowlist' | 'disabled';
   allowed: boolean;
 }
