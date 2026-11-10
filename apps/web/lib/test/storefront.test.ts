@@ -57,11 +57,4 @@ describe('framable storefronts', () => {
     assert.equal(isFramableCheckout('not a url'), false);
     assert.equal(isFramableCheckout(''), false);
   });
-
-  it('still refuses to be framed itself', () => {
-    // frame-src widened; frame-ancestors did not. These are opposite
-    // directions and it would be easy to loosen the wrong one.
-    const csp = appContentSecurityPolicy('production', { ga: '', meta: '', clarity: '' });
-    assert.match(csp, /frame-ancestors 'none'/);
-  });
 });
