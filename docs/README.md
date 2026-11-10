@@ -56,5 +56,5 @@ demo wallet this repo holds. Signed in with Pollar is **modo real** on mainnet,
 paid from the shopper's own account.
 
 The escrow contract is deployed on testnet and tested, and it is **not** on that
-path — [stellar.md](stellar.md#the-escrow-contract-dormant) says why, and what
+path — [stellar.md](stellar.md#the-escrow-contract) says why, and what
 would put it back.

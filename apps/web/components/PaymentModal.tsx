@@ -56,9 +56,9 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
   const mode = modeCopyFor(appMode, network, lang);
   const trustlineText = trustlineCopy(lang);
 
-  // The one-time step before the first real payment. `not-needed` in modo
-  // prueba, always — the demo token has no issuer, so there is nothing to
-  // open. See lib/trustline.ts.
+  // Trustline + balance follow deployments.usdcIssuer / usdcId (via
+  // usdcAsset and /api/balance). After the SAC redeploy those point at
+  // Circle's testnet USDC; until then they read the demo asset.
   const needsTrustline = balance?.trustline === 'needed';
   const [opening, setOpening] = useState(false);
   const [trustlineError, setTrustlineError] = useState<string | null>(null);

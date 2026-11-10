@@ -69,29 +69,21 @@ Full detail in **[docs/stellar.md](docs/stellar.md)**. The short version:
 | **SEP-53 signed messages** | identity, everywhere it matters. Every gate that can spend real money checks a signature over a message naming the address, not an address the browser claims |
 | **SEP-41 Soroban token** | `contracts/mock_usdc` — the testnet demo token, admin-gated mint. It backs the faucet route and the escrow, and deliberately *not* the deposit rail: a contract token has no classic payment record for a memo to ride on |
 | **SEP-7 URI** | the receive screen's payment link |
-| **Soroban escrow** | `contracts/escrow` — deployed, 19 tests, **dormant**. See below |
-| **Pollar wallet** | login, the address, the SEP-53 signature, and the USDC payment |
+| **Soroban escrow** | `contracts/escrow` — deployed, 19 tests. On the Pollar login network the shopper path mounts `PaymentModal` and calls `open`. Redeploy over the Circle testnet USDC SAC is pending (`DEPLOY.md`) |
+| **Pollar wallet** | login, the address, the SEP-53 signature, auth-entry / tx signing, and the USDC payment |
 | **stellar.expert** | every transaction the app shows is linked to the explorer |
 
-### Why a payment and not the escrow
+### Escrow and the deposit rail
 
-The escrow is deployed on testnet and it is good code. It is also not on the
-money rail, and the honest reason is written in
-[`lib/deposit.ts`](apps/web/lib/deposit.ts):
+The memo deposit rail (`lib/deposit.ts`) still funds the card path on networks
+that are not the login network, and in builds with no Pollar key. On the login
+network, checkout mounts `PaymentModal` and opens the Soroban escrow instead.
 
-> *The thing the order actually needs is much smaller than an escrow: the money
-> has to arrive before a card is issued against it. A classic payment with a
-> memo does that with no contract, no resolver key on the server, and nothing to
-> deploy.*
->
-> *It also means the failure path is honest. There is no automated outbound
-> payment here and no Stellar secret in the deployment, so a failed order is
-> refunded by hand. That is a worse product and a much better blast radius.*
-
-The escrow's `open / settle / refund` still work and are still tested — they are
-reachable from `/dev/ui`, not from the shopper's path. What it was built for, and
-the case for bringing it back on the mainnet rail, is in
-[docs/stellar.md](docs/stellar.md#the-escrow-contract-dormant).
+The current testnet escrow holds `mock_usdc`. Redeploying with
+`USDC_ISSUER=GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5` points it
+at the Circle testnet USDC SAC
+(`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`). Details:
+[docs/stellar.md](docs/stellar.md#the-escrow-contract).
 
 ---
 
@@ -182,7 +174,9 @@ Read this before the demo, not after it.
   `${orderGroup}-01`, from VTEX's single-seller convention. Día is single-seller
   and the guess has held, but it is a guess, and it degrades to the order *list*
   rather than a 404.
-- **The escrow is dormant**, not deleted. See above.
+- **The escrow is on the login-network checkout** via `PaymentModal`; the SAC
+  redeploy that swaps `mock_usdc` for Circle testnet USDC is a person-run
+  `deploy:testnet` (see `DEPLOY.md`).
 - **The store's catalogue is live.** Prices and stock on any given day are
   whatever Día actually has.
 - **The commit dates are backdated** to the window the work was planned over.
@@ -198,8 +192,9 @@ the demo.
 
 | | |
 |---|---|
-| **escrow** *(dormant)* | [`CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557`](https://stellar.expert/explorer/testnet/contract/CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557) |
+| **escrow** *(mock_usdc; SAC redeploy pending)* | [`CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557`](https://stellar.expert/explorer/testnet/contract/CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557) |
 | **demo USDC** — SEP-41, `USDC`, 7 decimals | [`CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF`](https://stellar.expert/explorer/testnet/contract/CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF) |
+| **Circle testnet USDC SAC** *(target token)* | [`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`](https://stellar.expert/explorer/testnet/contract/CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA) |
 | **resolver** — token admin, escrow resolver | [`GBGMPRHU3NW3BCXUNDNC7VSYQKS6FZKWFHSGEHHMR3G3TZOUWEDBHTFK`](https://stellar.expert/explorer/testnet/account/GBGMPRHU3NW3BCXUNDNC7VSYQKS6FZKWFHSGEHHMR3G3TZOUWEDBHTFK) |
 | **treasury** — receives settled baskets | [`GAXUICH5DZMB4ZIZVF6ETTE524RCZYRKHWLGG7EOLY6ECVD4IS6TBNZG`](https://stellar.expert/explorer/testnet/account/GAXUICH5DZMB4ZIZVF6ETTE524RCZYRKHWLGG7EOLY6ECVD4IS6TBNZG) |
 
@@ -356,7 +351,7 @@ apps/branding/       brand kit (not an npm package): logo, mascot, manuals, soci
 packages/mcp/        the supermarket MCP server (vendored, 520 tests)
 packages/trust/      footer trust copy shared by both apps, so they cannot drift
 packages/*-bindings/ generated TypeScript clients for the two contracts
-contracts/escrow/    open / settle / refund, with events — dormant
+contracts/escrow/    open / settle / refund, with events — mounted on login-network checkout
 contracts/mock_usdc/ SEP-41 token, admin-gated mint
 supabase/migrations/ orders, chats, cards — the reasoning is in the SQL
 scripts/             deploy.sh, the demo asset issuer, db migrate + invariants

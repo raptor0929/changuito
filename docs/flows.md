@@ -290,7 +290,7 @@ BROWSER                            /api/card                   STELLAR / DB
 Everything below is deployed on testnet, covered by 19 tests, and reachable
 only from `/dev/ui`. No shopper path calls it. Kept because bringing it back is
 a concrete next step — see
-[stellar.md](stellar.md#the-escrow-contract-dormant).
+[stellar.md](stellar.md#the-escrow-contract).
 
 ### 6a. Opening
 

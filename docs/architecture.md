@@ -306,7 +306,7 @@ It is not what the shopper's path uses, for two reasons that are worth separatin
 
 The second reason is the one that has since weakened: `orderGroup` is real
 evidence, read server-side from the store's own document. Wiring it to `settle`
-is the honest next step. [stellar.md](stellar.md#the-escrow-contract-dormant)
+is the honest next step. [stellar.md](stellar.md#the-escrow-contract)
 carries the rest.
 
 ---

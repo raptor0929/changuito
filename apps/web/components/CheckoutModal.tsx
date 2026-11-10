@@ -1,7 +1,6 @@
 'use client';
 
 import type { SendPaymentParams, SubmitOutcome } from '@pollar/core';
-import { usePollar } from '@pollar/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { formatARS } from '@changuito/mcp/money';
@@ -13,6 +12,7 @@ import { track } from '../lib/analytics';
 import type { Receipt } from '../lib/chat-store.ts';
 import { checkoutCopy } from '../lib/checkout-copy.ts';
 import { DEFAULT_NETWORK } from '../lib/deployments.ts';
+import type { OpenedOrder } from '../lib/order.ts';
 import { LOGIN_NETWORK, pollarEnabled } from '../lib/pollar.ts';
 import { realModeNeedsProof } from '../lib/real-mode.ts';
 import { isFramableCheckout, STOREFRONT_HOSTS } from '../lib/storefront.ts';
@@ -20,13 +20,13 @@ import { uiCopy } from '../lib/ui-copy.ts';
 import { stroops } from '../lib/units.ts';
 import { useBalances } from '../lib/use-balances.ts';
 import { useNetworkAccess } from '../lib/use-network-access.ts';
-import { useWalletSigner } from '../lib/use-wallet-signer.ts';
 import { signWalletProof, type WalletProof, type WalletSigner } from '../lib/wallet-proof.ts';
 import { CardPanel } from './CardPanel';
 import { CopyField } from './CopyField';
 import { useLang } from './LangProvider';
 import { ModeBadge } from './ModeBadge';
 import { useNetwork } from './NetworkProvider';
+import { PaymentModal } from './PaymentModal';
 
 /**
  * From a full basket to a receipt, in the order the money actually allows:
@@ -129,7 +129,13 @@ interface Props {
    */
   chatId?: string;
   onClose: () => void;
+  /** Memo-deposit rail: the importe landed and the card path can continue. */
   onPaid: (receipt: Receipt) => void;
+  /**
+   * Escrow path (login network): `open` succeeded and the USDC is locked.
+   * Required whenever PaymentModal can mount; ignored on the deposit rail.
+   */
+  onOpened: (order: OpenedOrder) => void;
 }
 
 /**
@@ -182,27 +188,28 @@ interface Props {
  * *different* question can find itself inside the branch with no provider
  * above it. So: is there a provider, *and* is the network being shown the
  * login network. `PaymentModal` uses the same gate.
+ *
+ * ## Escrow on the login network
+ *
+ * On the login network the shopper pays through the Soroban escrow
+ * (`PaymentModal` → `open`), not the memo deposit rail. The deposit dialog
+ * stays for every other network so a build without a Pollar key, and a
+ * network that is not the login one, still have a checkout path.
  */
 export function CheckoutModal(props: Props) {
   const { network } = useNetwork();
-  return pollarEnabled && LOGIN_NETWORK !== null && network === LOGIN_NETWORK ? (
-    <CheckoutWithWallet {...props} />
-  ) : (
-    <CheckoutDialog {...props} address={null} sign={null} pay={null} />
-  );
-}
-
-function CheckoutWithWallet(props: Props) {
-  const { wallet, isAuthenticated, sendPayment } = usePollar();
-  const sign = useWalletSigner();
-  const address = isAuthenticated ? (wallet?.address ?? null) : null;
-  // Only handed down with a session. `sendPayment` exists on the context
-  // either way and would throw on a wallet that is not there; passing null
-  // instead is what lets the dialog decide by asking whether it *has* a way to
-  // pay rather than by re-deriving who is signed in.
-  return (
-    <CheckoutDialog {...props} address={address} sign={sign} pay={isAuthenticated ? sendPayment : null} />
-  );
+  // Escrow open on the login network; memo deposit everywhere else.
+  if (pollarEnabled && LOGIN_NETWORK !== null && network === LOGIN_NETWORK) {
+    return (
+      <PaymentModal
+        cart={props.cart}
+        handoffUrl={props.handoffUrl}
+        onClose={props.onClose}
+        onOpened={props.onOpened}
+      />
+    );
+  }
+  return <CheckoutDialog {...props} address={null} sign={null} pay={null} />;
 }
 
 /** Just the part of Pollar's `sendPayment` this dialog uses. */

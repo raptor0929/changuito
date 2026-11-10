@@ -134,12 +134,15 @@ the default and it cannot spend anything.
 
 ---
 
-## The escrow contract (dormant)
+## The escrow contract
 
 `CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557` — deployed on
-testnet, 19 tests, reachable from `/dev/ui` and not from the shopper's path.
-It is documented in full because it is real code that works, and because
-bringing it back is a concrete next step rather than a hypothetical.
+testnet against `mock_usdc`, 19 tests. On the login network the shopper path
+mounts `PaymentModal`, which calls `open` through Pollar. Redeploying over the
+Circle testnet USDC SAC (`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`,
+issuer `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`) replaces this
+id in `deployments.json` — a person runs
+`USDC_ISSUER=… npm run deploy:testnet` (see `DEPLOY.md`).
 
 ```rust
 open(buyer, order_id: BytesN<32>, amount: i128,

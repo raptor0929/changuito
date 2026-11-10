@@ -129,7 +129,7 @@ would be the shopper's own word — and an escrow that settles on the buyer's wo
 is a custodial box with extra steps. The one unambiguous signal the app *can*
 read is `orderGroup`, server-side, from the public cart document. Wiring that to
 `settle` is the honest next step and it is written up in
-[stellar.md](stellar.md#the-escrow-contract-dormant).
+[stellar.md](stellar.md#the-escrow-contract).
 
 **Why a card at all, rather than paying the store in USDC?**
 Día takes cards. That is the whole of it. The card is the adapter between a
