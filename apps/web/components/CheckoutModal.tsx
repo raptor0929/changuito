@@ -32,8 +32,8 @@ import { flowLabels, flowRailIndex, flowScreen } from '../lib/checkout/flow.ts';
  *   2. lock    — the server quotes goods + envío at belo's USDC rate (order
  *                id, basket hash, USDC amount) and the shopper confirms that
  *                breakdown and types their Día login. The server builds
- *                `open` with the resolver as fee payer; the wallet signs it
- *                as the buyer, the server co-signs and sends. The USDC is
+ *                `open`; the wallet signs the authorization and Channels
+ *                pays the fee and sends. The USDC is
  *                now in a vault the program owns, not in an account of ours.
  *   3. shop    — the server starts a sandbox job (services/sandbox) that logs
  *                into the shopper's Día account, fills the cart, picks the
@@ -211,8 +211,7 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
     setError(null);
     let fundedSig: string | null = openSig;
     try {
-      // The server builds `open` with the resolver paying the fee; the wallet
-      // signs as the buyer and the server co-signs and sends.
+      // Channels pays the fee. The wallet signs the open authorization.
       if (!fundedSig) {
         let submission = pending;
         if (!submission) {
@@ -262,7 +261,8 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
         ? (lang === 'en' ? 'Your wallet approval was received, but confirmation is still pending. We are checking this order. You do not need to sign or pay again.'
           : 'Recibimos la aprobación de tu billetera, pero falta confirmar el pedido. Lo estamos consultando. No hace falta volver a firmar ni pagar.')
         : e instanceof Error && e.message ? e.message : copy.failed);
-      if (!(e instanceof OpenConfirmationPending)) setPendingOpen(null);
+      if (e instanceof OpenConfirmationPending && e.tx) setPendingOpen({ orderId: quote.orderId, tx: e.tx });
+      else if (!(e instanceof OpenConfirmationPending)) setPendingOpen(null);
       if (manual && fundedSig) {
         setStatus({ orderId: quote.orderId, checkoutKind: 'manual_fee_v1', stage: 'shopping', phase: 'queued', payment: null,
           storeOrderId: null, openSig: fundedSig, closeSig: null, handoffUrl: null, amountDisplay: '0.10', error: null,

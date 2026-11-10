@@ -8,7 +8,9 @@ import type { Cart } from '@changuito/mcp/types';
 import { track, trackLoginStart } from '../lib/analytics';
 import type { QuoteResponse } from '../app/api/quote/route.ts';
 import { modeCopyFor, trustlineCopy } from '../lib/mode-copy.ts';
-import { basketHash, newOrderId, openArgs, toHex, type OpenedOrder } from '../lib/order.ts';
+import { openThroughChannels } from '../lib/channels-open.ts';
+import { basketHash, DEFAULT_TIMEOUT_SECS, newOrderId, toHex, type OpenedOrder } from '../lib/order.ts';
+import { useWalletSigners } from '../lib/use-wallet-signers.ts';
 import { LOGIN_NETWORK, pollarEnabled, shortAddress } from '../lib/pollar.ts';
 import { usdcAsset } from '../lib/trustline.ts';
 import { useBalances } from '../lib/use-balances.ts';
@@ -44,7 +46,8 @@ interface Props {
 type Phase = 'review' | 'signing' | 'failed';
 
 function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
-  const { wallet, isAuthenticated, verified, openLoginModal, runTx, setTrustline } = usePollar();
+  const { wallet, isAuthenticated, verified, openLoginModal, setTrustline } = usePollar();
+  const { signAuthEntry } = useWalletSigners();
   const { network, mode: appMode } = useNetwork();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
   const { data: balance, refresh } = useBalances(address, network);
@@ -163,22 +166,16 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
     try {
       const orderId = newOrderId();
       const basket = await basketHash(cart);
-      const outcome = await runTx('invoke_contract', {
+      const hash = await openThroughChannels({
+        network,
         contractId: escrowId,
         method: 'open',
-        args: openArgs({ buyer: address, orderId, amountUnits, basketHash: basket }),
+        orderId: toHex(orderId),
+        amount: amountUnits.toString(),
+        basketHash: toHex(basket),
+        timeoutSecs: DEFAULT_TIMEOUT_SECS,
+        signAuthEntry,
       });
-
-      if (outcome.status === 'error') {
-        // resultCode is the ledger's own verdict and the only part worth
-        // pasting into a search; message is for the human.
-        throw new Error(
-          outcome.message ??
-            outcome.details ??
-            outcome.resultCode ??
-            copy.networkRefused,
-        );
-      }
 
       track('payment_success', { flow: 'checkout' });
       refresh();
@@ -189,7 +186,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
         buyer: address,
         basketHash: toHex(basket),
         amountUnits: amountUnits.toString(),
-        hash: outcome.hash,
+        hash,
         retailer: cart.retailer,
         cartId: cart.cartId,
         totalDisplay: cart.total.display,
@@ -201,7 +198,9 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
       });
       onClose();
     } catch (err) {
-      track('payment_fail', { flow: 'checkout', code: 'rejected' });
+      if (!(err instanceof Error) || !('code' in err)) {
+        track('payment_fail', { flow: 'checkout', code: 'rejected' });
+      }
       setFailure(err instanceof Error ? err.message : String(err));
       setPhase('failed');
     }

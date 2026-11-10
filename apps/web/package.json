@@ -24,6 +24,7 @@
     "@changuito/mcp": "*",
     "@changuito/usdc-bindings": "*",
     "@modelcontextprotocol/sdk": "1.30.0",
+    "@openzeppelin/relayer-plugin-channels": "0.21.1",
     "@pollar/core": "0.11.3",
     "@pollar/react": "0.11.3",
     "@stellar/stellar-sdk": "17.1.0",

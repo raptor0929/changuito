@@ -3,8 +3,9 @@
 import { usePollar } from '@pollar/react';
 import { useCallback, useMemo } from 'react';
 
-import { fromHex, openArgs } from '../lib/order.ts';
+import { openThroughChannels } from '../lib/channels-open.ts';
 import { useWalletSigner } from '../lib/use-wallet-signer.ts';
+import { useWalletSigners } from '../lib/use-wallet-signers.ts';
 import { WalletContext, type WalletState } from '../lib/use-wallet.ts';
 import { useNetwork } from './NetworkProvider';
 
@@ -14,8 +15,9 @@ import { useNetwork } from './NetworkProvider';
  * escrow call the buyer signs, the same one PaymentModal already uses.
  */
 export function WalletBridge({ children }: { children: React.ReactNode }) {
-  const { wallet, isAuthenticated, openLoginModal, logout, runTx, configStatus } = usePollar();
+  const { wallet, isAuthenticated, openLoginModal, logout, configStatus } = usePollar();
   const sign = useWalletSigner();
+  const { signAuthEntry } = useWalletSigners();
   const { network } = useNetwork();
   const address = isAuthenticated ? (wallet?.address ?? null) : null;
 
@@ -31,22 +33,18 @@ export function WalletBridge({ children }: { children: React.ReactNode }) {
     if (!res.ok || typeof json?.escrowId !== 'string') {
       throw new Error(json?.error ?? 'contracts failed');
     }
-    const outcome = await runTx('invoke_contract', {
+    // The buyer signs an auth entry. Channels pays the fee and is the source.
+    return openThroughChannels({
+      network,
       contractId: json.escrowId,
       method: 'open',
-      args: openArgs({
-        buyer: address,
-        orderId: fromHex(order.orderId),
-        amountUnits: BigInt(order.amount),
-        basketHash: fromHex(order.basketHash),
-        timeoutSecs: order.timeoutSecs,
-      }),
+      orderId: order.orderId,
+      amount: order.amount,
+      basketHash: order.basketHash,
+      timeoutSecs: order.timeoutSecs,
+      signAuthEntry,
     });
-    if (outcome.status === 'error') {
-      throw new Error(outcome.message ?? outcome.details ?? outcome.resultCode ?? 'open failed');
-    }
-    return outcome.hash;
-  }, [address, network, runTx]);
+  }, [address, network, signAuthEntry]);
 
   const value = useMemo<WalletState>(() => ({
     enabled: true,
