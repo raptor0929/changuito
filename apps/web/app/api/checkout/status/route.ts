@@ -11,7 +11,7 @@
  * job carried no card because `shared_card` has no row) and a run that never reached payment.
  * A demo run (a wallet not on the card's member list) stops at payment on
  * purpose and still *settles* once it gets there: the treasury takes the
- * devnet USDC so the demo ends like a purchase, and the receipt's basis is
+ * testnet USDC so the demo ends like a purchase, and the receipt's basis is
  * `demo-reached-payment`, not `sandbox-order-placed`. The reply carries the
  * cart link so the shopper finishes in Día.
  * The treasury keeps the USDC only when the operator's card actually paid
@@ -109,7 +109,7 @@ export async function GET(req: Request): Promise<Response> {
         rec.payment = job.result?.payment ?? 'not_attempted';
         rec.storeOrderForm = job.result?.cart?.orderFormId;
         // A demo run that reached payment is a finished order too: the
-        // treasury takes the (devnet) USDC as it would for a placed one, so
+        // treasury takes the (testnet) USDC as it would for a placed one, so
         // the demo ends the way a purchase does. Its receipt says what it was.
         const demoComplete = rec.mode === 'demo' && job.status === 'done' && job.result?.reached_payment === true;
         if ((job.status === 'done' && rec.payment === 'placed') || demoComplete) {

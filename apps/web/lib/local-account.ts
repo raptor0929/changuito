@@ -3,7 +3,7 @@
  *
  * chat-store.ts keeps chats in localStorage — the transcript, the cart, the
  * postcode in the session snapshot, the receipt of what was paid — under keys
- * that belong to no one in particular. So signing out and in as another Privy
+ * that belong to no one in particular. So signing out and in as another
  * account showed the previous account's history, purchases and postcode.
  *
  * Now the browser records which wallet the stored chats belong to
@@ -16,7 +16,7 @@
  * A guest's chats have no owner and are adopted by whoever signs in next: a
  * basket started as a guest and paid after signing in is one conversation.
  *
- * Privy's own storage is Privy's: its logout clears it. Nothing here touches
+ * The wallet provider's own storage is its own: its logout clears it. Nothing here touches
  * another origin's data or the language cookie.
  *
  * Every access is wrapped, as in chat-store.ts: Safari in private mode throws.
@@ -75,7 +75,7 @@ export function writeOwner(address: string, s: Store | undefined = typeof window
 /**
  * What to do with this browser's stored chats, given who owns them and who is
  * signed in now. Pure, for tests.
- *   - `wait`: Privy has not said yet, or the wallet is still being created.
+ *   - `wait`: the wallet provider has not said yet, or the wallet is still being created.
  *   - `keep`: same account, or a guest with a guest's chats.
  *   - `adopt`: a guest's chats, and now someone signed in: record them as owner.
  *   - `wipe`: the chats are another account's, or that account signed out.

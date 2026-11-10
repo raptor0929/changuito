@@ -15,9 +15,9 @@ import { WalletWidget } from './WalletWidget';
  * button style instead of the sunflower `.btn`.
  *
  * A server component holding client ones: the wordmark's `h1` is plain markup
- * and does not need to ship as JavaScript.
+ * the page passes in as `brand`, so it does not ship as JavaScript.
  */
-export function TopBar({ children }: { children?: ReactNode }) {
+export function TopBar({ brand, children }: { brand: ReactNode; children?: ReactNode }) {
   return (
     <header className="topbar" data-testid="topbar">
       <div className="topbar-left">
@@ -25,20 +25,7 @@ export function TopBar({ children }: { children?: ReactNode }) {
             anything else. Renders nothing at the wide breakpoint, where the
             rail is already a column. */}
         <HistoryToggle />
-        {/* The name is text, not only an alt: tools that read a heading's
-            text content (crawlers, some audits) saw an empty h1. The image is
-            then decorative, so it is not read twice. */}
-        <h1 className="brand-name">
-          <span className="sr-only">Changuito</span>
-          <img
-            className="brand-wordmark"
-            src="/brand/wordmark.png"
-            alt=""
-            aria-hidden="true"
-            width={1097}
-            height={249}
-          />
-        </h1>
+        {brand}
       </div>
       {children ?? <WalletWidget />}
     </header>

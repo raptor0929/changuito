@@ -20,7 +20,7 @@
 }
 
 /* A grid item's min-height:auto will not shrink, so a tall card step on a
-   ~400px Seeker shell was clipped by the locked page with nowhere to scroll.
+   ~400px phone shell was clipped by the locked page with nowhere to scroll.
    safe center keeps a short dialog centred and lets a tall one start at the top. */
 :global(.modal-backdrop:has(.modal-wide)) {
   overflow-y: auto;

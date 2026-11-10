@@ -50,7 +50,7 @@ export async function apiHumanDecision(
   if (path === '/api/account/delete') return { kind: 'allow' };
 
   // Phone-wallet sign-in, session read and logout. The handlers authenticate
-  // these. A Privy `{ token }` login is on this path too and is refused
+  // these. A provider-token `{ token }` login is on this path too and is refused
   // again in the handler when the Turnstile cookie is missing.
   if (isNativeWalletSessionRoute(path, req.method)) return { kind: 'allow' };
 

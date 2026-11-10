@@ -7,7 +7,7 @@ same authenticated browser through an interactive noVNC iframe.
 
 - Current shared-card members are eligible, but manual jobs never retrieve or
   receive the operator's card. The shopper enters their own payment details.
-- Only **0.10 test USDC on devnet** is escrowed. DIA charges groceries and
+- Only **0.10 test USDC on Stellar testnet** is escrowed. DIA charges groceries and
   delivery separately in pesos; its final amount is reviewed in its checkout.
 - The worker earns the fee when the complete basket, approved delivery and a
   fresh payment form are prepared and the viewer is available. The shopper does
@@ -22,12 +22,12 @@ same authenticated browser through an interactive noVNC iframe.
 
 ## Contract and durable lifecycle
 
-`open_service_fee(order_id, nonce, basket_hash, timeout_secs)` validates the order
-ID against SHA-256 of `UTF8("changuito/service-fee/v1") || buyer public key (32
-bytes) || nonce (32 bytes)`. It transfers exactly 100,000 base units of the
-configured six-decimal mint. The order layout, order/vault seeds, legacy
-instructions and resolver/buyer recovery rules remain compatible. The updated
-IDL is versioned in `anchor/idl/changuito_escrow.json`.
+The fee is an ordinary escrow `open` on the recorded testnet escrow, for exactly
+1,000,000 base units (0.10 USDC at seven decimals) of the mintable mock USDC.
+The order ID must equal SHA-256 of `UTF8("changuito/service-fee/v1") || buyer
+address || nonce (32 bytes)`, which `serviceOrderId` in
+`apps/web/lib/checkout/manual-policy.ts` computes and the server re-checks
+before it accepts the open. The escrow contract is unchanged.
 
 Manual records live in the server-only, RLS-protected `manual_checkout` table;
 legacy records remain in `kv`. SQLite on the worker's persistent volume holds
@@ -101,7 +101,7 @@ Keep the existing `SANDBOX_TOKEN` equal on both services and server-only. Set
 Retain one replica. The worker image bundles the viewer and starts Xvfb/VNC/API.
 
 Deploy migration and worker with the flag off; review and approve the concrete
-existing-program devnet upgrade, then deploy the compatible web application.
+recorded testnet escrow, then deploy the web application.
 Verify `/health` reports `manual_ready: true` and `callback_ready: true`.
 Manual readiness stays false while the authenticated callback is unavailable.
 Before enabling, perform a
@@ -114,8 +114,8 @@ Enable with `npm run config -- set manual_checkout_enabled true`.
 Disabling the flag blocks new admissions, not already-funded work. Drain sessions
 before maintenance: redeployment cannot preserve a running Chromium process.
 
-This implementation does not itself apply production migrations, upgrade the
-deployed program, enable the flag or submit a merchant payment.
+This implementation does not itself apply production migrations, redeploy the
+escrow, enable the flag or submit a merchant payment.
 
 ## Local validation
 
@@ -124,11 +124,7 @@ npm test
 npm run typecheck -w @changuito/web
 npm run build
 npm run build --prefix services/sandbox/viewer
-cd anchor
-NO_DNA=1 cargo test --locked
-NO_DNA=1 cargo build-sbf --tools-version v1.56 --arch v3
-NO_DNA=1 cargo test --test service_fee -- --include-ignored
-cd ../services/sandbox
+cd services/sandbox
 uv run python -m unittest discover -p test_manual.py -v
 uv run python test_viewer_browser.py
 ```
@@ -141,5 +137,5 @@ OrbStack Ubuntu machine without invoking the Docker client.
 
 `manual-db.integration.ts` is an explicit test for a disposable local Postgres
 database; it validates the real migration, RLS, stale events and stale writes.
-It is outside the unit-test glob. Live merchant and Android/Seeker checks remain
+It is outside the unit-test glob. Live merchant checks remain
 rollout requirements; the local fixture does not establish those outcomes.

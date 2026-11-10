@@ -36,7 +36,24 @@ export default async function Home() {
           <ShopProvider>
             {/* Above the deck and outside it: the bar spans the window at
                 every width, including the three-column one. */}
-            <TopBar />
+            <TopBar
+              brand={
+                /* The name is text, not only an alt: tools that read a
+                   heading's text content (crawlers, some audits) saw an empty
+                   h1. The image is then decorative, so it is not read twice. */
+                <h1 className="brand-name">
+                  <span className="sr-only">Changuito</span>
+                  <img
+                    className="brand-wordmark"
+                    src="/brand/wordmark.png"
+                    alt=""
+                    aria-hidden="true"
+                    width={1097}
+                    height={249}
+                  />
+                </h1>
+              }
+            />
             <Deck>
               <main className="shell">
                 {/* The wordmark and the wallet moved up into the bar; what is
