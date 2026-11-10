@@ -122,7 +122,13 @@ export async function withSession<T>(
   // Inside the queue, so the comparison sees `issued` after the turn ahead
   // of this one, and a restore never lands under a turn that is running.
   const run = () => {
-    if (snapshot && snapshotKey(snapshot) !== session.issued) session.state.restore(snapshot);
+    if (snapshot && snapshotKey(snapshot) !== session.issued) {
+      const here = session.state.getLocation();
+      // A snapshot from before the postal code was known must not wipe a
+      // location this isolate already has. One that names a location still
+      // wins: that is another isolate's record, carts included.
+      if (!(here && !snapshot.location)) session.state.restore(snapshot);
+    }
     return fn(session);
   };
   const turn = session.queue.then(run, run); // a failed predecessor must not poison the queue

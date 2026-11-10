@@ -6,8 +6,10 @@
  * empty — another isolate, a turn store that did not keep the transcript —
  * so the model greets again and asks for both, including after the shopper
  * has typed them. The browser still has those lines. They come back as
- * `prior`, and a postal code plus a store (Día when they named none) is set
- * through the MCP server's own `set_location` before the model runs.
+ * `prior`, and a postal code plus a store (the one already chosen, otherwise
+ * Día) is set through the MCP server's own `set_location` before the model
+ * runs. A code they type later replaces the one on the session, including a
+ * code that came from the profile. The store stays until they name another.
  */
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -27,12 +29,31 @@ export interface ShopperPlace {
   postalCode: string;
 }
 
+/** Same shape `set_location` accepts: 1425, C1425 or C1425DKE. */
+function normalizePostal(raw: string): string | null {
+  const code = raw.toUpperCase().replace(/\s+/g, '');
+  return /^[A-Z]?\d{4}([A-Z]{3})?$/.test(code) ? code : null;
+}
+
 function postalFrom(text: string): string | null {
   const trimmed = text.trim();
-  const only = /^(?:cp\s*)?(\d{4})$/i.exec(trimmed);
-  if (only) return only[1]!;
-  const named = /\b(?:cp|cpa|c[oó]digo(?:\s+postal)?)\s*:?\s*(\d{4})\b/i.exec(trimmed);
-  return named ? named[1]! : null;
+  const bare = trimmed.replace(/^[.\s,;:]+|[.\s,;:!?]+$/g, '');
+  const whole = normalizePostal(bare.replace(/^(?:cp|cpa)\s*/i, ''));
+  if (whole && bare.length <= 16) return whole;
+
+  const labeled = /\b(?:cp|cpa|c[oó]digo(?:\s+postal)?)\s*:?\s*([A-Za-z]?\s*\d{4}(?:\s*[A-Za-z]{3})?)\b/i.exec(
+    trimmed,
+  );
+  if (labeled) {
+    const code = normalizePostal(labeled[1]!);
+    if (code) return code;
+  }
+
+  // A short reply ("es 1181", "1181 día"). A longer grocery request can
+  // contain four digits that are not a postal code, and a price is $1181.
+  if (trimmed.length > 40) return null;
+  const loose = /(?:^|[^\d$])([A-Za-z]?\d{4}(?:[A-Za-z]{3})?)(?!\d)/i.exec(trimmed);
+  return loose ? normalizePostal(loose[1]!) : null;
 }
 
 function retailerFrom(text: string): ShopperPlace['retailer'] | null {
@@ -83,18 +104,37 @@ type ToolSession = {
   state: { getLocation(): unknown };
 };
 
+function knownRetailer(id: string | undefined): ShopperPlace['retailer'] | undefined {
+  return RETAILERS.some((r) => r.id === id) ? (id as ShopperPlace['retailer']) : undefined;
+}
+
 /**
- * Sets the session location from the shopper's own lines, when none is set.
+ * The location to set from the shopper's own lines.
+ *
+ * A named store wins. A postal code on its own keeps the store already on
+ * the session (the profile's Día, usually) and replaces the code. Nothing
+ * to do when that pair is already set.
+ */
+export function placeToSet(
+  current: { retailer?: string; postalCode?: string } | undefined,
+  texts: string[],
+): ShopperPlace | null {
+  const place = shopperPlace(texts);
+  if (!place) return null;
+  const retailer = place.namedStore ? place.retailer : (knownRetailer(current?.retailer) ?? 'dia');
+  const sameCode = current?.postalCode?.toUpperCase().replace(/\s+/g, '') === place.postalCode;
+  if (current?.retailer === retailer && sameCode) return null;
+  return { retailer, postalCode: place.postalCode };
+}
+
+/**
+ * Sets the session location from the shopper's own lines.
  * A store that will not resolve the code leaves the session as it was.
  */
 export async function applyShopperPlace(session: ToolSession, texts: string[]): Promise<boolean> {
-  const place = shopperPlace(texts);
-  if (!place) return false;
   const current = session.state.getLocation() as { retailer?: string; postalCode?: string } | undefined;
-  // A postal code with no store fills an empty session as Día. It does not
-  // overwrite a store already chosen, including one that came from the profile.
-  if (current && !place.namedStore) return false;
-  if (current?.retailer === place.retailer && current.postalCode === place.postalCode) return false;
+  const place = placeToSet(current, texts);
+  if (!place) return false;
   try {
     const res = await session.client.callTool(
       { name: 'set_location', arguments: { retailer: place.retailer, postal_code: place.postalCode } },

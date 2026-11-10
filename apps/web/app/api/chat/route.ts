@@ -10,6 +10,7 @@ import { requireHuman } from '@/lib/human-gate';
 import { readLoggedInUser, requireLoginOrFreeTurn } from '@/lib/login-gate';
 import { presetLocationFromProfile } from '@/lib/profile-location';
 import { networkNotServed, requestNetwork } from '@/lib/server-network';
+import { recallPair, shownProducts } from '@/lib/chat-recall';
 import { applyShopperPlace, priorLines } from '@/lib/shopper-location';
 
 /**
@@ -141,8 +142,22 @@ export async function POST(req: Request): Promise<Response> {
           // Before early-ask and the model. A saved profile, then the lines
           // the shopper already typed. Either one sets the location the
           // banner reads, so the model does not ask for it again.
+          const earlier = priorLines(body.prior);
+          const shown = shownProducts(body.shown);
           if (owner) await presetLocationFromProfile(session, owner);
-          await applyShopperPlace(session, [...priorLines(body.prior), body.message]);
+          await applyShopperPlace(session, [...earlier, body.message]);
+          // This isolate has no transcript. The browser still has the lines
+          // and the grid, so the model reads them before it answers. They
+          // are not emitted: the shopper is already looking at them.
+          if (turn.messages.length === 0) {
+            const remembered = recallPair({ prior: earlier, shown });
+            if (remembered) {
+              turn.messages.push(
+                { role: 'user', content: remembered.user },
+                { role: 'assistant', content: [{ type: 'text', text: remembered.assistant }] },
+              );
+            }
+          }
           brain = (await runTurn(session, turn, body.message, emit, lang, body.image)).brain;
 
           // Only after a clean return. A turn that threw mid-hop can leave an

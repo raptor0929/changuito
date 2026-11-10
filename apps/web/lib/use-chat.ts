@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { track } from './analytics';
+import { lastShown } from './chat-recall';
 import {
   applyEvent,
   endTurn,
@@ -106,6 +107,11 @@ export function useChat(auth?: UseChatAuth) {
   const sessionId = useRef<string>('');
   /** The shopper's own lines, so the next request can set a location the server forgot. */
   const said = useRef<string[]>([]);
+  /** The last product grid, so a new isolate can build the cart the shopper is looking at. */
+  const shown = useRef<{ skuId: string; name: string }[]>([]);
+  useEffect(() => {
+    shown.current = lastShown(state.blocks);
+  }, [state.blocks]);
   const abort = useRef<AbortController | null>(null);
   /** Sync lock — React state alone still lets a double-Enter race a second fetch. */
   const inFlight = useRef(false);
@@ -135,11 +141,13 @@ export function useChat(auth?: UseChatAuth) {
     const post = () => {
       const prior = said.current.slice(-6);
       said.current = [...said.current, text].slice(-6);
+      const onScreen = shown.current;
       const body: ChatRequest = {
         sessionId: sessionId.current,
         message: text,
         snapshot: snapshot.current,
         ...(prior.length ? { prior } : {}),
+        ...(onScreen.length ? { shown: onScreen } : {}),
         ...(authRef.current.network ? { network: authRef.current.network } : {}),
         ...(authRef.current.lang ? { lang: authRef.current.lang } : {}),
         ...(image ? { image } : {}),
@@ -346,6 +354,7 @@ export function useChat(auth?: UseChatAuth) {
     sessionId.current = chat.sessionId ?? '';
     snapshot.current = chat.snapshot ?? undefined;
     said.current = chat.blocks.flatMap((b) => (b.kind === 'user' ? [b.text] : [])).slice(-6);
+    shown.current = lastShown(chat.blocks);
     setLoginRequired(false);
     setState({
       blocks: chat.blocks,
@@ -361,6 +370,7 @@ export function useChat(auth?: UseChatAuth) {
     sessionId.current = '';
     snapshot.current = undefined;
     said.current = [];
+    shown.current = [];
     setLoginRequired(false);
     setState(initialState);
   }, []);
