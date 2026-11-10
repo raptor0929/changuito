@@ -201,12 +201,10 @@ export function ProfileGeneral({
 /**
  * Second step before anything is deleted. The confirm string travels in the
  * body so a stray POST cannot delete; the shopper sees a button, not the string.
- * When Privy's delete fails, the note stays on screen until they leave — a
- * reload would wipe it, and so would storing it under a `changuito:` key.
  */
 function AccountDelete({ copy, onLogout }: { copy: ProfileCopy; onLogout: () => void }) {
   const wallet = useWallet();
-  const [step, setStep] = useState<'idle' | 'confirm' | 'privy'>('idle');
+  const [step, setStep] = useState<'idle' | 'confirm'>('idle');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -219,13 +217,9 @@ function AccountDelete({ copy, onLogout }: { copy: ProfileCopy; onLogout: () => 
         headers: { 'content-type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ confirm: DELETE_CONFIRM }),
       });
-      const json = (await res.json().catch(() => null)) as { privy?: string; message?: string } | null;
+      const json = (await res.json().catch(() => null)) as { message?: string } | null;
       if (!res.ok) {
         setError(json?.message || copy.deleteFailed);
-        return;
-      }
-      if (json?.privy === 'failed') {
-        setStep('privy');
         return;
       }
       onLogout();
@@ -290,15 +284,6 @@ function AccountDelete({ copy, onLogout }: { copy: ProfileCopy; onLogout: () => 
           </div>
         </div>
       ) : null}
-      {step === 'privy' ? (
-        <div className="account-delete-panel">
-          <p role="alert">{copy.deletePrivyFailed}</p>
-          <a href="/privacidad">{copy.privacyLink}</a>
-          <button type="button" className="btn" onClick={onLogout}>
-            {copy.deleteDone}
-          </button>
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -321,7 +306,7 @@ function ProfileLoader({ copy, onSaved }: { copy: ProfileCopy; onSaved?: () => v
   const [error, setError] = useState<string | null>(null);
 
   // Read for *this* wallet (lib/fetch-as.ts): the session cookie can lag a
-  // Privy account switch, and the answer would be the previous account's.
+  // Pollar account switch, and the answer would be the previous account's.
   useEffect(() => {
     let live = true;
     setProfile(null);

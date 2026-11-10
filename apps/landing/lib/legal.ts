@@ -78,7 +78,7 @@ const TERMS_EN: readonly LegalSection[] = [
     paragraphs: [
       'Changuito is an AI shopping agent for Argentine supermarkets. You tell it what you need in your own words; it searches supermarket websites (such as Día, Jumbo, Disco and Carrefour), compares products and prices, and builds a cart for you to review.',
       'Changuito is not a supermarket. It does not sell, stock or deliver products. Purchases are made with the supermarket, which is responsible for the products, delivery, invoices and returns.',
-      'These terms cover www.changuito.me and the Changuito apps that link to them, including the Seeker app (me.changuito.sol).',
+      'These terms cover www.changuito.me and the Changuito apps that link to them.',
     ],
   },
   {
@@ -86,7 +86,7 @@ const TERMS_EN: readonly LegalSection[] = [
     heading: '2. Beta and test networks',
     paragraphs: [
       'Changuito is in beta. Features can change, fail or be removed without notice, and the service may be unavailable at times.',
-      'A test version of Changuito, including the Seeker app, runs on a public devnet. Payments there use test USDC from a faucet, which has no monetary value. No real money is charged on devnet. Where a version is shown as a preview or test mode, the same applies.',
+      'A test version of Changuito runs on Stellar testnet. Payments there use test USDC from a faucet, which has no monetary value. No real money is charged on testnet. Where a version is shown as a preview or test mode, the same applies.',
       'If a version of Changuito ever asks you to pay with real funds, the screen will say so before you confirm, and the payment terms below apply to it.',
     ],
   },
@@ -111,7 +111,7 @@ const TERMS_EN: readonly LegalSection[] = [
     id: 'wallet',
     heading: '5. Your account and your wallet',
     paragraphs: [
-      'You can sign in with email, Google or a wallet. Sign-in with email or Google creates a wallet linked to your account.',
+      'You can sign in with Pollar (email or Google) or with Freighter. Sign-in with email or Google creates a wallet linked to your account.',
       'You are responsible for your devices, your accounts and your wallet keys. Changuito never asks for your seed phrase or private key. Anyone who has them can move your funds, and Changuito cannot recover them.',
       'If you save supermarket account details in Changuito, you confirm that they are yours and that you may use them.',
     ],
@@ -172,7 +172,7 @@ const TERMS_ES: readonly LegalSection[] = [
     paragraphs: [
       'Changuito es un agente de compras con inteligencia artificial para supermercados de Argentina. Le decís lo que necesitás con tus palabras; busca en los sitios de los supermercados (como Día, Jumbo, Disco y Carrefour), compara productos y precios, y te arma un carrito para que lo revises.',
       'Changuito no es un supermercado. No vende, no tiene stock y no entrega productos. La compra se hace con el supermercado, que responde por los productos, la entrega, las facturas y las devoluciones.',
-      'Estos términos cubren www.changuito.me y las apps de Changuito que enlazan acá, incluida la app para Seeker (me.changuito.sol).',
+      'Estos términos cubren www.changuito.me y las apps de Changuito que enlazan acá.',
     ],
   },
   {
@@ -180,7 +180,7 @@ const TERMS_ES: readonly LegalSection[] = [
     heading: '2. Beta y redes de prueba',
     paragraphs: [
       'Changuito está en beta. Las funciones pueden cambiar, fallar o desaparecer sin aviso, y el servicio puede no estar disponible por momentos.',
-      'Una versión de prueba de Changuito, incluida la app de Seeker, funciona en una devnet pública. Ahí los pagos usan USDC de prueba de un faucet, que no tiene valor. En devnet no se cobra dinero real. Lo mismo vale para cualquier versión que se muestre como vista previa o modo de prueba.',
+      'Una versión de prueba de Changuito funciona en la testnet de Stellar. Ahí los pagos usan USDC de prueba de un faucet, que no tiene valor. En testnet no se cobra dinero real. Lo mismo vale para cualquier versión que se muestre como vista previa o modo de prueba.',
       'Si alguna versión de Changuito te pide pagar con fondos reales, la pantalla lo va a decir antes de que confirmes, y se aplican las condiciones de pago de abajo.',
     ],
   },
@@ -205,7 +205,7 @@ const TERMS_ES: readonly LegalSection[] = [
     id: 'wallet',
     heading: '5. Tu cuenta y tu billetera',
     paragraphs: [
-      'Podés entrar con email, Google o una billetera. El ingreso con email o Google crea una billetera asociada a tu cuenta.',
+      'Podés entrar con Pollar (email o Google) o con Freighter. El ingreso con email o Google crea una billetera asociada a tu cuenta.',
       'Sos responsable de tus dispositivos, tus cuentas y las claves de tu billetera. Changuito nunca te pide la frase semilla ni la clave privada. Quien las tenga puede mover tus fondos, y Changuito no puede recuperarlas.',
       'Si guardás datos de tu cuenta de un supermercado en Changuito, confirmás que son tuyos y que podés usarlos.',
     ],
@@ -262,14 +262,14 @@ const PRIVACY_EN: readonly LegalSection[] = [
     id: 'scope',
     heading: '1. Scope',
     paragraphs: [
-      'This policy covers www.changuito.me and the Changuito apps that link to it, including the Seeker app (me.changuito.sol). Each app’s own privacy page describes in more technical detail what its code stores; this policy does not contradict it.',
+      'This policy covers www.changuito.me and the Changuito apps that link to it. Each app’s own privacy page describes in more technical detail what its code stores; this policy does not contradict it.',
     ],
   },
   {
     id: 'account',
     heading: '2. Sign-in and wallet',
     paragraphs: [
-      'You can sign in with email or Google, which creates a wallet on your account, or with a wallet by signing a one-time message. After sign-in, the app keeps a signed session cookie for 30 days.',
+      'You can sign in with Pollar (email or Google), which creates a wallet on your account, or with Freighter by signing a one-time message. After sign-in, the app keeps a signed session cookie for 30 days.',
       'Changuito never asks for or receives your seed phrase or private key.',
     ],
   },
@@ -321,7 +321,7 @@ const PRIVACY_EN: readonly LegalSection[] = [
     id: 'rights',
     heading: '9. Your rights and deleting your data',
     paragraphs: [
-      'From your profile in the app you can delete your Changuito account: the encrypted profile, chats, related orders, saved checkouts, the usage counter, the session cookie and Changuito data in your browser. If possible, your Privy user is deleted too. Your supermarket account and anything already written on the blockchain are not deleted.',
+      'From your profile in the app you can delete your Changuito account: the encrypted profile, chats, related orders, saved checkouts, the usage counter, the session cookie and Changuito data in your browser. Your supermarket account and anything already written on the blockchain are not deleted.',
       `Under Argentine Law 25.326 you can ask to access, correct or delete your personal data. Write to ${SUPPORT_EMAIL}. The Agencia de Acceso a la Información Pública is the authority in charge of enforcing that law.`,
     ],
   },
@@ -347,14 +347,14 @@ const PRIVACY_ES: readonly LegalSection[] = [
     id: 'scope',
     heading: '1. Alcance',
     paragraphs: [
-      'Esta política cubre www.changuito.me y las apps de Changuito que enlazan acá, incluida la app para Seeker (me.changuito.sol). La página de privacidad de cada app describe con más detalle técnico lo que guarda su código; esta política no la contradice.',
+      'Esta política cubre www.changuito.me y las apps de Changuito que enlazan acá. La página de privacidad de cada app describe con más detalle técnico lo que guarda su código; esta política no la contradice.',
     ],
   },
   {
     id: 'account',
     heading: '2. Ingreso y billetera',
     paragraphs: [
-      'Podés entrar con email o Google, que crea una billetera en tu cuenta, o con una billetera firmando un mensaje de un solo uso. Después del ingreso, la app guarda una cookie de sesión firmada por 30 días.',
+      'Podés entrar con Pollar (email o Google), que crea una billetera en tu cuenta, o con Freighter firmando un mensaje de un solo uso. Después del ingreso, la app guarda una cookie de sesión firmada por 30 días.',
       'Changuito nunca te pide ni recibe tu frase semilla ni tu clave privada.',
     ],
   },
@@ -406,7 +406,7 @@ const PRIVACY_ES: readonly LegalSection[] = [
     id: 'rights',
     heading: '9. Tus derechos y cómo borrar tus datos',
     paragraphs: [
-      'Desde tu perfil en la app podés eliminar tu cuenta de Changuito: el perfil cifrado, los chats, los pedidos asociados, los checkouts guardados, el contador de uso, la cookie de sesión y los datos de Changuito en tu navegador. Si se puede, también se borra tu usuario de Privy. No se borran tu cuenta del supermercado ni lo que ya quedó escrito en la blockchain.',
+      'Desde tu perfil en la app podés eliminar tu cuenta de Changuito: el perfil cifrado, los chats, los pedidos asociados, los checkouts guardados, el contador de uso, la cookie de sesión y los datos de Changuito en tu navegador. No se borran tu cuenta del supermercado ni lo que ya quedó escrito en la blockchain.',
       `Según la Ley 25.326 podés pedir acceder, corregir o suprimir tus datos personales. Escribinos a ${SUPPORT_EMAIL}. La Agencia de Acceso a la Información Pública es el órgano de control de esa ley.`,
     ],
   },
@@ -432,8 +432,8 @@ const DELETE_EN: readonly LegalSection[] = [
     id: 'app',
     heading: '1. Ask in the app',
     paragraphs: [
-      'If you can sign in, including from the Changuito app on Seeker (me.changuito.sol), open your profile, choose “Delete account and data”, read what will be removed, and confirm with “Yes, delete”.',
-      'Changuito deletes the data below as part of that confirmation, and then signs you out. If it fails, the screen says so and the account is still there: try again. If the email or Google sign-in cannot be deleted, the screen says that too. Sign in again and retry. A sign-in that only used a wallet has no separate sign-in account to delete.',
+      'If you can sign in, open your profile, choose “Delete account and data”, read what will be removed, and confirm with “Yes, delete”.',
+      'Changuito deletes the data below as part of that confirmation, and then signs you out. If it fails, the screen says so and the account is still there: try again.',
     ],
   },
   {
@@ -448,7 +448,7 @@ const DELETE_EN: readonly LegalSection[] = [
     id: 'deleted',
     heading: '3. What we delete',
     paragraphs: [
-      'The encrypted supermarket profile you saved in Changuito (for Día: email, password, DNI and postal code). Chat transcripts stored for your wallet address, orders tied to them, and order rows stored under that address. Saved checkouts. The usage counter. The session cookie, and Changuito data in the browser where you confirm. The Privy user, when Privy accepts the deletion.',
+      'The encrypted supermarket profile you saved in Changuito (for Día: email, password, DNI and postal code). Chat transcripts stored for your wallet address, orders tied to them, and order rows stored under that address. Saved checkouts. The usage counter. The session cookie, and Changuito data in the browser where you confirm.',
       'An email request also covers waitlist and bug-report rows on www.changuito.me when they use an email we can match. The button in the app does not delete those rows, because they are not tied to the wallet.',
     ],
   },
@@ -458,7 +458,7 @@ const DELETE_EN: readonly LegalSection[] = [
     paragraphs: [
       'Transactions already written on the public network, including the USDC escrow. They are public and cannot be erased by Changuito or by you. Deleting the account does not move funds.',
       'Your account at the supermarket (for example Día). A chat turn that was not archived yet expires on its own within about an hour. Changuito data that exists only in another device’s browser stays there until you clear that browser.',
-      'Copies a third party already has under its own policy (the supermarket, the AI provider, Privy, or an analytics provider). We delete what we store. We do not control their systems.',
+      'Copies a third party already has under its own policy (the supermarket, the AI provider, Pollar, Freighter, or an analytics provider). We delete what we store. We do not control their systems.',
     ],
   },
   {
@@ -476,8 +476,8 @@ const DELETE_ES: readonly LegalSection[] = [
     id: 'app',
     heading: '1. Pedirlo en la app',
     paragraphs: [
-      'Si podés entrar, también desde la app de Changuito en Seeker (me.changuito.sol), abrí tu perfil, elegí “Eliminar cuenta y datos”, leé qué se va a borrar y confirmá con “Sí, eliminar”.',
-      'Changuito borra los datos de abajo en esa confirmación y después cierra la sesión. Si falla, la pantalla lo dice y la cuenta sigue: probá de nuevo. Si el ingreso por email o Google no se puede borrar, la pantalla también lo dice. Volvé a entrar e intentá otra vez. Un ingreso que solo usó una billetera no tiene una cuenta de ingreso aparte para borrar.',
+      'Si podés entrar, abrí tu perfil, elegí “Eliminar cuenta y datos”, leé qué se va a borrar y confirmá con “Sí, eliminar”.',
+      'Changuito borra los datos de abajo en esa confirmación y después cierra la sesión. Si falla, la pantalla lo dice y la cuenta sigue: probá de nuevo.',
     ],
   },
   {
@@ -492,7 +492,7 @@ const DELETE_ES: readonly LegalSection[] = [
     id: 'deleted',
     heading: '3. Qué borramos',
     paragraphs: [
-      'El perfil cifrado del supermercado que guardaste en Changuito (para Día: email, contraseña, DNI y código postal). Los chats guardados para tu dirección, los pedidos asociados y las filas de pedidos guardadas bajo esa dirección. Los checkouts guardados. El contador de uso. La cookie de sesión y los datos de Changuito en el navegador donde confirmás. El usuario de Privy, cuando Privy acepta el borrado.',
+      'El perfil cifrado del supermercado que guardaste en Changuito (para Día: email, contraseña, DNI y código postal). Los chats guardados para tu dirección, los pedidos asociados y las filas de pedidos guardadas bajo esa dirección. Los checkouts guardados. El contador de uso. La cookie de sesión y los datos de Changuito en el navegador donde confirmás.',
       'Un pedido por correo también incluye las filas de la lista de espera y de reportes de errores en www.changuito.me cuando usan un email que podemos asociar. El botón de la app no borra esas filas, porque no están atadas a la billetera.',
     ],
   },
@@ -502,7 +502,7 @@ const DELETE_ES: readonly LegalSection[] = [
     paragraphs: [
       'Las transacciones que ya quedaron escritas en la red pública, incluido el escrow en USDC. Son públicas y ni Changuito ni vos pueden borrarlas. Eliminar la cuenta no mueve fondos.',
       'Tu cuenta en el supermercado (por ejemplo Día). Un turno de chat que todavía no se archivó vence solo, dentro de la hora. Los datos de Changuito que solo están en el navegador de otro dispositivo quedan ahí hasta que limpies ese navegador.',
-      'Copias que un tercero ya tiene bajo su propia política (el supermercado, el proveedor de IA, Privy o un proveedor de analítica). Borramos lo que guardamos nosotros. No controlamos sus sistemas.',
+      'Copias que un tercero ya tiene bajo su propia política (el supermercado, el proveedor de IA, Pollar, Freighter o un proveedor de analítica). Borramos lo que guardamos nosotros. No controlamos sus sistemas.',
     ],
   },
   {

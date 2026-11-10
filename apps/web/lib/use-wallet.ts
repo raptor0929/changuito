@@ -5,38 +5,37 @@ import { createContext, useContext } from 'react';
 import type { WalletSigner } from './wallet-proof.ts';
 
 /**
- * The one wallet surface the app sees. Privy lives behind it
- * (components/WalletProvider.tsx), so no component imports a Privy hook and a
- * build without NEXT_PUBLIC_PRIVY_APP_ID renders the same tree with
+ * The one wallet surface the app sees. Pollar and Freighter live behind it
+ * (components/WalletProvider.tsx), so no component imports a Pollar hook and a
+ * build without NEXT_PUBLIC_POLLAR_API_KEY renders the same tree with
  * `enabled: false` — chat, search and cart work, paying does not.
  *
- * It is a context rather than a hook over Privy's hooks because those hooks
- * throw outside a PrivyProvider, and whether there is one is a build-time
+ * It is a context rather than a hook over Pollar's hooks because those hooks
+ * throw outside a PollarProvider, and whether there is one is a build-time
  * fact. A context default is the cheapest way to keep hook order fixed.
  */
 export interface WalletState {
-  /** Sign-in can happen: Privy is configured, or this is the phone-only shell. */
+  /** Sign-in can happen: Pollar is configured for the login network. */
   enabled: boolean;
-  /** Privy finished restoring its session, or the phone session check finished. */
+  /** Pollar finished restoring its session. */
   ready: boolean;
   authenticated: boolean;
   /**
-   * Android, including the Seeker shell. Email, Google and the phone
-   * account are all offered. Privy stays mounted.
+   * Phone-shell choices from the shared shopper surface. Unused here: this
+   * chain signs in through Pollar and Freighter in the browser.
    */
   androidChoices: boolean;
   /**
-   * `privy` is an embedded or linked external wallet authenticated by Privy. `mobile` is a phone wallet that signed
-   * the server's message. `off` is signed out. When both exist, `mobile` wins
-   * until the shopper starts a Privy login.
+   * Shared surface kinds. This chain authenticates through Pollar / Freighter
+   * and leaves phone-wallet kinds unused.
    */
   kind: 'off' | 'privy' | 'mobile';
   /** The account address. Case-sensitive: never upper-case it. */
   address: string | null;
   email: string | null;
-  /** Opens Privy. `email` or `google` limits the modal to that one method. */
+  /** Opens Pollar. `email` or `google` limits the modal to that one method. */
   login: (method?: 'email' | 'google') => void;
-  /** Connect a phone wallet, sign the server challenge, and keep that address. */
+  /** Unused on this chain: there is no phone-wallet login path. */
   loginMobile: () => Promise<void>;
   logout: () => Promise<void>;
   /**

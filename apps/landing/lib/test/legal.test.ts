@@ -46,7 +46,7 @@ test('both languages carry the same sections in the same order', () => {
 
 test('terms state the beta, test funds, fee, keys, no advice and Argentine law', () => {
   const text = legalCopy('terms', 'en').sections.flatMap((s) => s.paragraphs).join(' ');
-  for (const needle of ['devnet', 'test USDC', 'no monetary value', 'escrow', '20% of the savings', '0%', 'seed phrase', 'financial', 'Argentine Republic', 'can change']) {
+  for (const needle of ['testnet', 'test USDC', 'no monetary value', 'escrow', '20% of the savings', '0%', 'seed phrase', 'financial', 'Argentine Republic', 'can change']) {
     assert.ok(text.includes(needle), needle);
   }
 });

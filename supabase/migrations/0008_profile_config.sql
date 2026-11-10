@@ -29,7 +29,7 @@ insert into config (key, value) values
 
 create table profile (
   network    network_id     not null,
-  address    wallet_address not null,
+  address    stellar_address not null,
   secret     jsonb          not null,
   created_at timestamptz    not null default now(),
   updated_at timestamptz    not null default now(),

@@ -31,8 +31,6 @@ export interface ProfileCopy {
   deleteCancel: string;
   deleteWorking: string;
   deleteFailed: string;
-  deletePrivyFailed: string;
-  deleteDone: string;
   privacyLink: string;
 }
 
@@ -68,9 +66,6 @@ const ES: ProfileCopy = {
   deleteCancel: 'Cancelar',
   deleteWorking: 'Eliminando…',
   deleteFailed: 'No pudimos eliminar la cuenta. Probá de nuevo.',
-  deletePrivyFailed:
-    'Los datos de Changuito ya se borraron. El ingreso por email no se pudo eliminar. Volvé a entrar para intentarlo de nuevo.',
-  deleteDone: 'Listo',
   privacyLink: 'Política de privacidad',
 };
 
@@ -106,9 +101,6 @@ const EN: ProfileCopy = {
   deleteCancel: 'Cancel',
   deleteWorking: 'Deleting…',
   deleteFailed: "We couldn't delete the account. Try again.",
-  deletePrivyFailed:
-    'Your Changuito data is already gone. The email sign-in could not be deleted. Sign in again to retry.',
-  deleteDone: 'Done',
   privacyLink: 'Privacy policy',
 };
 

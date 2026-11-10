@@ -59,8 +59,8 @@ the same way. Now radios and checkboxes take their wrapping `<label>` text as
 their label (`COLLECT_JS` in `sandbox.py`), and the `shop` instruction in
 `agent.py` says to select Envío programado (never Express or store pickup),
 then Confirmar. With that, a two-item escrow run against a local Docker sandbox (2026-10-04)
-reached `/checkout/#/payment` in 214 s, with 0 orders placed, and
-[settled](https://solscan.io/tx/3akyS29xEdce7Phd7TrVaPoTzxjWaf7Uum5Xn8g9nxgRafJZmvBgN28ahm94Yu8bzoQDtmR2G9L325RSPePearWP?cluster=devnet). The field note is
+reached `/checkout/#/payment` in 214 s, with 0 orders placed, and settled the
+testnet escrow. The field note is
 in [`dia-navigation.md`](../services/sandbox/docs/dia-navigation.md) §4.
 
 ## How it works
@@ -132,7 +132,7 @@ values are redacted from everything Jev reads and everything the run prints.
 members` (`list`, `add <address> [note]`, `remove <address>`). A wallet that
 is not on it never reaches this service: it gets the web app's demo run (the
 in-process mock, whatever `config` says), which stops at payment, settles the
-(devnet) escrow to the treasury, and
+(testnet) escrow to the treasury, and
 hands the shopper the cart link to finish in Día. Same rules as `shopper` — in memory for the run, deleted
 after, `<redacted>` in any repr, and a 422 never echoes either. Nothing in
 the service reads a login or a card from its environment.
@@ -298,7 +298,7 @@ Día places the order there is nothing left to finish.
   out would give each replica its own queue on the same account.
 - **Not deployed to Railway yet.** The service is configured but awaits
   credentials; it runs locally in Docker, where a one-item run reached the
-  payment step. Larger baskets have not been run live. The devnet e2e
+  payment step. Larger baskets have not been run live. The testnet end-to-end
   evidence used the in-process mock.
 - **Live-site dependency.** Selectors, hosts and the Flutter login popup are
   Día's to change; the field notes are a map, not a contract.
@@ -323,7 +323,7 @@ chromium`, then `uvicorn server:app` on `$PORT` (default 8080).
 3. Deploy; check `GET https://<service>/health` returns `{"ok": true, …}`.
 4. In the web app (Vercel) set `SANDBOX_URL=https://<service>` and the same
    `SANDBOX_TOKEN`, and `npm run config -- set sandbox_mock false`.
-5. Make sure `shared_card` has the card (a `devnet` or `mainnet` row), and
+5. Make sure `shared_card` has the card (a `testnet` or `mainnet` row), and
    allow the wallets that may buy with it: `npm run members -- add <address> <who>`. Everyone else gets the demo run: up to payment, then settled.
 
 ## Run locally

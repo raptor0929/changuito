@@ -26,7 +26,7 @@ import { flowLabels, flowRailIndex, flowScreen } from '../lib/checkout/flow.ts';
 /**
  * From a full basket to a settled escrow, in four steps:
  *
- *   1. login   — email through Privy, or the phone account inside the Seeker shell.
+ *   1. login   — email or Google through Pollar, or Freighter in the browser.
  *   2. lock    — the server quotes goods + envío at belo's USDC rate (order
  *                id, basket hash, USDC amount) and the shopper confirms that
  *                breakdown and types their Día login. The server builds
@@ -332,7 +332,7 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
 
   // A finished demo files the chat as completed too, so the demo has an end:
   // the basket becomes a receipt like a real purchase would. The amount says
-  // "de prueba": the treasury took devnet USDC and Día was never paid, and the
+  // "de prueba": the treasury took testnet USDC and Día was never paid, and the
   // receipt must not read like a store order (chat-store keeps the string as
   // it was on screen). Settled when it reached payment, refunded when it
   // failed before: both end the chat.

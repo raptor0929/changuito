@@ -95,7 +95,7 @@ function ChatCore({
   isAuthenticated?: boolean;
   address?: string | null;
   openLoginModal?: () => void;
-  /** The Privy access token source. Absent in a build without Privy. */
+  /** The Pollar SEP-53 signer. Absent in a build without Pollar. */
   sign?: TokenSource;
 }) {
   const { network } = useNetwork();
@@ -197,11 +197,11 @@ function ChatCore({
     if (isAuthenticated) clearLoginRequired();
   }, [isAuthenticated, clearLoginRequired]);
 
-  /** True once the server has the cookie, not merely once Privy says hello. */
+  /** True once the server has the cookie, not merely once Pollar says hello. */
   const [sessionReady, setSessionReady] = useState(false);
 
   // The cookie is what /api/chat actually reads, and minting it is a round
-  // trip. The banner can hide as soon as Privy says the shopper is in, but
+  // trip. The banner can hide as soon as Pollar says the shopper is in, but
   // re-sending the rejected message has to wait until the mint resolved —
   // otherwise the retry POSTs into the same 401. Keyed on the address because
   // `wallet` can still be null when the flag flips.

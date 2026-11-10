@@ -23,12 +23,13 @@ import { ReceiveModal } from './ReceiveModal';
 
 /**
  * The wallet's half of the top bar, read right to left: the profile avatar,
- * the Privy wallet's devnet USDC balance, and Cargar USDC. Everything else
- * that used to sit in the card here — the address, the mode, Mis compras and
- * the way out — lives in the profile's General tab (ProfileModal.tsx).
+ * the Pollar / Freighter wallet's testnet USDC balance, and Cargar USDC.
+ * Everything else that used to sit in the card here — the address, the mode,
+ * Mis compras and the way out — lives in the profile's General tab
+ * (ProfileModal.tsx).
  *
- * Privy lives behind `useWallet()` (lib/use-wallet.ts), so this renders the
- * same tree whether or not the build has an app id; `enabled: false` is the
+ * Pollar lives behind `useWallet()` (lib/use-wallet.ts), so this renders the
+ * same tree whether or not the build has a Pollar key; `enabled: false` is the
  * misconfiguration, not a signed-out visitor.
  */
 export function WalletWidget() {
@@ -82,14 +83,14 @@ export function WalletWidget() {
     wasAuthed.current = wallet.authenticated;
   }, [wallet.authenticated]);
 
-  // After login, mint the httpOnly `chg_user` cookie from the Privy access
-  // token, so /api/chat skips the guest limit and the checkout routes know
+  // After login, mint the httpOnly `chg_user` cookie from the Pollar SEP-53
+  // signer, so /api/chat skips the guest limit and the checkout routes know
   // who is paying. Shared with the chat — see lib/session-login.ts.
   useEffect(() => {
     if (!address) return;
     track('payment_view', { state: 'ready' });
-    // A phone wallet already posted its signed proof. Asking again with a
-    // null Privy token would record a failed login.
+    // A phone-wallet path already posted its signed proof. Asking again with
+    // a null signer would record a failed login. Unused on this chain.
     if (wallet.kind === 'mobile') return;
     let cancelled = false;
     void ensureUserCookie(address, wallet.accessToken).then((ok) => {
@@ -101,7 +102,7 @@ export function WalletWidget() {
   }, [address, wallet.accessToken, wallet.kind]);
 
   // Signing out leaves nothing of this account in the browser: the session
-  // cookie, the stored chats (history, carts, receipts, postcode), Privy's
+  // cookie, the stored chats (history, carts, receipts, postcode), Pollar's
   // session, and — by reloading — everything held in memory.
   function signOut() {
     track('logout');
@@ -162,7 +163,7 @@ export function WalletWidget() {
     return (
       <div
         className={android ? 'topbar-wallet is-android' : wallet.enabled ? 'topbar-wallet' : 'topbar-wallet wallet-off'}
-        title={wallet.enabled ? undefined : 'Falta NEXT_PUBLIC_PRIVY_APP_ID. Ver DEPLOY.md'}
+        title={wallet.enabled ? undefined : 'Falta NEXT_PUBLIC_POLLAR_API_KEY. Ver DEPLOY.md'}
       >
         <ModeBadge network={network} mode={appMode} />
         {android ? (

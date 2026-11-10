@@ -37,7 +37,7 @@ export interface PublicProfile {
   complete: boolean;
 }
 
-export const PROFILE_NETWORK = 'devnet';
+export const PROFILE_NETWORK = 'testnet';
 
 export class ProfileInputError extends Error {
   constructor(message: string) {

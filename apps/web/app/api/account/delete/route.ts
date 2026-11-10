@@ -1,11 +1,10 @@
 /**
- * POST /api/account/delete { confirm, token? }
+ * POST /api/account/delete { confirm }
  *
  * Deletes the signed-in shopper's Changuito data (lib/account-delete.ts) and
  * ends the session. `confirm` has to be the exact string: a stray POST must
- * not delete. `token`, when the browser still has a Privy access token, is
- * forwarded to Privy's delete API. Changuito's rows are removed even when
- * that call fails; the answer says which one happened.
+ * not delete. Sign-in here is Pollar / Freighter; there is no separate
+ * provider-user delete call, so the answer reports that path as skipped.
  *
  * The Día account and anything already on the public network are not touched. The profile
  * screen says so before this route is called.
