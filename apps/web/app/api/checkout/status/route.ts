@@ -2,12 +2,14 @@
  * GET /api/checkout/status?orderId=…  ->  StatusResponse
  *
  * The checkout dialog polls this every few seconds. Each poll asks the
- * sandbox how far it got and, when the job is over, closes the escrow:
+ * sandbox how far it got and, when the job is over (or the escrow deadline
+ * has passed), closes the escrow:
  *
  *   - Día placed the order       -> settle: vault -> treasury, receipt on chain
- *   - anything else              -> refund: vault -> buyer
+ *   - store failed / not placed  -> refund: vault -> buyer
+ *   - deadline passed while open -> refund: vault -> buyer
  *
- * "Anything else" includes a declined card, a card that was never tried (the
+ * "Store failed" includes a declined card, a card that was never tried (the
  * job carried no card because `shared_card` has no row) and a run that never reached payment.
  * A demo run (a wallet not on the card's member list) stops at payment on
  * purpose and still *settles* once it gets there: the treasury takes the
@@ -18,7 +20,8 @@
  * for the shopper's order; the receipt carries Día's order number.
  *
  * Idempotent by reading the chain first: a closed order is reported, never
- * closed again.
+ * closed again. Settle still passes the on-chain basket_hash, so a different
+ * cart stays `BasketMismatch` on the contract.
  */
 import { createHash } from 'node:crypto';
 
@@ -128,9 +131,17 @@ export async function GET(req: Request): Promise<Response> {
       }
     } catch (err) {
       // A sandbox we cannot reach is not yet a failed job; keep polling. The
-      // buyer can still refund on chain once the deadline passes.
+      // deadline path below still refunds once the escrow expires.
       console.error('[checkout/status] sandbox', err);
     }
+  }
+
+  // Read the chain before deciding to wait: an open order past its deadline
+  // refunds even while the sandbox is still running or unreachable.
+  let order = await readOrder(orderId);
+  if (!finished && order?.status === 'open' && order.deadline <= Math.floor(Date.now() / 1000)) {
+    finished = 'refund';
+    rec.error = rec.error ?? 'El pedido venció; el USDC vuelve a tu billetera.';
   }
 
   if (!finished || closing.has(orderId)) {
@@ -141,7 +152,7 @@ export async function GET(req: Request): Promise<Response> {
 
   closing.add(orderId);
   try {
-    const order = await readOrder(orderId);
+    order = order ?? await readOrder(orderId);
     if (!order) throw new Error('order account missing');
     if (order.status === 'open') {
       if (finished === 'settle') {
@@ -154,6 +165,7 @@ export async function GET(req: Request): Promise<Response> {
             settledAt: new Date().toISOString(),
           }).replace('basis|buyer-confirmed', rec.mode === 'demo' ? 'basis|demo-reached-payment' : 'basis|sandbox-order-placed') +
           `job|${rec.jobId}\norderform|${rec.storeOrderForm ?? ''}\nstore-order|${rec.storeOrderId ?? ''}\n`;
+        // basketHash comes from the on-chain order, never from a re-quoted cart.
         rec.closeSig = await settleOrder(order, createHash('sha256').update(receipt).digest());
       } else {
         rec.closeSig = await refundOrder(order);
