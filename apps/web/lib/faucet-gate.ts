@@ -5,6 +5,8 @@ import { requireHuman } from './human-gate.ts';
 import { guestTurnCounter, limiterUnavailableResponse, takeQuota, type TurnCounter } from './login-gate.ts';
 import { requestNetwork } from './server-network.ts';
 import { addressKind } from './stellar.ts';
+import { verifyWalletProof } from './wallet-proof-verify.ts';
+import { faucetOpenToAll, registerWallet, walletOpensFaucet } from './wallet-record.ts';
 
 /**
  * Everything POST /api/faucet decides before it touches the chain.
@@ -55,8 +57,27 @@ export async function gateFaucet(
   const kind = addressKind(address);
   if (!kind) return Response.json({ error: 'not a Stellar address' }, { status: 400 });
 
+  const standing = await registerWallet(address, env, network);
+  if (standing.banned) {
+    return Response.json({ error: 'wallet_banned', message: 'Esta cuenta no puede usar Changuito.' }, { status: 403 });
+  }
+
   const auth = authorizeFaucet({ address, proof, now, env, net: network });
-  if (!auth.ok) return Response.json({ error: auth.error, message: auth.message }, { status: auth.status });
+  if (!auth.ok) {
+    const open = walletOpensFaucet(standing, await faucetOpenToAll(env), auth.error);
+    if (!open) return Response.json({ error: auth.error, message: auth.message }, { status: auth.status });
+    const signed = verifyWalletProof({ intent: 'faucet', address, proof, now });
+    if (!signed.ok) {
+      const error = signed.error === 'proof_missing' ? 'faucet_session_required' : signed.error === 'proof_expired' ? 'faucet_proof_expired' : 'faucet_proof_invalid';
+      const message =
+        signed.error === 'proof_missing'
+          ? 'Iniciá sesión con la cuenta de prueba para cargar USDC.'
+          : signed.error === 'proof_expired'
+            ? 'La confirmación venció. Probá de nuevo.'
+            : 'No pudimos confirmar tu sesión. Probá de nuevo.';
+      return Response.json({ error, message }, { status: 401 });
+    }
+  }
 
   const wait = 'Esperá un momento antes de volver a pedir fondos.';
   const mine = await takeQuota(`changuito:faucet:${address}`, 1, FAUCET_COOLDOWN_SECONDS, store);

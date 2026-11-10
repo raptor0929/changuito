@@ -9,6 +9,7 @@
  *   - the working turn of each archived chat (`changuito:turn:<sessionId>`)
  *   - the hourly usage counter (`changuito:user-turns:<address>`)
  *   - a legacy card-owner row, if one still names this address
+ *   - the wallet row (faucet grant and ban) for this address
  *
  * What does not go, and the profile screen says so: the shopper's account at
  * Día, and anything already written on the public network. A turn that was still only in
@@ -99,6 +100,7 @@ export async function deleteAccountData(address: string): Promise<DeletedAccount
     const chats = await tx`delete from chat where address = ${address} returning id`;
     const profile = await tx`delete from profile where address = ${address} returning address`;
     await tx`delete from card_owner where address = ${address}`;
+    await tx`delete from wallet where address = ${address}`;
     const quota = await tx`delete from quota where key = ${USER_TURNS_KEY(address)} returning key`;
     const checkoutRows = await tx`
       delete from kv

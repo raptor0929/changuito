@@ -20,6 +20,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "db:migrate": "node scripts/db.mjs migrate",
+    "wallet": "node scripts/wallet.mjs",
     "db:status": "node scripts/db.mjs status",
     "db:invariants": "node scripts/db-invariants.mjs",
     "db:archive": "node --experimental-strip-types scripts/db-chat-archive.mts",
