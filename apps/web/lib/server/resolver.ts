@@ -23,6 +23,7 @@ import { Client as Usdc } from '@changuito/usdc-bindings';
 
 import { contractIds } from '../contract-ids.ts';
 import { DEFAULT_NETWORK, deployment, type NetworkId } from '../deployments.ts';
+import { rpcUrl } from '../rpc-url.ts';
 
 /** The env var holding the secret for each network. */
 const SECRET_VAR: Record<NetworkId, string> = {
@@ -68,7 +69,7 @@ export function usdcAsAdmin(net: NetworkId = DEFAULT_NETWORK): Usdc {
   return new Usdc({
     contractId: contractIds(net).usdcId,
     networkPassphrase: d.networkPassphrase,
-    rpcUrl: d.rpcUrl,
+    rpcUrl: rpcUrl(net),
     ...signing(net),
   });
 }
@@ -79,7 +80,7 @@ export function escrowAsResolver(net: NetworkId = DEFAULT_NETWORK): Escrow {
   return new Escrow({
     contractId: contractIds(net).escrowId,
     networkPassphrase: d.networkPassphrase,
-    rpcUrl: d.rpcUrl,
+    rpcUrl: rpcUrl(net),
     ...signing(net),
   });
 }

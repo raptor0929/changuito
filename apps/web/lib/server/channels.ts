@@ -6,6 +6,11 @@
  * function: this module rebuilds it from the quoted order and checks that
  * the signed entry is that call, for that buyer.
  *
+ * A wallet does not always sign the entry itself. Freighter signs the payload
+ * the entry hashes to and hands back the bare signature, so prepare returns
+ * that payload next to each entry and submit puts the signature on the entry
+ * it was made for, after checking that it verifies there.
+ *
  * The client is imported from the package's client file, not its root. The
  * root also loads a Node-only Actions plugin, which a Worker cannot run.
  */
@@ -15,6 +20,8 @@ import {
   Address,
   Operation,
   TransactionBuilder,
+  authorizeEntry,
+  buildAuthorizationEntryPreimage,
   nativeToScVal,
   rpc,
   xdr,
@@ -58,6 +65,8 @@ export interface OpenFields {
 export interface PrepareOk {
   kind: 'sign';
   entries: string[];
+  /** What the buyer's key signs for the entry at the same index. */
+  payloads: string[];
   validUntilLedger: number;
   func: string;
 }
@@ -284,6 +293,45 @@ export function setAuthExpiry(entryXdr: string, ledger: number): string {
   return next.toXDR('base64');
 }
 
+/**
+ * What the buyer's key signs for this entry: the preimage the network hashes
+ * for the entry's own credential variant, at the expiry the entry carries.
+ *
+ * `ADDRESS_V2` binds the address into the preimage and the legacy form does
+ * not, so the two hash differently and a signature made for one never
+ * verifies under the other. Building it from the entry that will be submitted
+ * is what keeps the wallet signing the payload the network checks.
+ */
+export function authPayload(entryXdr: string, net: NetworkId = 'testnet'): string {
+  const entry = xdr.SorobanAuthorizationEntry.fromXDR(entryXdr, 'base64');
+  const expiry = buyerCredentials(entry).signatureExpirationLedger;
+  return buildAuthorizationEntryPreimage(entry, expiry, deployment(net).networkPassphrase).toXDR('base64');
+}
+
+/**
+ * Puts a wallet's bare signature on the entry it was made for.
+ *
+ * The SDK checks the signature against this entry's payload, with the key the
+ * entry names, before it builds anything. One that does not verify here would
+ * not verify on the network either, so it is refused and never submitted. The
+ * credential variant and the expiry are the entry's own.
+ */
+export async function attachBuyerSignature(
+  entryXdr: string,
+  signature: string,
+  net: NetworkId = 'testnet',
+): Promise<string> {
+  try {
+    const entry = xdr.SorobanAuthorizationEntry.fromXDR(entryXdr, 'base64');
+    const expiry = buyerCredentials(entry).signatureExpirationLedger;
+    const raw = Uint8Array.from(Buffer.from(signature, 'base64'));
+    const signed = await authorizeEntry(entry, async () => raw, expiry, deployment(net).networkPassphrase);
+    return signed.toXDR('base64');
+  } catch {
+    throw new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este pago.');
+  }
+}
+
 export function assertBuyerEntries(entries: string[], buyer: string, funcXdr: string): void {
   if (entries.length !== 1) {
     throw new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este pago.');
@@ -454,7 +502,8 @@ export async function prepareOpen(
   const ledger = sim.latestLedger + EXPIRY_LEDGERS;
   const entries = sim.auth.map((entry) => setAuthExpiry(entry, ledger));
   assertBuyerEntries(entries, buyer, func);
-  return { kind: 'sign', entries, validUntilLedger: ledger, func };
+  const payloads = entries.map((entry) => authPayload(entry));
+  return { kind: 'sign', entries, payloads, validUntilLedger: ledger, func };
 }
 
 export async function submitOpen(
@@ -462,6 +511,7 @@ export async function submitOpen(
   buyer: string,
   signed: string[],
   deps: ChannelsDeps,
+  signatures: unknown[] = [],
 ): Promise<{ hash: string }> {
   if (!deps.apiKey || !deps.client) {
     throw new ChannelsFailure(503, 'channels_unconfigured', 'Los pagos no están habilitados.');
@@ -479,11 +529,15 @@ export async function submitOpen(
     }
   }
   assertBuyerEntries(signed, buyer, func);
+  const auth = await Promise.all(signed.map((entry, i) => {
+    const signature = signatures[i];
+    return typeof signature === 'string' && signature ? attachBuyerSignature(entry, signature) : entry;
+  }));
   const sleep = deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   let last: ChannelsFailure | null = null;
   for (let attempt = 0; attempt < SUBMIT_TRIES; attempt++) {
     try {
-      const sent = await deps.client.submitSorobanTransaction({ func, auth: signed });
+      const sent = await deps.client.submitSorobanTransaction({ func, auth });
       const hash = sent.hash?.trim().toLowerCase();
       if (!hash || !HASH_RE.test(hash)) {
         throw new ChannelsFailure(502, 'channels_submit', 'No se pudo enviar el pago.');

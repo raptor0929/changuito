@@ -24,7 +24,7 @@ export type { AuthEntryResult, TxSignResult };
 export function useWalletSigners(): {
   signAuthEntry: (
     entryXdr: string,
-    options: { validUntilLedger: number },
+    options: { validUntilLedger: number; payload?: string },
   ) => Promise<AuthEntryResult>;
   signTransaction: (xdr: string) => Promise<TxSignResult>;
 } {
@@ -33,7 +33,7 @@ export function useWalletSigners(): {
   const client = useCallback((): WalletSignClient => getClient(), [getClient]);
 
   const signAuthEntry = useCallback(
-    (entryXdr: string, options: { validUntilLedger: number }) =>
+    (entryXdr: string, options: { validUntilLedger: number; payload?: string }) =>
       signAuthEntryWith(client(), entryXdr, options),
     [client],
   );

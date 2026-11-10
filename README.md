@@ -200,7 +200,7 @@ the demo.
 | **treasury** — receives settled baskets | [`GBKJHIKIZONKCCV2JVOGUDXEOPTQUZ2OKYZNV3R3LDALNZHCSF2JJEIF`](https://stellar.expert/explorer/testnet/account/GBKJHIKIZONKCCV2JVOGUDXEOPTQUZ2OKYZNV3R3LDALNZHCSF2JJEIF) |
 
 Network passphrase `Test SDF Network ; September 2015`, RPC
-`https://soroban-testnet.stellar.org`. The deposit accounts are configuration
+`https://soroban-rpc.testnet.stellar.gateway.fm`. The deposit accounts are configuration
 (`DEPOSIT_ADDRESS_TESTNET` / `DEPOSIT_ADDRESS_MAINNET`), not committed — mainnet
 has no contracts deployed and needs none for the payment rail.
 

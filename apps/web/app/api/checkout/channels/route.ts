@@ -7,6 +7,8 @@ export const dynamic = 'force-dynamic';
 /**
  * Prepare and submit `escrow.open` through OpenZeppelin Channels.
  * The buyer signs an auth entry; the fee is paid by a Channels account.
+ * A wallet that signs the entry's payload sends the entry back as prepared,
+ * with its signature beside it.
  * `func` in the body is ignored: the server rebuilds the call.
  */
 export async function POST(req: Request): Promise<Response> {
@@ -28,12 +30,14 @@ export async function POST(req: Request): Promise<Response> {
       if (prepared.kind === 'opened') return Response.json({ hash: prepared.hash });
       return Response.json({
         entries: prepared.entries,
+        payloads: prepared.payloads,
         validUntilLedger: prepared.validUntilLedger,
       });
     }
     if (step === 'submit') {
       const signed = Array.isArray(body?.auth) ? body.auth.filter((entry: unknown) => typeof entry === 'string') : [];
-      const sent = await submitOpen(input, session.address, signed, deps);
+      const signatures = Array.isArray(body?.signatures) ? body.signatures : [];
+      const sent = await submitOpen(input, session.address, signed, deps, signatures);
       await noteLanded(sent.hash);
       return Response.json({ hash: sent.hash });
     }

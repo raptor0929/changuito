@@ -10,10 +10,21 @@
  * here rethrows.
  */
 
-/** What {@link signAuthEntryWith} returns. Mirrors Pollar's SignAuthEntryOutcome. */
-export type AuthEntryResult =
+/** Pollar's SignAuthEntryOutcome. */
+export type WalletAuthEntryOutcome =
   | { status: 'signed'; signedAuthEntry: string }
   | { status: 'error'; details?: string };
+
+/**
+ * What {@link signAuthEntryWith} returns. `signature` is a wallet that signed
+ * the entry's payload and returned the bare signature, base64, not an entry.
+ */
+export type AuthEntryResult =
+  | WalletAuthEntryOutcome
+  | { status: 'signature'; signature: string };
+
+/** Pollar's id for its Freighter adapter (`WalletType.FREIGHTER`). */
+const FREIGHTER = 'freighter-native';
 
 /** What {@link signTransactionWith} returns. Mirrors Pollar's SignOutcome. */
 export type TxSignResult =
@@ -25,7 +36,9 @@ export interface WalletSignClient {
   signAuthEntry(
     entryXdr: string,
     options: { validUntilLedger: number },
-  ): Promise<AuthEntryResult>;
+  ): Promise<WalletAuthEntryOutcome>;
+  /** The connected external wallet's adapter id. Null for a custodial session. */
+  getWalletType?(): string | null;
   /**
    * Pollar names this `signTx`. The hook exposes it as `signTransaction` so
    * callers (#6) do not have to know Pollar's internal name.
@@ -40,16 +53,28 @@ function asErrorDetails(err: unknown): string {
 /**
  * Sign a Soroban authorization entry (Channels fee-payer path, #2).
  *
- * `validUntilLedger` is required by Pollar for the custodial path; Freighter
- * sets its own expiration and ignores it.
+ * `validUntilLedger` is required by Pollar for the custodial path, which signs
+ * the entry and returns it signed.
+ *
+ * Freighter is different on both ends. Its `signAuthEntry` takes the payload
+ * the entry hashes to (a `HashIdPreimage`), not the entry, and returns the
+ * signature alone. Pollar hands it whatever string it is given, so an entry
+ * went in and Freighter refused to parse it. With Freighter connected the
+ * payload goes in instead and the signature comes back as `signature`; the
+ * server puts it on the entry.
  */
 export async function signAuthEntryWith(
   client: WalletSignClient,
   entryXdr: string,
-  options: { validUntilLedger: number },
+  options: { validUntilLedger: number; payload?: string },
 ): Promise<AuthEntryResult> {
+  const { payload, validUntilLedger } = options;
   try {
-    return await client.signAuthEntry(entryXdr, options);
+    if (payload && client.getWalletType?.() === FREIGHTER) {
+      const signed = await client.signAuthEntry(payload, { validUntilLedger });
+      return signed.status === 'signed' ? { status: 'signature', signature: signed.signedAuthEntry } : signed;
+    }
+    return await client.signAuthEntry(entryXdr, { validUntilLedger });
   } catch (err) {
     return { status: 'error', details: asErrorDetails(err) };
   }

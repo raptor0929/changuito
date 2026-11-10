@@ -15,13 +15,14 @@ import { Client as Usdc } from '@changuito/usdc-bindings';
 
 import { contractIds } from './contract-ids.ts';
 import { DEFAULT_NETWORK, deployment, type NetworkId } from './deployments.ts';
+import { rpcUrl } from './rpc-url.ts';
 
 export function usdcClient(publicKey?: string, net: NetworkId = DEFAULT_NETWORK): Usdc {
   const d = deployment(net);
   return new Usdc({
     contractId: contractIds(net).usdcId,
     networkPassphrase: d.networkPassphrase,
-    rpcUrl: d.rpcUrl,
+    rpcUrl: rpcUrl(net),
     // A simulation still needs a source account to charge the imaginary fee to,
     // and it must exist on the ledger. The resolver is funded and signs nothing
     // here.

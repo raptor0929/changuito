@@ -4,6 +4,11 @@
  * Asks the server to simulate, asks the wallet to sign each auth entry, then
  * asks the server to submit. The server rebuilds the call; this file never
  * sends a host function.
+ *
+ * A wallet answers in one of two ways. It returns the entry signed, or it
+ * signs the entry's payload and returns the signature alone. The second kind
+ * goes back as the prepared entry with the signature beside it, and the
+ * server joins them.
  */
 
 import { track } from './analytics';
@@ -12,8 +17,12 @@ import { OpenConfirmationPending } from './checkout/open-submission.ts';
 export interface ChannelSigner {
   signAuthEntry(
     entryXdr: string,
-    options: { validUntilLedger: number },
-  ): Promise<{ status: 'signed'; signedAuthEntry: string } | { status: 'error'; details?: string }>;
+    options: { validUntilLedger: number; payload?: string },
+  ): Promise<
+    | { status: 'signed'; signedAuthEntry: string }
+    | { status: 'signature'; signature: string }
+    | { status: 'error'; details?: string }
+  >;
 }
 
 export interface ChannelOpen {
@@ -62,15 +71,17 @@ async function signAndSubmit(
     throw new ChannelRequestError(502, 'channels_sim', 'La red no pudo simular el pago.');
   }
   const auth: string[] = [];
-  for (const entry of entries) {
-    const signed = await signAuthEntry(entry, { validUntilLedger });
+  const signatures: (string | null)[] = [];
+  for (const [i, entry] of entries.entries()) {
+    const signed = await signAuthEntry(entry, { validUntilLedger, payload: prepared.payloads?.[i] });
     if (signed.status === 'error') {
       throw new ChannelRequestError(400, 'channels_rejected', signed.details || 'No se firmó el pago.');
     }
-    auth.push(signed.signedAuthEntry);
+    auth.push(signed.status === 'signature' ? entry : signed.signedAuthEntry);
+    signatures.push(signed.status === 'signature' ? signed.signature : null);
   }
   try {
-    const sent = await post({ ...body, step: 'submit', auth });
+    const sent = await post({ ...body, step: 'submit', auth, signatures });
     if (typeof sent.hash !== 'string') throw new ChannelRequestError(502, 'channels_submit', 'No se pudo enviar el pago.');
     return sent.hash;
   } catch (err) {
@@ -86,6 +97,7 @@ async function signAndSubmit(
 interface ChannelResponse {
   hash?: string;
   entries?: string[];
+  payloads?: string[];
   validUntilLedger?: number;
   error?: string;
   code?: string;
