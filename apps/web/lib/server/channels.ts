@@ -17,6 +17,7 @@ import {
   TransactionBuilder,
   nativeToScVal,
   rpc,
+  scValToNative,
   xdr,
 } from '@stellar/stellar-sdk';
 
@@ -26,6 +27,7 @@ import { readOrder } from '../checkout/escrow-server.ts';
 import { contractIds } from '../contract-ids.ts';
 import { deployment, type NetworkId } from '../deployments.ts';
 import { DEFAULT_TIMEOUT_SECS, MAX_TIMEOUT_SECS, MIN_TIMEOUT_SECS, fromHex } from '../order.ts';
+import { rpcUrl } from '../rpc-url.ts';
 import { rpcServer } from '../stellar.ts';
 
 const CHANNELS_TESTNET = 'https://channels.openzeppelin.com/testnet';
@@ -117,6 +119,11 @@ export interface ChannelsDeps {
   sleep?: (ms: number) => Promise<void>;
   /** True when the chain holds an order matching buyer, amount and basket hash. */
   readOpened?: (want: OpenedWant) => Promise<boolean>;
+  /**
+   * Transaction hash of an `opened` event for this order. The default reads
+   * it from RPC. Tests pass a stub so a unit test does not ask the network.
+   */
+  findOpenHash?: (want: OpenedWant) => Promise<string | null>;
   loadRecord?: (orderId: string) => Promise<ChannelsRecordRow | null>;
   saveAttempt?: (orderId: string, hash: string) => Promise<void>;
   recoverAttempt?: (rec: ChannelsRecord) => Promise<ChannelsRecord>;
@@ -396,6 +403,70 @@ function confirming(hash?: string): ChannelsFailure {
 }
 
 /**
+ * The `opened` event for this order, read without decoding a ledger header.
+ *
+ * SDK 17.1 cannot parse a protocol 30 ledger entry, so `readOrder` often
+ * cannot see an open that already locked the USDC. The event payload is a
+ * plain ScVal. Its transaction hash is the open the checkout has to keep.
+ */
+async function openedTxHash(want: OpenedWant): Promise<string | null> {
+  const url = rpcUrl('testnet');
+  const escrowId = contractIds('testnet').escrowId;
+  const latest = await rpcCall(url, 'getLatestLedger', {});
+  const sequence = typeof latest.sequence === 'number' ? latest.sequence : 0;
+  if (!sequence) return null;
+  const result = await rpcCall(url, 'getEvents', {
+    startLedger: Math.max(1, sequence - 2_000),
+    filters: [{
+      type: 'contract',
+      contractIds: [escrowId],
+      topics: [[
+        xdr.ScVal.scvSymbol('opened').toXDR('base64'),
+        nativeToScVal(Buffer.from(fromHex(want.orderId)), { type: 'bytes' }).toXDR('base64'),
+        new Address(want.buyer).toScVal().toXDR('base64'),
+      ]],
+    }],
+    pagination: { limit: 5 },
+  });
+  const events = Array.isArray(result.events) ? result.events : [];
+  for (const ev of events) {
+    if (!ev || typeof ev !== 'object') continue;
+    const row = ev as { txHash?: unknown; value?: unknown };
+    const hash = typeof row.txHash === 'string' ? row.txHash.trim().toLowerCase() : '';
+    if (!HASH_RE.test(hash) || typeof row.value !== 'string') continue;
+    const value = scValToNative(xdr.ScVal.fromXDR(row.value, 'base64')) as {
+      amount?: bigint;
+      basket_hash?: Uint8Array;
+    };
+    const basket = value.basket_hash ? Buffer.from(value.basket_hash).toString('hex') : '';
+    if (value.amount?.toString() === want.amount && basket === want.basketHash) return hash;
+  }
+  return null;
+}
+
+async function rpcCall(url: string, method: string, params: unknown): Promise<{ [key: string]: unknown }> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    signal: AbortSignal.timeout(8_000),
+  });
+  const json = await res.json() as { result?: { [key: string]: unknown }; error?: { message?: string } };
+  if (!res.ok || json.error) throw new Error(json.error?.message ?? 'rpc');
+  return json.result ?? {};
+}
+
+async function hashOnChain(want: OpenedWant, deps: ChannelsDeps): Promise<string | null> {
+  try {
+    const hash = await (deps.findOpenHash ?? openedTxHash)(want);
+    return hash && HASH_RE.test(hash) ? hash : null;
+  } catch (err) {
+    console.warn('[channels] opened lookup', err instanceof Error ? err.name : 'failed');
+    return null;
+  }
+}
+
+/**
  * A matching on-chain order is never a retryable failure.
  * Returns the known hash, or throws channels_confirming when the hash is unknown.
  */
@@ -404,6 +475,8 @@ async function settleFromChain(
   deps: ChannelsDeps,
   candidateHash?: string,
 ): Promise<{ hash: string } | null> {
+  const fromEvent = await hashOnChain(want, deps);
+  if (fromEvent) return { hash: fromEvent };
   if (!(await isOpened(want, deps))) return null;
   const rec = await loadQuoted(want.orderId, deps);
   if (rec?.openSig && HASH_RE.test(rec.openSig)) return { hash: rec.openSig };
@@ -433,6 +506,8 @@ export async function prepareOpen(
       return { kind: 'opened', hash: rec.openSig };
     }
     if (rec.openAttemptSig && HASH_RE.test(rec.openAttemptSig)) {
+      const fromEvent = await hashOnChain(want, deps);
+      if (fromEvent) return { kind: 'opened', hash: fromEvent };
       throw confirming(rec.openAttemptSig);
     }
   }
@@ -475,6 +550,8 @@ export async function submitOpen(
       return { hash: rec.openSig };
     }
     if (rec.openAttemptSig && HASH_RE.test(rec.openAttemptSig)) {
+      const fromEvent = await hashOnChain(want, deps);
+      if (fromEvent) return { hash: fromEvent };
       throw confirming(rec.openAttemptSig);
     }
   }
