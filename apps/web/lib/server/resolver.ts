@@ -21,6 +21,7 @@ import { basicNodeSigner } from '@stellar/stellar-sdk/contract';
 import { Client as Escrow } from '@changuito/escrow-bindings';
 import { Client as Usdc } from '@changuito/usdc-bindings';
 
+import { contractIds } from '../contract-ids.ts';
 import { DEFAULT_NETWORK, deployment, type NetworkId } from '../deployments.ts';
 
 /** The env var holding the secret for each network. */
@@ -65,7 +66,7 @@ function signing(net: NetworkId) {
 export function usdcAsAdmin(net: NetworkId = DEFAULT_NETWORK): Usdc {
   const d = deployment(net);
   return new Usdc({
-    contractId: d.usdcId,
+    contractId: contractIds(net).usdcId,
     networkPassphrase: d.networkPassphrase,
     rpcUrl: d.rpcUrl,
     ...signing(net),
@@ -76,7 +77,7 @@ export function usdcAsAdmin(net: NetworkId = DEFAULT_NETWORK): Usdc {
 export function escrowAsResolver(net: NetworkId = DEFAULT_NETWORK): Escrow {
   const d = deployment(net);
   return new Escrow({
-    contractId: d.escrowId,
+    contractId: contractIds(net).escrowId,
     networkPassphrase: d.networkPassphrase,
     rpcUrl: d.rpcUrl,
     ...signing(net),

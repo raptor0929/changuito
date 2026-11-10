@@ -7,7 +7,7 @@ import { addressKind } from '../stellar.ts';
 
 describe('shortAddress', () => {
   it('keeps both ends, which are the parts a person compares', () => {
-    assert.equal(shortAddress(DEPLOYMENTS.testnet.resolver), 'GBGM…HTFK');
+    assert.equal(shortAddress(DEPLOYMENTS.testnet.resolver), 'GBXB…YGN5');
   });
 
   it('leaves anything already short alone', () => {

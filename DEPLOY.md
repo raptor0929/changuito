@@ -193,6 +193,23 @@ Hyperdrive id the Worker deploys with no database binding and the app runs
 the way a fresh clone does. `DIRECT_URL` stays on the laptop that runs
 `npm run db:migrate`.
 
+**Contract ids are runtime variables, not build variables.** Set them on
+`changuito-web` → Settings → Variables and Secrets, as variables of the
+running Worker. The browser asks `/api/contracts` on each checkout, and the
+server reads the value for that request. Changing one does not take a new
+build. Unset, the request uses the id recorded in `deployments.json`.
+
+| Name | Network |
+|---|---|
+| `STELLAR_ESCROW_ID` | testnet escrow |
+| `STELLAR_USDC_ID` | testnet token |
+| `STELLAR_ESCROW_ID_MAINNET` | mainnet escrow |
+| `STELLAR_USDC_ID_MAINNET` | mainnet token |
+
+A value that is not a `C…` contract id is ignored. Do not put these names in
+the build variables: the build does not read them, and a value inlined there
+would not be the one a later request sees.
+
 Never set `NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` there: whatever it holds is
 inlined. On a local machine the same public names can come from the shell.
 
