@@ -183,13 +183,21 @@ export function buildOpenFuncForBuyer(input: OpenFields, buyer: string): string 
   return hostOpen(escrowId, { ...input, buyer, amount: amount.toString() });
 }
 
-/** The live simulator. The source is the public resolver, never the buyer. */
-export function stellarSimulator(net: NetworkId): Simulator {
+/** The two RPC calls a simulation needs. Neither decodes a ledger header. */
+export type SimulationRpc = Pick<rpc.Server, 'getAccount' | 'simulateTransaction'>;
+
+/**
+ * The live simulator. The source is the public resolver, never the buyer.
+ *
+ * Auth expiry counts from the ledger the simulation ran at. It does not call
+ * `getLatestLedger`: SDK 17.1 cannot decode a protocol 30 ledger header, and
+ * that throw failed every prepare on testnet while the simulation was fine.
+ */
+export function stellarSimulator(net: NetworkId, rpcOverride?: SimulationRpc): Simulator {
   return {
     async simulate(funcXdr: string, source: string) {
-      const server = rpcServer(net);
+      const server = rpcOverride ?? rpcServer(net);
       const account = await server.getAccount(source);
-      const latest = await server.getLatestLedger();
       const tx = new TransactionBuilder(new Account(account.accountId(), account.sequenceNumber()), {
         fee: '100000',
         networkPassphrase: deployment(net).networkPassphrase,
@@ -202,15 +210,29 @@ export function stellarSimulator(net: NetworkId): Simulator {
         .build();
       const sim = await server.simulateTransaction(tx);
       if (rpc.Api.isSimulationError(sim)) {
-        throw new ChannelsFailure(409, simCode(sim.error), simMessage(sim.error));
+        const code = simCode(sim.error);
+        if (code === 'channels_sim') console.warn('[channels] simulation failed', firstLine(sim.error));
+        throw new ChannelsFailure(409, code, simMessage(sim.error));
       }
       const auth = (sim.result?.auth ?? []).map((entry) => entry.toXDR('base64'));
-      return { auth, latestLedger: latest.sequence };
+      return { auth, latestLedger: sim.latestLedger };
     },
   };
 }
 
+/**
+ * A failed simulation names a contract error, not a reason. The token's
+ * transfer failing is reported by the escrow as `"contract call failed",
+ * transfer`; mock USDC's #4 is InsufficientBalance. The escrow's own #3 is
+ * OrderExists.
+ */
+const TRANSFER_FAILED = /Error\(Contract, #(\d+)\)\], data:\["contract call failed", transfer,/;
+const ESCROW_ORDER_EXISTS = /^HostError: Error\(Contract, #3\)/;
+
 function simCode(error: string): string {
+  const transfer = TRANSFER_FAILED.exec(error);
+  if (transfer?.[1] === '4') return 'channels_balance';
+  if (!transfer && ESCROW_ORDER_EXISTS.test(error)) return 'channels_exists';
   const text = error.toLowerCase();
   if (text.includes('account') || text.includes('not found')) return 'channels_account';
   if (text.includes('balance') || text.includes('insufficient')) return 'channels_balance';
@@ -221,23 +243,42 @@ function simMessage(error: string): string {
   const code = simCode(error);
   if (code === 'channels_account') return 'La cuenta todavía no existe en testnet.';
   if (code === 'channels_balance') return 'No alcanza el USDC para este pedido.';
+  if (code === 'channels_exists') return 'Ese pedido ya está abierto.';
   return 'La red no pudo simular el pago.';
 }
 
+/** For the server log only: the host error's headline, not its event dump. */
+function firstLine(text: string): string {
+  return text.split('\n', 1)[0]!.slice(0, 200);
+}
+
+/**
+ * The buyer's address credentials. Protocol 30 simulation records
+ * `ADDRESS_V2`, which binds the address into the signed payload and carries
+ * the same fields. Source-account and delegated credentials are refused: the
+ * buyer is the one signer.
+ */
+function buyerCredentials(entry: xdr.SorobanAuthorizationEntry): xdr.SorobanAddressCredentials {
+  const creds = entry.credentials;
+  if (creds.type === 'sorobanCredentialsAddress') return creds.address;
+  if (creds.type === 'sorobanCredentialsAddressV2') return creds.addressV2;
+  throw new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este pago.');
+}
+
+/** Rewrites the expiry and keeps the credential variant the network recorded. */
 export function setAuthExpiry(entryXdr: string, ledger: number): string {
   const entry = xdr.SorobanAuthorizationEntry.fromXDR(entryXdr, 'base64');
-  const creds = entry.credentials;
-  if (creds.type !== 'sorobanCredentialsAddress') {
-    throw new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este pago.');
-  }
-  const address = creds.address;
+  const address = buyerCredentials(entry);
+  const renewed = new xdr.SorobanAddressCredentials({
+    address: address.address,
+    nonce: address.nonce,
+    signatureExpirationLedger: ledger,
+    signature: address.signature,
+  });
   const next = new xdr.SorobanAuthorizationEntry({
-    credentials: xdr.SorobanCredentials.sorobanCredentialsAddress(new xdr.SorobanAddressCredentials({
-      address: address.address,
-      nonce: address.nonce,
-      signatureExpirationLedger: ledger,
-      signature: address.signature,
-    })),
+    credentials: entry.credentials.type === 'sorobanCredentialsAddressV2'
+      ? xdr.SorobanCredentials.sorobanCredentialsAddressV2(renewed)
+      : xdr.SorobanCredentials.sorobanCredentialsAddress(renewed),
     rootInvocation: entry.rootInvocation,
   });
   return next.toXDR('base64');
@@ -248,11 +289,7 @@ export function assertBuyerEntries(entries: string[], buyer: string, funcXdr: st
     throw new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este pago.');
   }
   const entry = xdr.SorobanAuthorizationEntry.fromXDR(entries[0]!, 'base64');
-  const creds = entry.credentials;
-  if (creds.type !== 'sorobanCredentialsAddress') {
-    throw new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este pago.');
-  }
-  const address = Address.fromScAddress(creds.address.address).toString();
+  const address = Address.fromScAddress(buyerCredentials(entry).address).toString();
   if (address !== buyer) {
     throw new ChannelsFailure(400, 'channels_auth', 'La autorización no corresponde a este pago.');
   }
@@ -407,7 +444,12 @@ export async function prepareOpen(
     sim = await deps.simulator.simulate(func, source);
   } catch (err) {
     if (err instanceof ChannelsFailure) throw err;
-    throw new ChannelsFailure(502, 'channels_sim', 'La red no pudo simular el pago.');
+    // Not a simulation result: the RPC call or its decoding threw. A code of
+    // its own keeps it apart from a simulation that ran and failed.
+    const name = err instanceof Error ? err.name : 'Error';
+    const message = err instanceof Error ? firstLine(err.message) : '';
+    console.warn('[channels] simulate threw', name, message);
+    throw new ChannelsFailure(502, 'channels_rpc', 'La red no pudo simular el pago.');
   }
   const ledger = sim.latestLedger + EXPIRY_LEDGERS;
   const entries = sim.auth.map((entry) => setAuthExpiry(entry, ledger));
