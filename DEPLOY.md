@@ -265,12 +265,12 @@ Grouped by which of the two apps needs them.
 | `REAL_MODE_ALLOWLIST_ADDRESSES` | who may pay — see [2.8](#28-who-may-pay) | server only |
 | `REAL_MODE_OPEN_TO_ALL` | optional, `1` to drop that list — read [2.8](#28-who-may-pay) first | server only |
 
-**Still configured, no longer reachable from the UI:**
+**Still configured for the escrow and the testnet faucet:**
 `STELLAR_RESOLVER_SECRET`, `STELLAR_RESOLVER_SECRET_MAINNET`,
-`FAUCET_ALLOWLIST_ADDRESSES`, `FAUCET_OPEN_TO_ALL`. These belong to the escrow
-rail and the testnet faucet, and neither has a button any more — see
-[docs/flows.md](docs/flows.md#6-dormant-the-escrow). Leave them set if they
-are set; nothing calls them.
+`FAUCET_ALLOWLIST_ADDRESSES`, `FAUCET_OPEN_TO_ALL`. Settle and refund need the
+resolver secret; the faucet needs its own gate. See
+[docs/flows.md](docs/flows.md#6-the-escrow). Leave them set if they
+are set.
 
 `DEPOSIT_ADDRESS_*` is **public by nature** — it is printed on screen for the
 shopper to pay — and no secret for either one is anywhere near this deployment.

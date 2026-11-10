@@ -136,13 +136,14 @@ the default and it cannot spend anything.
 
 ## The escrow contract
 
-`CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557` — deployed on
-testnet against `mock_usdc`, 19 tests. On the login network the shopper path
-mounts `PaymentModal`, which calls `open` through Pollar. Redeploying over the
-Circle testnet USDC SAC (`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`,
-issuer `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`) replaces this
-id in `deployments.json` — a person runs
-`USDC_ISSUER=… npm run deploy:testnet` (see `DEPLOY.md`).
+`CDBGEMWESQJNEGBJ46TMPXNI5KFZN5B23W6ACO6NZFQATWWYY2WW3HDF` — deployed on
+testnet against the Circle USDC SAC
+(`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`, issuer
+`GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`), 19 tests. On the
+login network the shopper path mounts `PaymentModal`, which calls `open`
+through Pollar. The earlier escrow over `mock_usdc`
+(`CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557`) is not the one
+`deployments.json` points at.
 
 ```rust
 open(buyer, order_id: BytesN<32>, amount: i128,
@@ -262,8 +263,8 @@ The classic testnet USDC the deposit rail uses **does** need a trustline, and
 
 | Role | Address | Does |
 |---|---|---|
-| resolver | `GBGMPRHU…HTFK` | token admin (the faucet mints) **and** escrow resolver |
-| treasury | `GAXUICH5…BNZG` | where a settled escrow's USDC lands |
+| resolver | `GBXBAOFW…HGYGN5` | escrow resolver. `STELLAR_RESOLVER_SECRET` must be this account |
+| treasury | `GBKJHIKI…2JJEIF` | where a settled escrow's USDC lands |
 | demo wallet | `GDFF477U…MINA55X` | holds the testnet classic USDC; pays in preview |
 | deposit accounts | configuration, not committed | receive the shopper's payment |
 

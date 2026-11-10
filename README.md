@@ -67,9 +67,9 @@ Full detail in **[docs/stellar.md](docs/stellar.md)**. The short version:
 | **Classic USDC payment + memo** | the money rail. One payment to an operator account, identified by a `código` in the memo. No contract, no server signing key, no custody of anything but the deposit account |
 | **Horizon** | the *only* confirmation source. `lib/deposit-watch.ts` reads the public ledger — there is no webhook to miss and no secret to hold. Anyone can verify a deposit themselves |
 | **SEP-53 signed messages** | identity, everywhere it matters. Every gate that can spend real money checks a signature over a message naming the address, not an address the browser claims |
-| **SEP-41 Soroban token** | `contracts/mock_usdc` — the testnet demo token, admin-gated mint. It backs the faucet route and the escrow, and deliberately *not* the deposit rail: a contract token has no classic payment record for a memo to ride on |
+| **SEP-41 Soroban token** | `contracts/mock_usdc` — the testnet demo token, admin-gated mint. It backs the faucet, and deliberately *not* the deposit rail: a contract token has no classic payment record for a memo to ride on. The escrow holds Circle's testnet USDC SAC instead |
 | **SEP-7 URI** | the receive screen's payment link |
-| **Soroban escrow** | `contracts/escrow` — deployed, 19 tests. On the Pollar login network the shopper path mounts `PaymentModal` and calls `open`. Redeploy over the Circle testnet USDC SAC is pending (`DEPLOY.md`) |
+| **Soroban escrow** | `contracts/escrow` — deployed on testnet over the Circle USDC SAC, 19 tests. On the Pollar login network the shopper path mounts `PaymentModal` and calls `open` |
 | **Pollar wallet** | login, the address, the SEP-53 signature, auth-entry / tx signing, and the USDC payment |
 | **stellar.expert** | every transaction the app shows is linked to the explorer |
 
@@ -79,10 +79,9 @@ The memo deposit rail (`lib/deposit.ts`) still funds the card path on networks
 that are not the login network, and in builds with no Pollar key. On the login
 network, checkout mounts `PaymentModal` and opens the Soroban escrow instead.
 
-The current testnet escrow holds `mock_usdc`. Redeploying with
-`USDC_ISSUER=GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5` points it
-at the Circle testnet USDC SAC
-(`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`). Details:
+The testnet escrow holds the Circle USDC SAC
+(`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`, issuer
+`GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`). Details:
 [docs/stellar.md](docs/stellar.md#the-escrow-contract).
 
 ---
@@ -174,9 +173,9 @@ Read this before the demo, not after it.
   `${orderGroup}-01`, from VTEX's single-seller convention. Día is single-seller
   and the guess has held, but it is a guess, and it degrades to the order *list*
   rather than a 404.
-- **The escrow is on the login-network checkout** via `PaymentModal`; the SAC
-  redeploy that swaps `mock_usdc` for Circle testnet USDC is a person-run
-  `deploy:testnet` (see `DEPLOY.md`).
+- **The escrow is on the login-network checkout** via `PaymentModal`, holding
+  Circle testnet USDC. The treasury still needs a USDC trustline before the
+  first `settle` (`DEPLOY.md`).
 - **The store's catalogue is live.** Prices and stock on any given day are
   whatever Día actually has.
 - **The commit dates are backdated** to the window the work was planned over.
@@ -192,11 +191,11 @@ the demo.
 
 | | |
 |---|---|
-| **escrow** *(mock_usdc; SAC redeploy pending)* | [`CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557`](https://stellar.expert/explorer/testnet/contract/CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557) |
-| **demo USDC** — SEP-41, `USDC`, 7 decimals | [`CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF`](https://stellar.expert/explorer/testnet/contract/CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF) |
-| **Circle testnet USDC SAC** *(target token)* | [`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`](https://stellar.expert/explorer/testnet/contract/CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA) |
-| **resolver** — token admin, escrow resolver | [`GBGMPRHU3NW3BCXUNDNC7VSYQKS6FZKWFHSGEHHMR3G3TZOUWEDBHTFK`](https://stellar.expert/explorer/testnet/account/GBGMPRHU3NW3BCXUNDNC7VSYQKS6FZKWFHSGEHHMR3G3TZOUWEDBHTFK) |
-| **treasury** — receives settled baskets | [`GAXUICH5DZMB4ZIZVF6ETTE524RCZYRKHWLGG7EOLY6ECVD4IS6TBNZG`](https://stellar.expert/explorer/testnet/account/GAXUICH5DZMB4ZIZVF6ETTE524RCZYRKHWLGG7EOLY6ECVD4IS6TBNZG) |
+| **escrow** *(Circle testnet USDC SAC)* | [`CDBGEMWESQJNEGBJ46TMPXNI5KFZN5B23W6ACO6NZFQATWWYY2WW3HDF`](https://stellar.expert/explorer/testnet/contract/CDBGEMWESQJNEGBJ46TMPXNI5KFZN5B23W6ACO6NZFQATWWYY2WW3HDF) |
+| **demo USDC** — SEP-41 faucet token, `USDC`, 7 decimals | [`CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF`](https://stellar.expert/explorer/testnet/contract/CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF) |
+| **Circle testnet USDC SAC** — the escrow's token | [`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`](https://stellar.expert/explorer/testnet/contract/CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA) |
+| **resolver** — escrow resolver | [`GBXBAOFWG4Y4ZQEDXH73BACYYCE7ODSKXHLXYVRPLJOYFRDCPWHGYGN5`](https://stellar.expert/explorer/testnet/account/GBXBAOFWG4Y4ZQEDXH73BACYYCE7ODSKXHLXYVRPLJOYFRDCPWHGYGN5) |
+| **treasury** — receives settled baskets | [`GBKJHIKIZONKCCV2JVOGUDXEOPTQUZ2OKYZNV3R3LDALNZHCSF2JJEIF`](https://stellar.expert/explorer/testnet/account/GBKJHIKIZONKCCV2JVOGUDXEOPTQUZ2OKYZNV3R3LDALNZHCSF2JJEIF) |
 
 Network passphrase `Test SDF Network ; September 2015`, RPC
 `https://soroban-testnet.stellar.org`. The deposit accounts are configuration
@@ -209,12 +208,12 @@ not have to take that from a README — ask the contract:
 
 ```bash
 stellar contract invoke --network testnet \
-  --id CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557 \
-  --source-account GBGMPRHU3NW3BCXUNDNC7VSYQKS6FZKWFHSGEHHMR3G3TZOUWEDBHTFK \
+  --id CDBGEMWESQJNEGBJ46TMPXNI5KFZN5B23W6ACO6NZFQATWWYY2WW3HDF \
+  --source-account GBXBAOFWG4Y4ZQEDXH73BACYYCE7ODSKXHLXYVRPLJOYFRDCPWHGYGN5 \
   --send=no -- config
 ```
 ```json
-{"resolver":"GBGMPRHU…DBHTFK","token":"CB63C7UV…LQUBJF","treasury":"GAXUICH5…S6TBNZG"}
+{"resolver":"GBXBAOFW…HGYGN5","token":"CBIELTK6…XQDAMA","treasury":"GBKJHIKI…2JJEIF"}
 ```
 
 `--send=no` only simulates, so it signs nothing, costs nothing, and any funded
