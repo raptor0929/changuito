@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
-import { Address, xdr } from '@stellar/stellar-sdk';
+import { Account, Address, xdr } from '@stellar/stellar-sdk';
 import {
   PluginExecutionError,
   PluginTransportError,
@@ -18,9 +18,11 @@ import {
   mapChannelsError,
   prepareOpen,
   setAuthExpiry,
+  stellarSimulator,
   submitOpen,
   type ChannelsDeps,
   type OpenFields,
+  type SimulationRpc,
 } from '../server/channels.ts';
 
 const ESCROW = 'CA4BDF4U65OHCO6AB4KRJWBRZ4BJBZURDFNFKJDEZAKQRCUNJZFLN72S';
@@ -636,5 +638,162 @@ describe('channels structured errors', () => {
       (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_confirming',
     );
     assert.equal(n, 0);
+  });
+});
+
+describe('channels live simulator', () => {
+  const USDC = contractIds('testnet').usdcId;
+
+  /** Shaped like testnet's answer for an open whose buyer holds no mock USDC. */
+  const LOW_BALANCE = [
+    'HostError: Error(Contract, #4)',
+    '',
+    'Event log (newest first):',
+    `   0: [Diagnostic Event] contract:${ESCROW}, topics:[error, Error(Contract, #4)], data:"escalating error to VM trap from failed host function call: call"`,
+    `   1: [Diagnostic Event] contract:${ESCROW}, topics:[error, Error(Contract, #4)], data:["contract call failed", transfer, [${BUYER}, ${ESCROW}, 1000000]]`,
+    `   2: [Failed Diagnostic Event (not emitted)] contract:${USDC}, topics:[error, Error(Contract, #4)], data:["failing with contract error", 4]`,
+  ].join('\n');
+
+  const ORDER_EXISTS = [
+    'HostError: Error(Contract, #3)',
+    '',
+    'Event log (newest first):',
+    `   0: [Diagnostic Event] contract:${ESCROW}, topics:[error, Error(Contract, #3)], data:"escalating Ok(ScErrorType::Contract) frame-exit to Err"`,
+  ].join('\n');
+
+  /**
+   * An RPC whose ledger header the installed SDK cannot decode, as testnet's
+   * protocol 30 header is for SDK 17.1. Only simulateTransaction works.
+   */
+  function rpcStub(answer: (tx: unknown) => unknown): SimulationRpc {
+    const stub = {
+      async getAccount(id: string) { return new Account(id, '1'); },
+      async getLatestLedger() { throw new Error('LedgerHeader.scpValue.ext.v: unknown enum value 3'); },
+      async simulateTransaction(tx: unknown) { return answer(tx); },
+    };
+    return stub as unknown as SimulationRpc;
+  }
+
+  /** Protocol 30 testnet records the buyer's auth as `ADDRESS_V2`. */
+  function entryV2(buyer: string, func: string): xdr.SorobanAuthorizationEntry {
+    const legacy = xdr.SorobanAuthorizationEntry.fromXDR(entry(buyer, func), 'base64');
+    if (legacy.credentials.type !== 'sorobanCredentialsAddress') throw new Error('not address credentials');
+    return new xdr.SorobanAuthorizationEntry({
+      credentials: xdr.SorobanCredentials.sorobanCredentialsAddressV2(legacy.credentials.address),
+      rootInvocation: legacy.rootInvocation,
+    });
+  }
+
+  function simulated(func: string, latestLedger: number) {
+    return {
+      id: '1',
+      latestLedger,
+      events: [],
+      _parsed: true,
+      result: { auth: [entryV2(BUYER, func)], retval: xdr.ScVal.scvVoid() },
+    };
+  }
+
+  it('prepare returns the buyer entries without asking for the latest ledger', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    const simulator = stellarSimulator('testnet', rpcStub(() => simulated(func, 5000)));
+    const out = await prepareOpen(input(), BUYER, deps({ simulator }));
+    assert.equal(out.kind, 'sign');
+    if (out.kind !== 'sign') return;
+    assert.equal(out.validUntilLedger, 5060);
+    assert.equal(out.entries.length, 1);
+    assert.equal(out.func, func);
+  });
+
+  it('keeps ADDRESS_V2 credentials and sets their expiry', () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    const renewed = xdr.SorobanAuthorizationEntry.fromXDR(setAuthExpiry(entryV2(BUYER, func).toXDR('base64'), 4321), 'base64');
+    assert.equal(renewed.credentials.type, 'sorobanCredentialsAddressV2');
+    if (renewed.credentials.type !== 'sorobanCredentialsAddressV2') return;
+    assert.equal(renewed.credentials.addressV2.signatureExpirationLedger, 4321);
+    assert.doesNotThrow(() => assertBuyerEntries([renewed.toXDR('base64')], BUYER, func));
+  });
+
+  it('refuses ADDRESS_V2 credentials for anyone but the buyer', () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    assert.throws(
+      () => assertBuyerEntries([entryV2(OTHER, func).toXDR('base64')], BUYER, func),
+      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_auth',
+    );
+  });
+
+  it('refuses delegated credentials', () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    const legacy = xdr.SorobanAuthorizationEntry.fromXDR(entry(BUYER, func), 'base64');
+    if (legacy.credentials.type !== 'sorobanCredentialsAddress') throw new Error('not address credentials');
+    const delegated = new xdr.SorobanAuthorizationEntry({
+      credentials: xdr.SorobanCredentials.sorobanCredentialsAddressWithDelegates(
+        new xdr.SorobanAddressCredentialsWithDelegates({ addressCredentials: legacy.credentials.address, delegates: [] }),
+      ),
+      rootInvocation: legacy.rootInvocation,
+    }).toXDR('base64');
+    assert.throws(() => setAuthExpiry(delegated, 10), /autorización/);
+    assert.throws(() => assertBuyerEntries([delegated], BUYER, func), /autorización/);
+  });
+
+  it('simulates from the resolver, not the buyer', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const func = buildOpenFuncForBuyer(input(), BUYER);
+    let source = '';
+    const simulator = stellarSimulator('testnet', rpcStub((tx) => {
+      source = (tx as { source: string }).source;
+      return simulated(func, 5000);
+    }));
+    await prepareOpen(input(), BUYER, deps({ simulator }));
+    assert.equal(source, DEPLOYMENTS.testnet.resolver);
+  });
+
+  it('calls a failed token transfer a balance problem', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const simulator = stellarSimulator('testnet', rpcStub(() => ({ id: '1', latestLedger: 5000, events: [], _parsed: true, error: LOW_BALANCE })));
+    await assert.rejects(
+      () => prepareOpen(input(), BUYER, deps({ simulator })),
+      (err: unknown) => err instanceof ChannelsFailure
+        && err.code === 'channels_balance'
+        && err.message === 'No alcanza el USDC para este pedido.',
+    );
+  });
+
+  it('calls the escrow refusing a known order id an existing order', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const simulator = stellarSimulator('testnet', rpcStub(() => ({ id: '1', latestLedger: 5000, events: [], _parsed: true, error: ORDER_EXISTS })));
+    await assert.rejects(
+      () => prepareOpen(input(), BUYER, deps({ simulator })),
+      (err: unknown) => err instanceof ChannelsFailure && err.code === 'channels_exists',
+    );
+  });
+
+  it('keeps an unknown host error off the screen', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const simulator = stellarSimulator('testnet', rpcStub(() => ({
+      id: '1', latestLedger: 5000, events: [], _parsed: true, error: 'HostError: Error(WasmVm, InvalidAction)',
+    })));
+    await assert.rejects(
+      () => prepareOpen(input(), BUYER, deps({ simulator })),
+      (err: unknown) => err instanceof ChannelsFailure
+        && err.code === 'channels_sim'
+        && !/HostError|WasmVm/.test(err.message),
+    );
+  });
+
+  it('gives a throw from the RPC its own code and the shopper copy', async () => {
+    process.env.STELLAR_ESCROW_ID = ESCROW;
+    const simulator = { async simulate(): Promise<never> { throw new Error('LedgerHeader.scpValue.ext.v: unknown enum value 3'); } };
+    await assert.rejects(
+      () => prepareOpen(input(), BUYER, deps({ simulator })),
+      (err: unknown) => err instanceof ChannelsFailure
+        && err.status === 502
+        && err.code === 'channels_rpc'
+        && err.message === 'La red no pudo simular el pago.',
+    );
   });
 });
