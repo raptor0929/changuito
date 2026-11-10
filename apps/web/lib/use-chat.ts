@@ -104,6 +104,8 @@ export function useChat(auth?: UseChatAuth) {
   // the one from the turn that just finished, not the one React rendered with.
   const snapshot = useRef<ChatState['snapshot']>(undefined);
   const sessionId = useRef<string>('');
+  /** The shopper's own lines, so the next request can set a location the server forgot. */
+  const said = useRef<string[]>([]);
   const abort = useRef<AbortController | null>(null);
   /** Sync lock — React state alone still lets a double-Enter race a second fetch. */
   const inFlight = useRef(false);
@@ -131,10 +133,13 @@ export function useChat(auth?: UseChatAuth) {
     abort.current = controller;
 
     const post = () => {
+      const prior = said.current.slice(-6);
+      said.current = [...said.current, text].slice(-6);
       const body: ChatRequest = {
         sessionId: sessionId.current,
         message: text,
         snapshot: snapshot.current,
+        ...(prior.length ? { prior } : {}),
         ...(authRef.current.network ? { network: authRef.current.network } : {}),
         ...(authRef.current.lang ? { lang: authRef.current.lang } : {}),
         ...(image ? { image } : {}),
@@ -340,6 +345,7 @@ export function useChat(auth?: UseChatAuth) {
     seedIds(chat.blocks.reduce((hi, b) => Math.max(hi, idNumber(b.id)), 0));
     sessionId.current = chat.sessionId ?? '';
     snapshot.current = chat.snapshot ?? undefined;
+    said.current = chat.blocks.flatMap((b) => (b.kind === 'user' ? [b.text] : [])).slice(-6);
     setLoginRequired(false);
     setState({
       blocks: chat.blocks,
@@ -354,6 +360,7 @@ export function useChat(auth?: UseChatAuth) {
     if (inFlight.current) abort.current?.abort();
     sessionId.current = '';
     snapshot.current = undefined;
+    said.current = [];
     setLoginRequired(false);
     setState(initialState);
   }, []);

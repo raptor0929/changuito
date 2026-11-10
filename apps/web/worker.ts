@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import handler from "vinext/server/fetch-handler";
 
 import { applyContractIdBindings } from "./lib/contract-ids.ts";
+import { applyRpcUrlBindings } from "./lib/rpc-url.ts";
 
 /**
  * Worker entry. The app keeps reading DATABASE_URL. Hyperdrive's connection
@@ -25,6 +26,7 @@ export default {
     // Contract ids are runtime bindings. Copy them before the handler reads
     // them, and do not bake the values into this file.
     applyContractIdBindings(cfEnv);
+    applyRpcUrlBindings(cfEnv);
     return fetchHandler.fetch(request, cfEnv, ctx);
   },
 };

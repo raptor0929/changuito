@@ -28,6 +28,15 @@ const contractIds = {
   STELLAR_USDC_ID: bindings.text("CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E"),
 };
 
+// Soroban RPC, same reason as the contract ids: a deploy that left them out
+// would delete the dashboard binding, and strict mode refuses that. Testnet
+// is Gateway; mainnet stays on the host the app already uses. Changing either
+// means changing this and the dashboard together.
+const rpcUrls = {
+  STELLAR_RPC_URL: bindings.text("https://soroban-rpc.testnet.stellar.gateway.fm"),
+  STELLAR_RPC_URL_MAINNET: bindings.text("https://mainnet.sorobanrpc.com"),
+};
+
 // Which Postgres this Worker reaches is a decision, not a default: the
 // database is a privacy boundary between the two apps. No id, no binding, and
 // the app runs without a database the way a fresh clone does.
@@ -63,6 +72,7 @@ export default defineConfig({
       NODE_ENV: bindings.text("production"),
       ...(hyperdriveId ? { HYPERDRIVE: bindings.hyperdrive({ id: hyperdriveId }) } : {}),
       ...contractIds,
+      ...rpcUrls,
       ...publicEnv,
     },
   }),

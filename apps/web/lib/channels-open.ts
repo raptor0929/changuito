@@ -7,7 +7,9 @@
  */
 
 import { track } from './analytics';
+import { AuthEntryError, preimageForWallet, walletAuthEntry } from './auth-entry.ts';
 import { OpenConfirmationPending } from './checkout/open-submission.ts';
+import { DEPLOYMENTS } from './deployments.ts';
 
 export interface ChannelSigner {
   signAuthEntry(
@@ -40,7 +42,7 @@ export async function openThroughChannels(input: ChannelOpen): Promise<string> {
   try {
     const first = await post({ ...body, step: 'prepare' });
     if (typeof first.hash === 'string') return first.hash;
-    const hash = await signAndSubmit(body, first, input.signAuthEntry);
+    const hash = await signAndSubmit(body, first, input.signAuthEntry, passphrase(input.network));
     return hash;
   } catch (err) {
     if (err instanceof OpenConfirmationPending) throw err;
@@ -50,10 +52,17 @@ export async function openThroughChannels(input: ChannelOpen): Promise<string> {
   }
 }
 
+function passphrase(network: string): string {
+  return network === 'mainnet'
+    ? DEPLOYMENTS.mainnet.networkPassphrase
+    : DEPLOYMENTS.testnet.networkPassphrase;
+}
+
 async function signAndSubmit(
   body: Record<string, unknown>,
   prepared: ChannelResponse,
   signAuthEntry: ChannelOpen['signAuthEntry'],
+  networkPassphrase: string,
   renewed = false,
 ): Promise<string> {
   const entries = prepared.entries ?? [];
@@ -63,11 +72,29 @@ async function signAndSubmit(
   }
   const auth: string[] = [];
   for (const entry of entries) {
-    const signed = await signAuthEntry(entry, { validUntilLedger });
+    let preimage: string;
+    try {
+      preimage = preimageForWallet(entry, networkPassphrase);
+    } catch (err) {
+      if (err instanceof AuthEntryError) {
+        throw new ChannelRequestError(400, 'channels_auth', err.message);
+      }
+      throw err;
+    }
+    // The wallet parses a preimage. The signature comes back as raw bytes,
+    // and the entry submitted below is the one the host will check.
+    const signed = await signAuthEntry(preimage, { validUntilLedger });
     if (signed.status === 'error') {
       throw new ChannelRequestError(400, 'channels_rejected', signed.details || 'No se firmó el pago.');
     }
-    auth.push(signed.signedAuthEntry);
+    try {
+      auth.push(walletAuthEntry(entry, signed.signedAuthEntry, networkPassphrase));
+    } catch (err) {
+      if (err instanceof AuthEntryError) {
+        throw new ChannelRequestError(400, 'channels_rejected', err.message);
+      }
+      throw err;
+    }
   }
   try {
     const sent = await post({ ...body, step: 'submit', auth });
@@ -77,7 +104,7 @@ async function signAndSubmit(
     if (err instanceof ChannelRequestError && err.code === 'channels_auth_expiry' && !renewed) {
       const again = await post({ ...body, step: 'prepare' });
       if (typeof again.hash === 'string') return again.hash;
-      return signAndSubmit(body, again, signAuthEntry, true);
+      return signAndSubmit(body, again, signAuthEntry, networkPassphrase, true);
     }
     throw err;
   }

@@ -84,6 +84,12 @@ export interface ChatRequest {
    * travel, and `isChatImage` is what keeps them to a JPEG the model can read.
    */
   image?: ChatImage;
+  /**
+   * The shopper's earlier lines in this chat, oldest first, capped by the
+   * sender. The server uses them to set a supermarket and postal code the
+   * model would otherwise ask for again. Absent on the first turn.
+   */
+  prior?: string[];
 }
 
 export const SSE_HEADERS: Record<string, string> = {
