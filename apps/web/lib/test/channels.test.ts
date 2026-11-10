@@ -82,6 +82,7 @@ function deps(over: Partial<ChannelsDeps> = {}): ChannelsDeps {
     simulator: { async simulate() { return { auth: [], latestLedger: 1000 }; } },
     loadRecord: async () => null,
     readOpened: async () => false,
+    findOpenHash: async () => null,
     sleep: async () => {},
     ...over,
   };

@@ -45,6 +45,10 @@ export async function openThroughChannels(input: ChannelOpen): Promise<string> {
     const hash = await signAndSubmit(body, first, input.signAuthEntry, passphrase(input.network));
     return hash;
   } catch (err) {
+    if (err instanceof OpenConfirmationPending && !err.tx) {
+      const again = await postedHash(body);
+      if (again) return again;
+    }
     if (err instanceof OpenConfirmationPending) throw err;
     const code = err instanceof ChannelRequestError ? err.code : 'channels_submit';
     track('payment_fail', { flow: 'checkout', code });
@@ -56,6 +60,17 @@ function passphrase(network: string): string {
   return network === 'mainnet'
     ? DEPLOYMENTS.mainnet.networkPassphrase
     : DEPLOYMENTS.testnet.networkPassphrase;
+}
+
+/** One more prepare. A landed open now has a hash; a still-pending one does not. */
+async function postedHash(body: Record<string, unknown>): Promise<string | null> {
+  try {
+    const again = await post({ ...body, step: 'prepare' });
+    return typeof again.hash === 'string' ? again.hash : null;
+  } catch (err) {
+    if (err instanceof OpenConfirmationPending) return null;
+    throw err;
+  }
 }
 
 async function signAndSubmit(
