@@ -99,15 +99,14 @@ describe('beta onboarding', () => {
     }
   });
 
-  it('shows the phone version only under 560px, and only one of the two at a time', () => {
+  it('keeps the full steps on a phone, and hides the one-line version', () => {
     const css = read('../../app/globals.css');
     assert.match(css, /\.onb-short, \.onb-label-short \{ display: none; \}/);
-    const phone = css.slice(css.indexOf('@media (max-width: 560px) {\n  .onb {'));
+    assert.doesNotMatch(css, /\.onb-body, \.onb-label-full \{ display: none; \}/);
+    assert.doesNotMatch(css, /\.onb-short \{ display: block;/);
+    const phone = css.slice(css.indexOf('@media (max-width: 560px) {\n  .onb-foot {'));
     const block = phone.slice(0, phone.indexOf('\n}\n'));
-    assert.match(block, /\.onb-body, \.onb-label-full \{ display: none; \}/);
-    assert.match(block, /\.onb-short \{ display: block;/);
-    assert.match(block, /\.onb-label-short \{ display: inline; \}/);
-    assert.match(block, /\.onb \{ flex-direction: row;/, 'the button sits beside the paragraph');
+    assert.match(block, /\.onb-foot \{ flex-direction: column; align-items: stretch; \}/);
     const comp = read('../../components/BetaOnboarding.tsx');
     // Still one dismiss button, with both labels; the compact text uses the same link component.
     assert.equal(comp.match(/data-testid="beta-onboarding-dismiss"/g)?.length, 1);
@@ -183,8 +182,16 @@ describe('beta onboarding', () => {
     assert.match(client, /'content-type': 'application\/json'/);
   });
 
-  it('is inline, not a modal, so it never covers the login button', () => {
+  it('is a modal the backdrop and Escape cannot dismiss', () => {
     const comp = readFileSync(new URL('../../components/BetaOnboarding.tsx', import.meta.url), 'utf8');
-    assert.doesNotMatch(comp, /aria-modal|modal-backdrop/);
+    assert.match(comp, /role="dialog"/);
+    assert.match(comp, /aria-modal="true"/);
+    assert.match(comp, /className="onb-backdrop"/);
+    assert.match(comp, /event\.key === 'Escape'/);
+    const backdrop = comp.slice(comp.indexOf('className="onb-backdrop"'), comp.indexOf('role="dialog"'));
+    assert.doesNotMatch(backdrop, /dismissOnboarding/);
+    const escape = comp.slice(comp.indexOf("event.key === 'Escape'"), comp.indexOf("event.key !== 'Tab'"));
+    assert.doesNotMatch(escape, /dismissOnboarding|setShow\(false\)/);
+    assert.equal(comp.match(/dismissOnboarding\(window\.localStorage\)/g)?.length, 1);
   });
 });

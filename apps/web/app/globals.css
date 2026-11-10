@@ -2213,23 +2213,38 @@ body:not(:has(.topbar)) .shell {
 .ck-alert-title { margin: 0; font-size: 14px; font-weight: 600; color: var(--warn-ink); }
 
 
-/* First-visit beta explainer (components/BetaOnboarding.tsx). Desktop shows
-   .onb-body; phones show the one-paragraph .onb-short beside the button. The
-   hidden one is display:none, so screen readers only read what is shown. */
+/* First-visit beta explainer (components/BetaOnboarding.tsx). A modal: the
+   dimmed page does not dismiss it, and the full steps show at every width.
+   .onb-short stays display:none, so screen readers only read the list. */
+.onb-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(42, 26, 20, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
 .onb {
+  width: min(440px, 100%);
+  background: var(--surface);
   border: 1px solid rgba(42, 26, 20, 0.12);
   border-radius: 14px;
-  padding: 14px 16px;
-  margin: 0 0 14px;
+  padding: 16px 18px;
+  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+  box-shadow: 0 16px 40px rgba(42, 26, 20, 0.18);
 }
+.onb:focus-visible { outline: 3px solid var(--chg-espresso); outline-offset: 3px; }
 .onb-body { display: flex; flex-direction: column; gap: 8px; }
 .onb-title { margin: 0; font-size: 16px; }
 .onb-steps { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.55; }
+.onb-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .onb-note { margin: 0; font-size: 13px; color: var(--muted); }
-.onb-actions { display: flex; justify-content: flex-end; }
+.onb-actions { display: flex; justify-content: flex-end; flex: none; }
+.onb-actions .btn { min-height: 44px; }
 .onb-short, .onb-label-short { display: none; }
 .onb-link {
   display: inline;
@@ -2351,9 +2366,6 @@ html.doc-scroll body {
 }
 .legal-footer { margin-top: 24px; }
 @media (max-width: 560px) {
-  .onb { flex-direction: row; align-items: center; gap: 10px; padding: 8px 10px 8px 12px; margin-bottom: 10px; border-radius: 12px; }
-  .onb-body, .onb-label-full { display: none; }
-  .onb-short { display: block; flex: 1; min-width: 0; margin: 0; font-size: 13px; line-height: 1.35; }
-  .onb-label-short { display: inline; }
-  .onb-actions { flex: none; }
+  .onb-foot { flex-direction: column; align-items: stretch; }
+  .onb-actions { justify-content: flex-end; }
 }
