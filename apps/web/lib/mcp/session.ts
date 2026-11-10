@@ -1,6 +1,6 @@
 import type { SessionSnapshot } from '@changuito/mcp/session';
 
-import { bootMcp, closeMcp, type McpPair } from './boot';
+import { bootMcp, closeMcp, type McpPair } from './boot.ts';
 
 /**
  * Sessions, on a host that does not promise to keep anything.
@@ -16,12 +16,49 @@ import { bootMcp, closeMcp, type McpPair } from './boot';
  * nothing in it they do not have. That buys durability across cold starts with
  * no store to provision, and it makes two browser tabs two shoppers, which is
  * what a user would expect.
+ *
+ * The record of truth includes a *warm* session. A Worker runs several
+ * isolates, each with its own Map, so a shopper can send the supermarket and
+ * postal code to one isolate and the next message to another that served
+ * only the first. That isolate's session predates the location; reading it
+ * instead of the snapshot made the agent ask for both again.
+ *
+ * Its one relative import names its extension, so the module loads under
+ * `node --experimental-strip-types`.
  */
 export interface Session extends McpPair {
   id: string;
   lastUsed: number;
   /** Serializes turns, so two tabs on one id cannot interleave cart writes. */
   queue: Promise<unknown>;
+  /**
+   * The snapshot this instance last handed the browser, as `snapshotKey`.
+   * A snapshot that matches it is one this session already holds or has
+   * moved past (a turn that threw has no `done`, so the browser still has
+   * the previous one). Anything else came from another instance.
+   */
+  issued: string;
+}
+
+/**
+ * A snapshot as a string that ignores key order and absent fields.
+ *
+ * The browser sends back either the JSON it was given or the copy
+ * chat-store.ts rebuilt from localStorage, which lists the same fields in
+ * another order. Those two are one snapshot.
+ */
+export function snapshotKey(snapshot: SessionSnapshot): string {
+  const canon = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(canon);
+    if (v === null || typeof v !== 'object') return v;
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(v).sort()) {
+      const field = (v as Record<string, unknown>)[k];
+      if (field !== undefined) out[k] = canon(field);
+    }
+    return out;
+  };
+  return JSON.stringify(canon(snapshot));
 }
 
 const sessions = new Map<string, Session>();
@@ -58,7 +95,13 @@ async function getOrCreate(id: string, snapshot?: SessionSnapshot): Promise<Sess
   // `get_cart_link` hands the user a link to it — a wrong answer with no error.
   if (snapshot) pair.state.restore(snapshot);
 
-  const session: Session = { id, ...pair, lastUsed: now, queue: Promise.resolve() };
+  const session: Session = {
+    id,
+    ...pair,
+    lastUsed: now,
+    queue: Promise.resolve(),
+    issued: snapshotKey(pair.state.snapshot()),
+  };
   sessions.set(id, session);
   await evictStale(now);
   return session;
@@ -76,15 +119,20 @@ export async function withSession<T>(
 ): Promise<{ result: T; snapshot: SessionSnapshot }> {
   const session = await getOrCreate(id, snapshot);
 
-  const turn = session.queue.then(
-    () => fn(session),
-    () => fn(session), // a failed predecessor must not poison the queue
-  );
+  // Inside the queue, so the comparison sees `issued` after the turn ahead
+  // of this one, and a restore never lands under a turn that is running.
+  const run = () => {
+    if (snapshot && snapshotKey(snapshot) !== session.issued) session.state.restore(snapshot);
+    return fn(session);
+  };
+  const turn = session.queue.then(run, run); // a failed predecessor must not poison the queue
   session.queue = turn.catch(() => {});
 
   const result = await turn;
   session.lastUsed = Date.now();
-  return { result, snapshot: session.state.snapshot() };
+  const next = session.state.snapshot();
+  session.issued = snapshotKey(next);
+  return { result, snapshot: next };
 }
 
 /** Test and shutdown seam; nothing in a request path should need it. */
