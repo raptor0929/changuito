@@ -9,8 +9,7 @@ export function ReportBug() {
   return (
     <p className="report-bug">
       <a href="https://www.changuito.me/reportarbug" target="_blank" rel="noopener noreferrer">
-        {/* The Spanish is written out rather than looked up: lib/test/social.test.ts
-            reads this file as text and asserts the label is in it. The URL stays
+        {/* The Spanish is written out rather than looked up. The URL stays
             Spanish in both languages — it is the landing site's real path. */}
         {lang === 'en' ? uiCopy(lang).reportBug : 'Reportar un bug'}
       </a>

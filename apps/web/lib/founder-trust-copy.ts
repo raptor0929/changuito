@@ -43,9 +43,8 @@ export const NEW_TAB_HINT = 'se abre en una pestaña nueva';
 /**
  * The same line in English.
  *
- * Everything above is the Spanish original and is asserted character for
- * character by `lib/test/founder-trust.test.ts` — the registered mark, the
- * middle dot, the flag, the absence of dashes. None of that moves. What follows
+ * Everything above is the Spanish original: the registered mark, the middle
+ * dot, the flag, the absence of dashes. None of that moves. What follows
  * selects between it and an English second copy built from the same parts, so
  * the two can never disagree about the year, the mark, or who made it.
  *
