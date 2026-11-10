@@ -13,12 +13,13 @@
  */
 import { Client as Usdc } from '@changuito/usdc-bindings';
 
+import { contractIds } from './contract-ids.ts';
 import { DEFAULT_NETWORK, deployment, type NetworkId } from './deployments.ts';
 
 export function usdcClient(publicKey?: string, net: NetworkId = DEFAULT_NETWORK): Usdc {
   const d = deployment(net);
   return new Usdc({
-    contractId: d.usdcId,
+    contractId: contractIds(net).usdcId,
     networkPassphrase: d.networkPassphrase,
     rpcUrl: d.rpcUrl,
     // A simulation still needs a source account to charge the imaginary fee to,
@@ -46,8 +47,8 @@ export function usdcClient(publicKey?: string, net: NetworkId = DEFAULT_NETWORK)
  * that number off the Horizon account it already fetched.
  */
 export async function usdcBalance(address: string, net: NetworkId = DEFAULT_NETWORK): Promise<bigint> {
-  const d = deployment(net);
-  if (!d.usdcId) throw new Error(`no hay un token USDC desplegado en ${net}`);
+  const { usdcId } = contractIds(net);
+  if (!usdcId) throw new Error(`no hay un token USDC desplegado en ${net}`);
   const tx = await usdcClient(undefined, net).balance({ id: address });
   return tx.result;
 }

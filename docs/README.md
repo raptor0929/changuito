@@ -10,7 +10,7 @@ shopper pays the súper with.
 |---|---|
 | [judges.md](judges.md) | fifteen minutes in order, every claim mapped to the file that backs it, and what is real versus simulated |
 | [architecture.md](architecture.md) | the system diagram, the cross-origin wall, the money rail, and where the trust boundaries fall |
-| [flows.md](flows.md) | the paths that matter, end to end: a chat turn, funding, the deposit → card checkout, and the dormant escrow |
+| [flows.md](flows.md) | the paths that matter, end to end: a chat turn, funding, the deposit rail, and the escrow checkout |
 | [stellar.md](stellar.md) | every Stellar technology used, and what each one is doing here |
 | [tech-stack.md](tech-stack.md) | the dependency list with versions, the data stores, and every environment variable |
 | [e2e.md](e2e.md) | Playwright smoke against the live sites, and the GitHub Actions secrets |
@@ -55,6 +55,6 @@ Two networks, one path. Signed out is **modo prueba** on testnet, paid from a
 demo wallet this repo holds. Signed in with Pollar is **modo real** on mainnet,
 paid from the shopper's own account.
 
-The escrow contract is deployed on testnet and tested, and it is **not** on that
-path — [stellar.md](stellar.md#the-escrow-contract-dormant) says why, and what
-would put it back.
+The escrow contract is deployed on testnet over the mintable `mock_usdc`. On the
+login network it is the checkout path — [stellar.md](stellar.md#the-escrow-contract).
+Other networks still use the memo deposit.

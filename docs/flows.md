@@ -285,12 +285,12 @@ BROWSER                            /api/card                   STELLAR / DB
 
 ---
 
-## 6. Dormant: the escrow
+## 6. The escrow
 
-Everything below is deployed on testnet, covered by 19 tests, and reachable
-only from `/dev/ui`. No shopper path calls it. Kept because bringing it back is
-a concrete next step — see
-[stellar.md](stellar.md#the-escrow-contract-dormant).
+Deployed on testnet over the mintable `mock_usdc` and covered by 19 tests. On the
+login network, checkout mounts `PaymentModal` and calls `open`. Other networks
+keep the memo deposit rail. See
+[stellar.md](stellar.md#the-escrow-contract).
 
 ### 6a. Opening
 

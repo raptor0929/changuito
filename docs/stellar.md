@@ -134,12 +134,17 @@ the default and it cannot spend anything.
 
 ---
 
-## The escrow contract (dormant)
+## The escrow contract
 
-`CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557` — deployed on
-testnet, 19 tests, reachable from `/dev/ui` and not from the shopper's path.
-It is documented in full because it is real code that works, and because
-bringing it back is a concrete next step rather than a hypothetical.
+`CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX` — deployed on
+testnet against the mintable `mock_usdc`
+(`CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E`), 19 tests. On the
+login network the shopper path mounts `PaymentModal`, which calls `open`
+through Pollar. The classic deposit issuer
+(`GCGV3225QTJFJ32KTPJNOR5SYANP4QWNUGKKGKVK7ILMK4QACZHJTGJB`) stays on the memo
+rail only — it is not the escrow token. An earlier `mock_usdc`
+(`CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF`) and the Circle
+SAC escrow are not what `deployments.json` points at.
 
 ```rust
 open(buyer, order_id: BytesN<32>, amount: i128,
@@ -224,9 +229,11 @@ call leaves no event behind, and that a refunded order cannot then be settled.
 
 ## The demo USDC token (SEP-41)
 
-`CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF` — SEP-41, symbol
+`CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E` — SEP-41, symbol
 `USDC`, 7 decimals, admin-gated `mint`, 15 tests. It backs the escrow and the
-faucet; it is **not** on the deposit rail, for the memo reason above.
+faucet; it is **not** on the deposit rail, for the memo reason above. The
+previous mintable deploy
+(`CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF`) is retired.
 
 **Why not Blend's testnet mock.** It is a real SEP-41 token, but a probe during
 planning showed its admin is `GATALTGT…5V56`, an address we do not control, and
@@ -259,8 +266,8 @@ The classic testnet USDC the deposit rail uses **does** need a trustline, and
 
 | Role | Address | Does |
 |---|---|---|
-| resolver | `GBGMPRHU…HTFK` | token admin (the faucet mints) **and** escrow resolver |
-| treasury | `GAXUICH5…BNZG` | where a settled escrow's USDC lands |
+| resolver | `GBXBAOFW…HGYGN5` | escrow resolver. `STELLAR_RESOLVER_SECRET` must be this account |
+| treasury | `GBKJHIKI…2JJEIF` | where a settled escrow's USDC lands |
 | demo wallet | `GDFF477U…MINA55X` | holds the testnet classic USDC; pays in preview |
 | deposit accounts | configuration, not committed | receive the shopper's payment |
 

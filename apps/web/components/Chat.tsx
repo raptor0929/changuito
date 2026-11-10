@@ -20,8 +20,10 @@ import {
   loginGateBannerText,
   loginRequiredMessage,
 } from '../lib/login-constants';
+import type { OpenedOrder } from '../lib/order.ts';
 import { pollarEnabled } from '../lib/pollar';
 import { ensureUserCookie } from '../lib/session-login';
+import { formatUsdc } from '../lib/stellar.ts';
 import { storeOrderUrl, storeOrdersUrl } from '../lib/storefront.ts';
 import { progressCopy } from '../lib/turn-progress.ts';
 import { uiCopy } from '../lib/ui-copy.ts';
@@ -33,6 +35,7 @@ import { useLang } from './LangProvider';
 import { useNetwork } from './NetworkProvider';
 import { CameraIcon, ImageIcon, MicIcon, RetryIcon } from './icons';
 import { CheckoutModal } from './CheckoutModal';
+import { OrderPanel } from './OrderPanel';
 import { ProductGrid } from './ProductGrid';
 import { useShop } from './ShopProvider';
 import { MarkdownText } from './MarkdownText';
@@ -120,6 +123,8 @@ function ChatCore({
   // The basket the payment modal is open over. A cart, not a block id: the
   // user pays for what a card showed, and that object is the record of it.
   const [paying, setPaying] = useState<{ cart: Cart; handoffUrl?: string } | null>(null);
+  // Escrow `open` succeeded: money is locked until settle/refund on OrderPanel.
+  const [opened, setOpened] = useState<OpenedOrder | null>(null);
   const thread = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
 
@@ -146,6 +151,7 @@ function ChatCore({
     setPhoto(null);
     setPhotoNote(null);
     setPaying(null);
+    setOpened(null);
     ack();
   }, [request, ack, resume, reset]);
 
@@ -682,7 +688,31 @@ function ChatCore({
             setPaying(null);
             shop?.settle(receipt);
           }}
+          onOpened={(order) => {
+            const cart = paying.cart;
+            setPaying(null);
+            setOpened(order);
+            // Lock the chat the same way the deposit rail does: Pagar on a
+            // paid card would invite a second open against the same basket.
+            shop?.settle({
+              orderId: order.orderId,
+              retailer: order.retailer,
+              paidDisplay: `${formatUsdc(BigInt(order.amountUnits))} USDC`,
+              paidAt: Date.now(),
+              lines: cart.lines
+                .filter((l) => l.available)
+                .map((l) => ({
+                  name: l.name,
+                  quantity: l.quantity,
+                  lineTotal: l.lineTotal.display,
+                })),
+              total: order.totalDisplay,
+            });
+          }}
         />
+      ) : null}
+      {opened ? (
+        <OrderPanel order={opened} sign={sign} onDismiss={() => setOpened(null)} />
       ) : null}
     </div>
   );

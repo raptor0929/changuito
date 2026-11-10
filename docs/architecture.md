@@ -15,9 +15,10 @@ changuito is four things that happen to live in one repository:
    `/api/card`) — a classic Stellar payment identified by a memo, confirmed
    through the ledger port (Horizon today), which unlocks a card the shopper
    types into the store's own payment form.
-4. **A Soroban escrow** (`contracts/escrow`) that held USDC between "the user
-   approved this basket" and "the basket actually happened". Deployed, tested,
-   and **dormant**: see [Why the escrow is not on the rail](#why-the-escrow-is-not-on-the-rail).
+4. **A Soroban escrow** (`contracts/escrow`) that holds USDC between "the user
+   approved this basket" and "the basket actually happened". Deployed on
+   testnet over the mintable `mock_usdc` and mounted on the login-network checkout.
+   See [the escrow contract](stellar.md#the-escrow-contract).
 
 The app is the reason the first two exist: the MCP server had never been used by
 anything except a chat client, and this proves it works inside a product.
@@ -69,7 +70,7 @@ flowchart TB
         direction TB
         VTEX["Día — VTEX<br/><i>catalogue · cart · public orderForm</i>"]
         HORIZON["Stellar Horizon<br/><i>the only confirmation source</i>"]
-        RPC["Soroban RPC<br/><i>balances · the dormant escrow</i>"]
+        RPC["Soroban RPC<br/><i>balances · escrow open</i>"]
         ISSUER["Card issuer"]
         REDIS[("Upstash Redis<br/><i>turn history, 1h TTL</i>")]
         PG[("Postgres<br/><i>orders · chat · cards</i>")]
@@ -306,7 +307,7 @@ It is not what the shopper's path uses, for two reasons that are worth separatin
 
 The second reason is the one that has since weakened: `orderGroup` is real
 evidence, read server-side from the store's own document. Wiring it to `settle`
-is the honest next step. [stellar.md](stellar.md#the-escrow-contract-dormant)
+is the honest next step. [stellar.md](stellar.md#the-escrow-contract)
 carries the rest.
 
 ---
@@ -372,7 +373,7 @@ changuito/
 ├── apps/landing/            marketing site for www.changuito.me
 ├── apps/branding/           brand kit, sibling of the two apps (not a package)
 ├── contracts/
-│   ├── escrow/              open, settle, refund, events — 19 tests, dormant
+│   ├── escrow/              open, settle, refund, events — 19 tests, login-network checkout
 │   └── mock_usdc/           SEP-41 token, admin-gated mint — 15 tests
 ├── packages/
 │   ├── mcp/                 the vendored MCP server — 520 tests

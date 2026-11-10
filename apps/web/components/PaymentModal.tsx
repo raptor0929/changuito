@@ -7,7 +7,6 @@ import type { Cart } from '@changuito/mcp/types';
 
 import { track, trackLoginStart } from '../lib/analytics';
 import type { QuoteResponse } from '../app/api/quote/route.ts';
-import { deployment } from '../lib/deployments.ts';
 import { modeCopyFor, trustlineCopy } from '../lib/mode-copy.ts';
 import { basketHash, newOrderId, openArgs, toHex, type OpenedOrder } from '../lib/order.ts';
 import { LOGIN_NETWORK, pollarEnabled, shortAddress } from '../lib/pollar.ts';
@@ -56,9 +55,11 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
   const mode = modeCopyFor(appMode, network, lang);
   const trustlineText = trustlineCopy(lang);
 
-  // The one-time step before the first real payment. `not-needed` in modo
-  // prueba, always — the demo token has no issuer, so there is nothing to
-  // open. See lib/trustline.ts.
+  // The escrow id comes from the Worker on this request, via /api/contracts.
+  // The recorded id in deployments.ts is only the default the server uses
+  // when the runtime variable is unset.
+  const [escrowId, setEscrowId] = useState<string | null>(null);
+  const [escrowError, setEscrowError] = useState<string | null>(null);
   const needsTrustline = balance?.trustline === 'needed';
   const [opening, setOpening] = useState(false);
   const [trustlineError, setTrustlineError] = useState<string | null>(null);
@@ -68,6 +69,26 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
   const [phase, setPhase] = useState<Phase>('review');
   const [failure, setFailure] = useState<string | null>(null);
   const confirm = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/contracts?network=${network}`, { cache: 'no-store' })
+      .then(async (res) => {
+        const json = await res.json();
+        if (cancelled) return;
+        if (!res.ok || typeof json.escrowId !== 'string') {
+          throw new Error(json.error ?? `contracts failed (${res.status})`);
+        }
+        setEscrowId(json.escrowId);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setEscrowError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [network]);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,14 +157,14 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
   const short = balance !== null && quote !== null && held < amountUnits;
 
   async function pay() {
-    if (!address || !quote) return;
+    if (!address || !quote || !escrowId) return;
     setPhase('signing');
     setFailure(null);
     try {
       const orderId = newOrderId();
       const basket = await basketHash(cart);
       const outcome = await runTx('invoke_contract', {
-        contractId: deployment(network).escrowId,
+        contractId: escrowId,
         method: 'open',
         args: openArgs({ buyer: address, orderId, amountUnits, basketHash: basket }),
       });
@@ -242,6 +263,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
         </dl>
 
         {quoteError ? <p className="pay-error">{quoteError}</p> : null}
+        {escrowError ? <p className="pay-error">{escrowError}</p> : null}
         {failure ? <p className="pay-error">{failure}</p> : null}
         {short ? (
           <p className="pay-warn">
@@ -282,7 +304,7 @@ function PayWithPollar({ cart, handoffUrl, onClose, onOpened }: Props) {
               type="button"
               className="btn"
               onClick={() => void pay()}
-              disabled={!quote || !verified || short || phase === 'signing'}
+              disabled={!quote || !escrowId || !verified || short || phase === 'signing'}
             >
               {phase === 'signing'
                 ? copy.signing

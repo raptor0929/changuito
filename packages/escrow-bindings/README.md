@@ -1,6 +1,6 @@
 # @changuito/escrow-bindings
 
-Generated from the deployed contract `CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557` by `stellar contract bindings typescript`,
+Generated from the deployed contract `CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX` by `stellar contract bindings typescript`,
 then reshaped by `scripts/fixup-bindings.mjs`. **Do not edit by hand** — the next
 deploy overwrites everything here.
 

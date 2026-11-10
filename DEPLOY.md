@@ -63,6 +63,35 @@ contract. To force new ids:
 npm run deploy:testnet -- --force
 ```
 
+#### Live testnet escrow (mintable `mock_usdc`)
+
+The Circle USDC SAC path is withdrawn. Run without `USDC_ISSUER` so the script
+deploys a new `mock_usdc` (resolver as admin) and an escrow over that token.
+The live ids:
+
+| | |
+|---|---|
+| escrow | `CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX` |
+| mintable token | `CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E` |
+| classic deposit issuer | `GCGV3225QTJFJ32KTPJNOR5SYANP4QWNUGKKGKVK7ILMK4QACZHJTGJB` (memo rail only; not the escrow token) |
+
+```bash
+npm run deploy:testnet
+```
+
+Two accounts need to exist and hold XLM before it runs, and a person funds them:
+`changuito-resolver` and `changuito-treasury` in the `stellar keys ls` keystore.
+The only keystore identity for the resolver is `changuito-resolver`
+(`GBXBAOFWG4Y4ZQEDXH73BACYYCE7ODSKXHLXYVRPLJOYFRDCPWHGYGN5`). Do not redeploy
+with another resolver. A person sets `STELLAR_RESOLVER_SECRET` to that identity
+so it matches `deployments.json`. The treasury
+(`GBKJHIKIZONKCCV2JVOGUDXEOPTQUZ2OKYZNV3R3LDALNZHCSF2JJEIF`) stays. The escrow
+token is Soroban-only, so the treasury needs no classic USDC trustline for
+`settle`.
+
+`USDC_ISSUER=…` still exists in the script for a SAC deploy, but that is not the
+live escrow and must not be used for this redeploy.
+
 ### 1.4 Commit what changed
 
 ```bash
@@ -174,6 +203,23 @@ at build time, so it is set here, not under the Worker's runtime variables:
 Hyperdrive id the Worker deploys with no database binding and the app runs
 the way a fresh clone does. `DIRECT_URL` stays on the laptop that runs
 `npm run db:migrate`.
+
+**Contract ids are runtime variables, not build variables.** Set them on
+`changuito-web` → Settings → Variables and Secrets, as variables of the
+running Worker. The browser asks `/api/contracts` on each checkout, and the
+server reads the value for that request. Changing one does not take a new
+build. Unset, the request uses the id recorded in `deployments.json`.
+
+| Name | Network |
+|---|---|
+| `STELLAR_ESCROW_ID` | testnet escrow |
+| `STELLAR_USDC_ID` | testnet token |
+| `STELLAR_ESCROW_ID_MAINNET` | mainnet escrow |
+| `STELLAR_USDC_ID_MAINNET` | mainnet token |
+
+A value that is not a `C…` contract id is ignored. Do not put these names in
+the build variables: the build does not read them, and a value inlined there
+would not be the one a later request sees.
 
 Never set `NEXT_PUBLIC_POLLAR_API_KEY_MAINNET` there: whatever it holds is
 inlined. On a local machine the same public names can come from the shell.
@@ -323,12 +369,12 @@ Grouped by which of the two apps needs them.
 | `REAL_MODE_ALLOWLIST_ADDRESSES` | who may pay — see [2.8](#28-who-may-pay) | server only |
 | `REAL_MODE_OPEN_TO_ALL` | optional, `1` to drop that list — read [2.8](#28-who-may-pay) first | server only |
 
-**Still configured, no longer reachable from the UI:**
+**Still configured for the escrow and the testnet faucet:**
 `STELLAR_RESOLVER_SECRET`, `STELLAR_RESOLVER_SECRET_MAINNET`,
-`FAUCET_ALLOWLIST_ADDRESSES`, `FAUCET_OPEN_TO_ALL`. These belong to the escrow
-rail and the testnet faucet, and neither has a button any more — see
-[docs/flows.md](docs/flows.md#6-dormant-the-escrow). Leave them set if they
-are set; nothing calls them.
+`FAUCET_ALLOWLIST_ADDRESSES`, `FAUCET_OPEN_TO_ALL`. Settle and refund need the
+resolver secret; the faucet needs its own gate. See
+[docs/flows.md](docs/flows.md#6-the-escrow). Leave them set if they
+are set.
 
 `DEPOSIT_ADDRESS_*` is **public by nature** — it is printed on screen for the
 shopper to pay — and no secret for either one is anywhere near this deployment.

@@ -147,6 +147,6 @@ El shopper (`app.changuito.me`) tiene su propio `robots.txt` y no se toca desde 
 
 The dashboard reads live data on the server and regenerates at most every 5 minutes (ISR); the page and `/stats/export` share one cached read.
 
-- **No secrets needed:** Solana devnet escrow program `BFa1gZL9kVVo8Mq5gaDRM5RiCG4NDiyHLbpymfXvLz9d` (public RPC), Stellar testnet escrow `CBCUESHDKRXAH4YAHOKJFRFEOIYBTU2LYJ4LCOFIGMYGNHBCPACXQ557` and demo USDC `CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF` (Stellar Expert events + Horizon), merged PRs (GitHub public search).
+- **No secrets needed:** Solana devnet escrow program `BFa1gZL9kVVo8Mq5gaDRM5RiCG4NDiyHLbpymfXvLz9d` (public RPC), Stellar testnet escrow `CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX` and mock USDC `CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E` (Stellar Expert events + Horizon), merged PRs (GitHub public search).
 - **Optional, server-only:** `STATS_STELLAR_DATABASE_URL` and `STATS_SOLANA_DATABASE_URL` (read-only roles) for app accounts and delivered orders. The waitlist figure stays on the last published value.
 - Any source that is missing or down keeps its last published value, and the page says so next to the "Updated" time. Only aggregates and public transaction hashes reach the browser.
