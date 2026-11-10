@@ -8,6 +8,8 @@ import { HUMAN_COOKIE, mintHumanToken } from '../human-gate.ts';
 import { readLoggedInUser, sessionSecret, USER_COOKIE, verifyUserToken } from '../login-gate.ts';
 import { issueUserSession } from '../session-issue.ts';
 import { walletProofMessage, type WalletIntent } from '../wallet-proof.ts';
+import type { NetworkId } from '../deployments.ts';
+import type { WalletDirectory, WalletStanding } from '../wallet-record.ts';
 
 /**
  * POST /api/session/login. The QA finding (audit C2): any address the
@@ -92,6 +94,28 @@ describe('POST /api/session/login', () => {
     assert.deepEqual(read, { ok: true, address: shopper.publicKey() });
     assert.match(cookie, /HttpOnly/);
   });
+
+  it('refuses a banned wallet and does not set a cookie', async () => {
+    const book = memoryWallets([{ address: shopper.publicKey(), banned: true, faucetAllowed: true }]);
+    const r = await status(await issueUserSession(await post({ address: shopper.publicKey(), proof: signed(shopper) }), env, now, book.directory));
+    assert.equal(r.status, 403);
+    assert.equal(r.error, 'wallet_banned');
+    assert.equal(r.cookie, null);
+    assert.equal(book.inserts(), 0);
+    const still = await book.directory.standing('testnet', shopper.publicKey());
+    assert.equal(still.banned, true);
+    assert.equal(still.faucetAllowed, true);
+  });
+
+  it('records the wallet once the login proof holds', async () => {
+    const book = memoryWallets();
+    const res = await issueUserSession(await post({ address: shopper.publicKey(), proof: signed(shopper) }), env, now, book.directory);
+    assert.equal(res.status, 200);
+    assert.equal(book.inserts(), 1);
+    const row = await book.directory.standing('testnet', shopper.publicKey());
+    assert.equal(row.stored, true);
+    assert.equal(row.banned, false);
+  });
 });
 
 describe('sessionSecret', () => {
@@ -110,3 +134,36 @@ describe('sessionSecret', () => {
     assert.deepEqual(await readLoggedInUser(req, { NODE_ENV: 'production' } as NodeJS.ProcessEnv), { ok: false });
   });
 });
+
+function memoryWallets(seed: { address: string; banned?: boolean; faucetAllowed?: boolean }[] = []): {
+  directory: WalletDirectory;
+  inserts: () => number;
+} {
+  const rows = new Map<string, { faucetAllowed: boolean; banned: boolean }>();
+  let inserts = 0;
+  for (const row of seed) rows.set(`testnet:${row.address}`, { faucetAllowed: row.faucetAllowed === true, banned: row.banned === true });
+  function read(network: NetworkId, address: string): WalletStanding {
+    const row = rows.get(`${network}:${address}`);
+    if (!row) return { network, faucetAllowed: false, banned: false, stored: false };
+    return { network, faucetAllowed: row.faucetAllowed, banned: row.banned, stored: true };
+  }
+  return {
+    inserts: () => inserts,
+    directory: {
+      async register(network, address) {
+        const key = `${network}:${address}`;
+        if (!rows.has(key)) {
+          rows.set(key, { faucetAllowed: false, banned: false });
+          inserts += 1;
+        }
+        return read(network, address);
+      },
+      async standing(network, address) {
+        return read(network, address);
+      },
+      async openToAll() {
+        return false;
+      },
+    },
+  };
+}

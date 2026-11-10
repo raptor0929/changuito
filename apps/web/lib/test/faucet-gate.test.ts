@@ -9,6 +9,8 @@ import { FAUCET_GRANTS_PER_HOUR, gateFaucet } from '../faucet-gate.ts';
 import { CounterUnavailable, memoryCounter, type TurnCounter } from '../login-gate.ts';
 import { walletProofMessage } from '../wallet-proof.ts';
 import { HUMAN_COOKIE, mintHumanToken } from '../human-gate.ts';
+import type { NetworkId } from '../deployments.ts';
+import type { WalletDirectory, WalletStanding } from '../wallet-record.ts';
 
 /**
  * POST /api/faucet up to the point where it would touch the chain. A test
@@ -134,4 +136,69 @@ describe('POST /api/faucet gate', () => {
     const res = await gateFaucet(await post({ address: 'tester@example.com' }), env, now, memoryCounter());
     assert.equal((await refusal(res)).status, 400);
   });
+
+  it('refuses a banned wallet before the allowlist', async () => {
+    const book = memoryWallets([{ address: tester.publicKey(), banned: true, faucetAllowed: true }]);
+    const res = await gateFaucet(await post({ address: tester.publicKey(), proof: signed(tester) }), env, now, memoryCounter(), book.directory);
+    assert.deepEqual(await refusal(res), { status: 403, error: 'wallet_banned' });
+    assert.equal(book.inserts(), 0);
+  });
+
+  it('does not insert a wallet for an unproven faucet request', async () => {
+    const book = memoryWallets();
+    const res = await gateFaucet(await post({ address: tester.publicKey() }), env, now, memoryCounter(), book.directory);
+    assert.deepEqual(await refusal(res), { status: 401, error: 'faucet_session_required' });
+    assert.equal(book.inserts(), 0);
+    const open = { NODE_ENV: 'development', TURNSTILE_SECRET_KEY: SECRET } as NodeJS.ProcessEnv;
+    const dev = await gateFaucet(await post({ address: stranger.publicKey() }), open, now, memoryCounter(), book.directory);
+    assert.ok(!(dev instanceof Response));
+    assert.equal(book.inserts(), 0);
+  });
+
+  it('lets a granted wallet through when the env list is closed, without inserting', async () => {
+    const book = memoryWallets([{ address: stranger.publicKey(), faucetAllowed: true }]);
+    const closed = { ...env, FAUCET_ALLOWLIST_ADDRESSES: '' } as NodeJS.ProcessEnv;
+    const res = await gateFaucet(
+      await post({ address: stranger.publicKey(), proof: signed(stranger) }),
+      closed,
+      now,
+      memoryCounter(),
+      book.directory,
+    );
+    assert.deepEqual(res, { address: stranger.publicKey(), kind: 'account', network: DEFAULT_NETWORK });
+    assert.equal(book.inserts(), 0);
+  });
 });
+
+function memoryWallets(seed: { address: string; banned?: boolean; faucetAllowed?: boolean }[] = []): {
+  directory: WalletDirectory;
+  inserts: () => number;
+} {
+  const rows = new Map<string, { faucetAllowed: boolean; banned: boolean }>();
+  let inserts = 0;
+  for (const row of seed) rows.set(`testnet:${row.address}`, { faucetAllowed: row.faucetAllowed === true, banned: row.banned === true });
+  function read(network: NetworkId, address: string): WalletStanding {
+    const row = rows.get(`${network}:${address}`);
+    if (!row) return { network, faucetAllowed: false, banned: false, stored: false };
+    return { network, faucetAllowed: row.faucetAllowed, banned: row.banned, stored: true };
+  }
+  return {
+    inserts: () => inserts,
+    directory: {
+      async register(network, address) {
+        const key = `${network}:${address}`;
+        if (!rows.has(key)) {
+          rows.set(key, { faucetAllowed: false, banned: false });
+          inserts += 1;
+        }
+        return read(network, address);
+      },
+      async standing(network, address) {
+        return read(network, address);
+      },
+      async openToAll() {
+        return false;
+      },
+    },
+  };
+}

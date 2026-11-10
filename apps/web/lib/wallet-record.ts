@@ -39,6 +39,16 @@ function standingOf(network: NetworkId, row: { faucet_allowed: boolean; banned: 
 }
 
 /**
+ * A stand-in for the table, so a test can ban a wallet without Postgres.
+ * Production leaves it unset and talks to the database.
+ */
+export interface WalletDirectory {
+  register(network: NetworkId, address: string): Promise<WalletStanding>;
+  standing(network: NetworkId, address: string): Promise<WalletStanding>;
+  openToAll(): Promise<boolean>;
+}
+
+/**
  * Insert the wallet the first time it signs in. An existing row is returned
  * unchanged, including a ban or a faucet grant written before this login.
  */
@@ -46,7 +56,9 @@ export async function registerWallet(
   address: string,
   env: NodeJS.ProcessEnv = process.env,
   network: NetworkId = walletNetwork(env),
+  directory?: WalletDirectory,
 ): Promise<WalletStanding> {
+  if (directory) return directory.register(network, address);
   if (!hasDatabase(env)) return { network, ...OPEN };
   try {
     const inserted = await db(env)`
@@ -67,8 +79,34 @@ export async function registerWallet(
   }
 }
 
+/**
+ * Read the row without creating one. The faucet uses this: a request that
+ * has not proved the address must not insert it.
+ */
+export async function walletStanding(
+  address: string,
+  env: NodeJS.ProcessEnv = process.env,
+  network: NetworkId = walletNetwork(env),
+  directory?: WalletDirectory,
+): Promise<WalletStanding> {
+  if (directory) return directory.standing(network, address);
+  if (!hasDatabase(env)) return { network, ...OPEN };
+  try {
+    const rows = await db(env)`
+      select faucet_allowed, banned from wallet
+      where network = ${network} and address = ${address}`;
+    const row = rows[0] as { faucet_allowed: boolean; banned: boolean } | undefined;
+    if (!row) return { network, ...OPEN };
+    return standingOf(network, row);
+  } catch (err) {
+    console.warn('[wallet] read failed; treating the wallet as unbanned:', err instanceof Error ? err.message : err);
+    return { network, ...OPEN };
+  }
+}
+
 /** `config.faucet_open_to_all`. Missing row, missing table and no database are false. */
-export async function faucetOpenToAll(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+export async function faucetOpenToAll(env: NodeJS.ProcessEnv = process.env, directory?: WalletDirectory): Promise<boolean> {
+  if (directory) return directory.openToAll();
   if (!hasDatabase(env)) return false;
   try {
     const rows = await db(env)`select value from config where key = 'faucet_open_to_all'`;

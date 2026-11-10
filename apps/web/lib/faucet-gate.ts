@@ -6,7 +6,7 @@ import { guestTurnCounter, limiterUnavailableResponse, takeQuota, type TurnCount
 import { requestNetwork } from './server-network.ts';
 import { addressKind } from './stellar.ts';
 import { verifyWalletProof } from './wallet-proof-verify.ts';
-import { faucetOpenToAll, registerWallet, walletOpensFaucet } from './wallet-record.ts';
+import { faucetOpenToAll, walletOpensFaucet, walletStanding, type WalletDirectory } from './wallet-record.ts';
 
 /**
  * Everything POST /api/faucet decides before it touches the chain.
@@ -33,6 +33,7 @@ export async function gateFaucet(
   env: NodeJS.ProcessEnv = process.env,
   now: number = Date.now(),
   store: TurnCounter = guestTurnCounter(env),
+  wallets?: WalletDirectory,
 ): Promise<{ address: string; kind: 'account' | 'contract'; network: NetworkId } | Response> {
   const gated = await requireHuman(req, env);
   if (gated) return gated;
@@ -57,14 +58,16 @@ export async function gateFaucet(
   const kind = addressKind(address);
   if (!kind) return Response.json({ error: 'not a Stellar address' }, { status: 400 });
 
-  const standing = await registerWallet(address, env, network);
+  // Read only. Login is what inserts a row, after a proof. A bare address
+  // posted here must not become a wallet.
+  const standing = await walletStanding(address, env, network, wallets);
   if (standing.banned) {
     return Response.json({ error: 'wallet_banned', message: 'Esta cuenta no puede usar Changuito.' }, { status: 403 });
   }
 
   const auth = authorizeFaucet({ address, proof, now, env, net: network });
   if (!auth.ok) {
-    const open = walletOpensFaucet(standing, await faucetOpenToAll(env), auth.error);
+    const open = walletOpensFaucet(standing, await faucetOpenToAll(env, wallets), auth.error);
     if (!open) return Response.json({ error: auth.error, message: auth.message }, { status: auth.status });
     const signed = verifyWalletProof({ intent: 'faucet', address, proof, now });
     if (!signed.ok) {
