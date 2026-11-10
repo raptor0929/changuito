@@ -23,7 +23,7 @@ export const DEPLOYMENTS = {
     friendbotUrl: 'https://friendbot.stellar.org',
     /** stellar.expert's path segment: 'testnet' or 'public'. */
     explorerPath: 'testnet',
-    deployedAt: '2026-11-10T01:04:39.824Z',
+    deployedAt: '2026-11-10T02:47:45.729Z',
     /** Backend hot key: signs settle and refund (and mints, on testnet). */
     resolver: 'GBXBAOFWG4Y4ZQEDXH73BACYYCE7ODSKXHLXYVRPLJOYFRDCPWHGYGN5',
     /** Where a settled order's USDC ends up. The app never signs for it. */
@@ -36,8 +36,8 @@ export const DEPLOYMENTS = {
      * and an empty string matches nothing.
      */
     demoWallet: 'GDFF477UQUWOFIHSOEXPPOD5GPUSEW6OLGZB5FCPS6AFRAOPTMINA55X',
-    escrowId: 'CDBGEMWESQJNEGBJ46TMPXNI5KFZN5B23W6ACO6NZFQATWWYY2WW3HDF',
-    usdcId: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+    escrowId: 'CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX',
+    usdcId: 'CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E',
     /**
      * The issuer of the classic asset this network deposits in.
      *
@@ -51,7 +51,7 @@ export const DEPLOYMENTS = {
      * escrow and is no longer on the deposit rail — the two are separate
      * assets that share a code.
      */
-    usdcIssuer: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
+    usdcIssuer: 'GCGV3225QTJFJ32KTPJNOR5SYANP4QWNUGKKGKVK7ILMK4QACZHJTGJB',
     usdcCode: 'USDC',
     usdcDecimals: 7,
   },

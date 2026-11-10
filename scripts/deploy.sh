@@ -3,7 +3,7 @@
 # Deploys the contracts to a Stellar network and records their ids.
 #
 #   scripts/deploy.sh                    # testnet, deploy anything missing
-#   scripts/deploy.sh --force            # testnet, fresh ids, overwriting
+#   scripts/deploy.sh --force            # testnet, fresh ids (new mock_usdc + escrow), overwriting
 #   USDC_ISSUER=G... scripts/deploy.sh   # testnet, escrow over the USDC SAC, no mock_usdc
 #   scripts/deploy.sh mainnet            # mainnet — reads the checklist below
 #
@@ -219,9 +219,12 @@ USDC_ID="$USDC_ID" ESCROW_ID="$ESCROW_ID" USDC_ISSUER="${USDC_ISSUER:-}" OUT="$O
   }
   // Spread first: demoWallet is not a deploy identity and must survive a re-run.
   n.accounts = { ...n.accounts, resolver: RESOLVER_ADDR, treasury: TREASURY_ADDR };
-  // null, not '', on a network whose token has no issuer: the app reads that
-  // as 'there is no trustline to open here', and '' would read as 'unknown'.
-  const issuer = USDC_ISSUER || null;
+  // usdc.id is the escrow token; usdc.issuer is the classic asset the deposit
+  // rail takes. They differ whenever the escrow runs over mock_usdc, so a
+  // deploy without USDC_ISSUER keeps the issuer already recorded instead of
+  // overwriting it. null, not '', when there is none: the app reads that as
+  // 'there is no trustline to open here', and '' would read as 'unknown'.
+  const issuer = USDC_ISSUER || n.contracts.usdc.issuer || null;
   n.contracts = { usdc: { ...n.contracts.usdc, id: USDC_ID, issuer }, escrow: { id: ESCROW_ID } };
   fs.writeFileSync(OUT, JSON.stringify(d, null, 2) + '\n');
 "

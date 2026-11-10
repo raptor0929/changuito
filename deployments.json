@@ -7,7 +7,7 @@
       "horizonUrl": "https://horizon-testnet.stellar.org",
       "friendbotUrl": "https://friendbot.stellar.org",
       "explorerPath": "testnet",
-      "deployedAt": "2026-11-10T01:04:39.824Z",
+      "deployedAt": "2026-11-10T02:47:45.729Z",
       "accounts": {
         "resolver": "GBXBAOFWG4Y4ZQEDXH73BACYYCE7ODSKXHLXYVRPLJOYFRDCPWHGYGN5",
         "treasury": "GBKJHIKIZONKCCV2JVOGUDXEOPTQUZ2OKYZNV3R3LDALNZHCSF2JJEIF",
@@ -15,13 +15,13 @@
       },
       "contracts": {
         "usdc": {
-          "id": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+          "id": "CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E",
           "decimals": 7,
           "symbol": "USDC",
-          "issuer": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+          "issuer": "GCGV3225QTJFJ32KTPJNOR5SYANP4QWNUGKKGKVK7ILMK4QACZHJTGJB"
         },
         "escrow": {
-          "id": "CDBGEMWESQJNEGBJ46TMPXNI5KFZN5B23W6ACO6NZFQATWWYY2WW3HDF"
+          "id": "CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX"
         }
       }
     },
