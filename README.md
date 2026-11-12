@@ -186,14 +186,14 @@ Read this before the demo, not after it.
 
 ## Deployed on testnet
 
-Live since **2026-09-21**. `deployments.json` is the single source of truth for
-contract ids, and `stellar.test.ts` compares it against the ids baked into the
-generated bindings — so a redeploy that half-lands fails the suite rather than
-the demo.
+Live since **2026-09-21**. The shop uses the escrow in the table
+(`STELLAR_ESCROW_ID`). `deployments.json` still records the earlier contract
+the generated bindings were built from, and `stellar.test.ts` compares that
+file with those bindings.
 
 | | |
 |---|---|
-| **escrow** *(mintable `mock_usdc`)* | [`CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX`](https://stellar.expert/explorer/testnet/contract/CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX) |
+| **escrow** *(mintable `mock_usdc`)* | [`CA4BDF4U65OHCO6AB4KRJWBRZ4BJBZURDFNFKJDEZAKQRCUNJZFLN72S`](https://stellar.expert/explorer/testnet/contract/CA4BDF4U65OHCO6AB4KRJWBRZ4BJBZURDFNFKJDEZAKQRCUNJZFLN72S) |
 | **demo USDC** — SEP-41 faucet + escrow token, `USDC`, 7 decimals | [`CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E`](https://stellar.expert/explorer/testnet/contract/CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E) |
 | **classic deposit issuer** — memo-rail USDC only, not the escrow token | [`GCGV3225QTJFJ32KTPJNOR5SYANP4QWNUGKKGKVK7ILMK4QACZHJTGJB`](https://stellar.expert/explorer/testnet/account/GCGV3225QTJFJ32KTPJNOR5SYANP4QWNUGKKGKVK7ILMK4QACZHJTGJB) |
 | **resolver** — escrow resolver | [`GBXBAOFWG4Y4ZQEDXH73BACYYCE7ODSKXHLXYVRPLJOYFRDCPWHGYGN5`](https://stellar.expert/explorer/testnet/account/GBXBAOFWG4Y4ZQEDXH73BACYYCE7ODSKXHLXYVRPLJOYFRDCPWHGYGN5) |
@@ -204,13 +204,11 @@ Network passphrase `Test SDF Network ; September 2015`, RPC
 (`DEPOSIT_ADDRESS_TESTNET` / `DEPOSIT_ADDRESS_MAINNET`), not committed — mainnet
 has no contracts deployed and needs none for the payment rail.
 
-The escrow's constructor wired resolver, treasury and token in at deploy time and
-there is no setter, so who can settle and where the money lands are fixed. You do
-not have to take that from a README — ask the contract:
+Ask the contract who can settle and which token it holds:
 
 ```bash
 stellar contract invoke --network testnet \
-  --id CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX \
+  --id CA4BDF4U65OHCO6AB4KRJWBRZ4BJBZURDFNFKJDEZAKQRCUNJZFLN72S \
   --source-account GBXBAOFWG4Y4ZQEDXH73BACYYCE7ODSKXHLXYVRPLJOYFRDCPWHGYGN5 \
   --send=no -- config
 ```
@@ -223,6 +221,10 @@ account will do as `--source-account`.
 
 ## Verified on testnet
 
+The first open, the settle and the refund below were sent to the earlier
+contract `CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX`. The last
+row is on the escrow the shop uses now.
+
 Not by inspection — these are ledger entries:
 
 | | |
@@ -231,6 +233,7 @@ Not by inspection — these are ledger entries:
 | escrow settle | [`3410b8a0…`](https://stellar.expert/explorer/testnet/tx/3410b8a01e913b4613a5c23568392ad3d707e29f42bbdf0aa7a02cb09f3e68c3) — escrow → treasury, receipt recorded |
 | escrow refund | [`a64fb38a…`](https://stellar.expert/explorer/testnet/tx/a64fb38ac495112ff0fbc798fb45df67f945a4781cd80d6334155496581627c8) — escrow → buyer, balance back to the stroop |
 | faucet | [`03baa469…`](https://stellar.expert/explorer/testnet/tx/03baa469c514406487ea29c32da076d8c8af7725c2a67fb73f5f8ad056ca215a) — friendbot, then 50 USDC minted |
+| current escrow open | [`89c9e801…`](https://stellar.expert/explorer/testnet/tx/89c9e801eed9f430d04a789ae26870d1c780a1ca7b2ddd881c3510319314821d) — 11.44 USDC, fee paid by a Channels account |
 
 And the escrow receipt is checkable by hand. The settle above stored
 `881ae41cb172e10778dd6810e5c3e9be5fef54b266cb0686f4da446109f978d0`, which is:
