@@ -136,15 +136,16 @@ the default and it cannot spend anything.
 
 ## The escrow contract
 
-`CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX` — deployed on
-testnet against the mintable `mock_usdc`
+`CA4BDF4U65OHCO6AB4KRJWBRZ4BJBZURDFNFKJDEZAKQRCUNJZFLN72S` — the escrow the
+shop uses, on testnet against the mintable `mock_usdc`
 (`CAOPLEE4NVOVEBYRO7NHG5K4FEML5O5C5AATYBK4FCDLYRAJFZWBNN3E`), 19 tests. On the
 login network the shopper path mounts `PaymentModal`, which calls `open`
-through Pollar. The classic deposit issuer
-(`GCGV3225QTJFJ32KTPJNOR5SYANP4QWNUGKKGKVK7ILMK4QACZHJTGJB`) stays on the memo
-rail only — it is not the escrow token. An earlier `mock_usdc`
+through Pollar. `deployments.json` still names the earlier contract
+`CCA3ES6ANWAAJXB436XTSPGFRGX5GDZLHC7UOF25K4B5OFDJML4JG7EX`. The classic deposit
+issuer (`GCGV3225QTJFJ32KTPJNOR5SYANP4QWNUGKKGKVK7ILMK4QACZHJTGJB`) stays on
+the memo rail only — it is not the escrow token. An earlier `mock_usdc`
 (`CB63C7UVZ3PBALQ7IE37QU2ZX5X3UMTLJOHDRI2EW44JU26YDGLQUBJF`) and the Circle
-SAC escrow are not what `deployments.json` points at.
+SAC escrow are not this contract.
 
 ```rust
 open(buyer, order_id: BytesN<32>, amount: i128,
